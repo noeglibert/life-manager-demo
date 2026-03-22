@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Workout History - Life Manager{% endblock %}
+
+{% block content %}
+<div class="activity-page">
+    <div class="page-header">
+        <h1>Workout History</h1>
+    </div>
+
+    <!-- Summary Stats -->
+    <div class="activity-stats-banner">
+        <div class="stat-item">
+            <span class="stat-icon">{{ svg_icon('chart', 'stat-icon-svg') }}</span>
+            <div class="stat-info">
+                <span class="stat-number">{{ total_workouts }}</span>
+                <span class="stat-label">Total Workouts</span>
+            </div>
+        </div>
+        <div class="stat-item">
+            <span class="stat-icon">{{ svg_icon('muscle', 'stat-icon-svg') }}</span>
+            <div class="stat-info">
+                <span class="stat-number">{{ total_runs }}</span>
+                <span class="stat-label">Runs ({{ total_km }}km)</span>
+            </div>
+        </div>
+        <div class="stat-item">
+            <span class="stat-icon">{{ svg_icon('dumbbell', 'stat-icon-svg') }}</span>
+            <div class="stat-info">
+                <span class="stat-number">{{ total_gym }}</span>
+                <span class="stat-label">Gym Sessions</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter Tabs -->
+    <div class="type-switcher">
+        <a href="{{ url_for('activity_history', type='all') }}" class="type-switcher-btn {{ 'active' if workout_type == 'all' else '' }}">All</a>
+        <a href="{{ url_for('activity_history', type='run') }}" class="type-switcher-btn {{ 'active' if workout_type == 'run' else '' }}">{{ svg_icon('muscle', 'btn-icon-svg') }} Runs</a>
+        <a href="{{ url_for('activity_history', type='gym') }}" class="type-switcher-btn {{ 'active' if workout_type == 'gym' else '' }}">{{ svg_icon('dumbbell', 'btn-icon-svg') }} Gym</a>
+        <a href="{{ url_for('activity_history', type='cross-training') }}" class="type-switcher-btn {{ 'active' if workout_type == 'cross-training' else '' }}">{{ svg_icon('cycling', 'btn-icon-svg') }} Cross</a>
+    </div>
+
+    <!-- Workout List -->
+    {% if workouts.items %}
+    <div class="workout-list">
+        {% for w in workouts.items %}
+        <div class="workout-row workout-row-detailed {% if w.workout_type == 'gym' and w.exercises %}workout-row-gym{% endif %}" {% if w.workout_type == 'gym' and w.exercises %}onclick="this.classList.toggle('expanded')"{% endif %}>
+            <div class="workout-row-main">
+                <span class="workout-date">{{ w.date.strftime('%b %d, %Y') }}</span>
+                <span class="workout-type-icon">{% if w.workout_type == 'run' %}{{ svg_icon('muscle', 'inline-icon') }}{% elif w.workout_type == 'gym' %}{{ svg_icon('dumbbell', 'inline-icon') }}{% else %}{{ svg_icon('cycling', 'inline-icon') }}{% endif %}</span>
+                <span class="workout-title">{{ w.title or w.workout_type|capitalize }}</span>
+                <span class="workout-stats">
+                    {% if w.workout_type == 'run' %}
+                        {{ w.distance_km or 0 }}km · {{ (w.duration_minutes or 0)|duration_fmt }}
+                        {% if w.pace_per_km %} · {{ w.pace_per_km }}/km{% endif %}
+                        {% if w.effort %} · {{ w.effort }}{% endif %}
+                    {% else %}
+                        {{ (w.duration_minutes or 0)|duration_fmt }}
+                    {% endif %}
+                </span>
+                <span class="workout-xp">+{{ w.xp_earned }} XP</span>
+            </div>
+            {% if w.notes %}
+            <div class="workout-notes">{{ w.notes }}</div>
+            {% endif %}
+            {% if w.workout_type == 'gym' and w.exercises %}
+            {% set exercises = w.exercises|parse_exercises %}
+            {% if exercises %}
+            <div class="workout-exercises-detail">
+                {% for ex in exercises %}
+                <div class="exercise-detail-block">
+                    <div class="exercise-detail-name">{{ ex.name }}</div>
+                    {% if ex.sets is iterable and ex.sets is not string %}
+                    <table class="exercise-detail-table">
+                        <thead><tr><th>Set</th><th>Weight</th><th>Reps</th></tr></thead>
+                        <tbody>
+                        {% for s in ex.sets %}
+                        <tr{% if s.failed %} class="set-failed-row"{% endif %}>
+                            <td>{{ s.set or loop.index }}</td>
+                            <td>{{ s.weight_kg }}kg</td>
+                            <td>{{ s.reps }}{% if s.failed %} ✕{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <div style="font-size:0.8rem;color:var(--text-secondary)">{{ ex.sets or '?' }}×{{ ex.reps or '?' }} @ {{ ex.weight_kg or '?' }}kg</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if workouts.pages > 1 %}
+    <div class="pagination">
+        {% if workouts.has_prev %}
+        <a href="{{ url_for('activity_history', type=workout_type, page=workouts.prev_num) }}" class="btn-secondary">← Previous</a>
+        {% endif %}
+        <span class="page-info">Page {{ workouts.page }} of {{ workouts.pages }}</span>
+        {% if workouts.has_next %}
+        <a href="{{ url_for('activity_history', type=workout_type, page=workouts.next_num) }}" class="btn-secondary">Next →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <p class="empty-state">No workouts found. <a href="{{ url_for('activity_log') }}">Log your first workout!</a></p>
+    {% endif %}
+
+    <div class="plan-nav">
+        <a href="{{ url_for('activity') }}" class="btn-secondary">← Back to Activity</a>
+    </div>
+</div>
+{% endblock %}

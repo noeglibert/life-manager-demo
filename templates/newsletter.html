@@ -1,0 +1,568 @@
+{% extends "base.html" %}
+
+{% block title %}Newsletter - Life Manager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="newsletter-page">
+        <!-- Stats Banner -->
+        <div class="newsletter-stats-banner">
+            <div class="newsletter-stats-row">
+                <div class="newsletter-stat">
+                    <span class="newsletter-stat-value">{{ total_ideas }}</span>
+                    <span class="newsletter-stat-label">Ideas</span>
+                </div>
+                <div class="newsletter-stat">
+                    <span class="newsletter-stat-value">{{ backlog_ideas|selectattr('status', 'equalto', 'used')|list|length }}</span>
+                    <span class="newsletter-stat-label">Used</span>
+                </div>
+                <div class="newsletter-stat">
+                    <span class="newsletter-stat-value">{{ game_stats.newsletter_ideas_total or 0 }}</span>
+                    <span class="newsletter-stat-label">All Time</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Issues Section -->
+        <div class="newsletter-card nl-issues-section">
+            <div class="column-header">
+                <h3>{{ svg_icon('scroll', 'inline-icon') }} Issues</h3>
+                <span class="column-count">{{ issues|length }}</span>
+            </div>
+            <form id="newIssueForm" class="nl-new-issue-form">
+                <input type="text" id="newIssueTitle" placeholder="New issue title..." required>
+                <input type="date" id="newIssueDate">
+                <button type="submit" class="btn-primary btn-small">Create</button>
+            </form>
+            <div class="nl-issues-list" id="issuesList">
+                {% if issues %}
+                    {% for issue in issues %}
+                    <a href="{{ url_for('newsletter_editor', issue_id=issue.id) }}" class="nl-issue-card">
+                        <div class="nl-issue-card-info">
+                            <h4>{{ issue.title }}</h4>
+                            <p>
+                                {{ issue.created_at.strftime('%b %d, %Y') }}
+                                {% if issue.target_date %} &middot; Target: {{ issue.target_date.strftime('%b %d') }}{% endif %}
+                            </p>
+                        </div>
+                        <span class="nl-status-badge status-{{ issue.status }}">{{ issue.status|title }}</span>
+                        <span class="nl-issue-card-action">
+                            {% if issue.status == 'sent' %}
+                            {{ svg_icon('check', 'inline-icon') }} View
+                            {% elif issue.content %}
+                            {{ svg_icon('pencil', 'inline-icon') }} Edit
+                            {% else %}
+                            {{ svg_icon('writing', 'inline-icon') }} Write
+                            {% endif %}
+                        </span>
+                    </a>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-column" id="issuesEmpty">No issues yet. Create your first one!</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Quick Add Idea -->
+        <div class="newsletter-card quick-add-card">
+            <h3>Add an Idea</h3>
+            <form id="addIdeaForm" class="quick-add-form">
+                <div class="quick-add-top">
+                    <input type="text" id="ideaTitle" placeholder="What's the idea?" required>
+                    <select id="ideaCategory">
+                        <option value="tech">Tech</option>
+                        <option value="life">Life</option>
+                        <option value="recommendation">Recommendation</option>
+                        <option value="story">Story</option>
+                        <option value="question">Question</option>
+                        <option value="misc" selected>Misc</option>
+                    </select>
+                    <button type="submit" class="btn-primary">Add</button>
+                </div>
+                <textarea id="ideaNotes" placeholder="Notes (optional)..." rows="2"></textarea>
+            </form>
+        </div>
+
+        <!-- Export Bar (appears when ideas are checked) -->
+        <div class="export-bar" id="exportBar" style="display:none;">
+            <span id="selectedCount">0</span> selected
+            <button class="btn-primary btn-small" onclick="exportSelected()">{{ svg_icon('clipboard', 'btn-icon-svg') }} Copy to Clipboard</button>
+            <button class="btn-small" onclick="markUsed()">Mark as Used</button>
+            <button class="btn-small" onclick="clearSelection()">Clear</button>
+        </div>
+
+        <!-- Ideas List -->
+        <div class="newsletter-card">
+            <div class="column-header">
+                <h3>Ideas</h3>
+                <div class="header-actions">
+                    <label class="show-used-toggle">
+                        <input type="checkbox" id="showUsed" onchange="toggleUsed()"> Show used
+                    </label>
+                    <span class="column-count" id="ideasCount">{{ backlog_ideas|length }}</span>
+                </div>
+            </div>
+            <div class="category-filter">
+                <button class="filter-pill active" data-filter="all" onclick="filterIdeas('all', this)">All</button>
+                <button class="filter-pill" data-filter="tech" onclick="filterIdeas('tech', this)">Tech</button>
+                <button class="filter-pill" data-filter="life" onclick="filterIdeas('life', this)">Life</button>
+                <button class="filter-pill" data-filter="recommendation" onclick="filterIdeas('recommendation', this)">Rec</button>
+                <button class="filter-pill" data-filter="story" onclick="filterIdeas('story', this)">Story</button>
+                <button class="filter-pill" data-filter="question" onclick="filterIdeas('question', this)">Q</button>
+                <button class="filter-pill" data-filter="misc" onclick="filterIdeas('misc', this)">Misc</button>
+            </div>
+            <div class="ideas-list" id="ideasList">
+                {% if backlog_ideas %}
+                    {% for idea in backlog_ideas %}
+                    <div class="idea-card {% if idea.status == 'used' %}idea-used{% endif %}" data-id="{{ idea.id }}" data-category="{{ idea.category }}" data-status="{{ idea.status }}" {% if idea.status == 'used' %}style="display:none;"{% endif %}>
+                        <div class="idea-card-left">
+                            <input type="checkbox" class="idea-checkbox" data-id="{{ idea.id }}" onchange="updateSelection()">
+                        </div>
+                        <div class="idea-card-content">
+                            <div class="idea-card-top">
+                                <span class="category-dot cat-{{ idea.category }}"></span>
+                                <span class="idea-title">{{ idea.title }}</span>
+                                {% if idea.status == 'used' %}<span class="used-badge">used</span>{% endif %}
+                            </div>
+                            {% if idea.notes %}
+                            <div class="idea-notes">{{ idea.notes }}</div>
+                            {% endif %}
+                            <div class="idea-card-bottom">
+                                <span class="idea-date">{{ idea.created_at.strftime('%b %d') }}</span>
+                                <div class="idea-actions">
+                                    <button class="idea-btn edit-btn" onclick="editIdea({{ idea.id }})" title="Edit">{{ svg_icon('pencil', 'btn-icon-svg') }}</button>
+                                    <button class="idea-btn delete-btn" onclick="deleteIdea({{ idea.id }})" title="Delete">&times;</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-column" id="ideasEmpty">No ideas yet. Add your first one above!</div>
+                {% endif %}
+            </div>
+        </div>
+        <!-- Mailing List -->
+        <div class="newsletter-card mailing-list-card">
+            <div class="column-header">
+                <h3>Mailing List</h3>
+                <span class="column-count">{{ subscribers|length }} total</span>
+            </div>
+
+            <!-- Add subscriber form -->
+            <form id="addSubscriberForm" class="subscriber-add-form">
+                <input type="text" id="subName" placeholder="Name" class="sub-name-input">
+                <input type="email" id="subEmail" placeholder="Email" required class="sub-email-input">
+                <button type="submit" class="btn-primary btn-small">Add</button>
+            </form>
+
+            <div style="margin: 0.75rem 0 0.5rem; text-align: right; display: flex; gap: 0.5rem; justify-content: flex-end;">
+                <button class="btn-small" onclick="syncNetlify()" title="Pull new signups from Netlify" id="syncNetlifyBtn">Sync Netlify</button>
+                <button class="btn-small" onclick="copyEmails()" title="Copy all emails">Copy Emails</button>
+            </div>
+
+            <div class="subscriber-list" id="listEN">
+                {% if subscribers %}
+                    {% for sub in subscribers %}
+                    <div class="subscriber-row" data-id="{{ sub.id }}" data-email="{{ sub.email }}">
+                        <span class="subscriber-name">{{ sub.name or '—' }}</span>
+                        <span class="subscriber-email">{{ sub.email }}</span>
+                        {% if sub.notes %}<span class="subscriber-note-icon" title="{{ sub.notes|e }}">{{ svg_icon('question', 'btn-icon-svg') }}</span>{% endif %}
+                        <button class="idea-btn delete-btn" onclick="removeSubscriber({{ sub.id }})" title="Remove">&times;</button>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-column sub-empty">No subscribers yet</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Create new issue
+document.getElementById('newIssueForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const title = document.getElementById('newIssueTitle').value.trim();
+    if (!title) return;
+
+    const targetDate = document.getElementById('newIssueDate').value;
+
+    try {
+        const resp = await fetch('/api/newsletter/issue', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, target_date: targetDate })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            const issue = data.issue;
+            const empty = document.getElementById('issuesEmpty');
+            if (empty) empty.remove();
+
+            const dateStr = new Date(issue.target_date || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const link = document.createElement('a');
+            link.href = `/newsletter/edit/${issue.id}`;
+            link.className = 'nl-issue-card';
+            const info = document.createElement('div');
+            info.className = 'nl-issue-card-info';
+            const h4 = document.createElement('h4');
+            h4.textContent = issue.title;
+            const p = document.createElement('p');
+            p.textContent = 'Just now' + (issue.target_date ? ' \u00b7 Target: ' + dateStr : '');
+            info.appendChild(h4);
+            info.appendChild(p);
+            const badge = document.createElement('span');
+            badge.className = 'nl-status-badge status-planning';
+            badge.textContent = 'Planning';
+            const action = document.createElement('span');
+            action.className = 'nl-issue-card-action';
+            action.textContent = 'Write';
+            link.appendChild(info);
+            link.appendChild(badge);
+            link.appendChild(action);
+            document.getElementById('issuesList').prepend(link);
+
+            document.getElementById('newIssueTitle').value = '';
+            document.getElementById('newIssueDate').value = '';
+
+            if (data.xp_earned) showNotification(`+${data.xp_earned} XP`);
+        }
+    } catch (err) {
+        alert('Error creating issue');
+    }
+});
+
+// Add idea
+document.getElementById('addIdeaForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const title = document.getElementById('ideaTitle').value.trim();
+    if (!title) return;
+
+    const data = {
+        title: title,
+        notes: document.getElementById('ideaNotes').value.trim(),
+        category: document.getElementById('ideaCategory').value
+    };
+
+    try {
+        const resp = await fetch('/api/newsletter/idea', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        const result = await resp.json();
+        if (result.success) {
+            const idea = result.idea;
+            const empty = document.getElementById('ideasEmpty');
+            if (empty) empty.remove();
+
+            const html = `
+                <div class="idea-card" data-id="${idea.id}" data-category="${idea.category}" data-status="backlog">
+                    <div class="idea-card-left">
+                        <input type="checkbox" class="idea-checkbox" data-id="${idea.id}" onchange="updateSelection()">
+                    </div>
+                    <div class="idea-card-content">
+                        <div class="idea-card-top">
+                            <span class="category-dot cat-${idea.category}"></span>
+                            <span class="idea-title">${idea.title}</span>
+                        </div>
+                        ${idea.notes ? `<div class="idea-notes">${idea.notes}</div>` : ''}
+                        <div class="idea-card-bottom">
+                            <span class="idea-date">${idea.created_at}</span>
+                            <div class="idea-actions">
+                                <button class="idea-btn edit-btn" onclick="editIdea(${idea.id})" title="Edit">✏️</button>
+                                <button class="idea-btn delete-btn" onclick="deleteIdea(${idea.id})" title="Delete">&times;</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            document.getElementById('ideasList').insertAdjacentHTML('afterbegin', html);
+            updateIdeasCount();
+
+            document.getElementById('ideaTitle').value = '';
+            document.getElementById('ideaNotes').value = '';
+
+            if (result.xp_earned) showNotification(`+${result.xp_earned} XP`);
+            if (result.achievements) result.achievements.forEach(a => showNotification(`🏆 ${a}`));
+        }
+    } catch (err) {
+        alert('Error adding idea');
+    }
+});
+
+// Selection & Export
+function updateSelection() {
+    const checked = document.querySelectorAll('.idea-checkbox:checked');
+    const bar = document.getElementById('exportBar');
+    document.getElementById('selectedCount').textContent = checked.length;
+    bar.style.display = checked.length > 0 ? 'flex' : 'none';
+}
+
+function clearSelection() {
+    document.querySelectorAll('.idea-checkbox:checked').forEach(cb => cb.checked = false);
+    updateSelection();
+}
+
+async function exportSelected() {
+    const checked = document.querySelectorAll('.idea-checkbox:checked');
+    if (!checked.length) return;
+
+    let lines = ['# Newsletter Draft', '', '## Topics', ''];
+    let i = 1;
+    checked.forEach(cb => {
+        const card = cb.closest('.idea-card');
+        const title = card.querySelector('.idea-title').textContent;
+        const notesEl = card.querySelector('.idea-notes');
+        const notes = notesEl ? notesEl.textContent.trim() : '';
+        lines.push(`${i}. **${title}**`);
+        if (notes) lines.push(`   ${notes}`);
+        lines.push('');
+        i++;
+    });
+
+    try {
+        await navigator.clipboard.writeText(lines.join('\n'));
+        showNotification('📋 Copied to clipboard!');
+    } catch (err) {
+        // Fallback
+        const ta = document.createElement('textarea');
+        ta.value = lines.join('\n');
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+        showNotification('📋 Copied to clipboard!');
+    }
+}
+
+async function markUsed() {
+    const checked = document.querySelectorAll('.idea-checkbox:checked');
+    if (!checked.length) return;
+
+    for (const cb of checked) {
+        const id = cb.dataset.id;
+        try {
+            await fetch(`/api/newsletter/idea/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: 'used' })
+            });
+            const card = cb.closest('.idea-card');
+            card.dataset.status = 'used';
+            card.classList.add('idea-used');
+            const top = card.querySelector('.idea-card-top');
+            if (!top.querySelector('.used-badge')) {
+                top.insertAdjacentHTML('beforeend', '<span class="used-badge">used</span>');
+            }
+            cb.checked = false;
+            if (!document.getElementById('showUsed').checked) {
+                card.style.display = 'none';
+            }
+        } catch (err) { console.error(err); }
+    }
+    updateSelection();
+    updateIdeasCount();
+    showNotification('Marked as used');
+}
+
+// Delete idea
+async function deleteIdea(ideaId) {
+    if (!confirm('Delete this idea?')) return;
+    try {
+        await fetch(`/api/newsletter/idea/${ideaId}`, { method: 'DELETE' });
+        const card = document.querySelector(`.idea-card[data-id="${ideaId}"]`);
+        if (card) card.remove();
+        updateIdeasCount();
+    } catch (err) { alert('Error deleting idea'); }
+}
+
+// Edit idea (inline)
+function editIdea(ideaId) {
+    const card = document.querySelector(`.idea-card[data-id="${ideaId}"]`);
+    const titleEl = card.querySelector('.idea-title');
+    const notesEl = card.querySelector('.idea-notes');
+    const oldTitle = titleEl.textContent;
+    const oldNotes = notesEl ? notesEl.textContent : '';
+
+    titleEl.innerHTML = `<input type="text" class="inline-edit" value="${oldTitle}" id="edit-title-${ideaId}">`;
+    if (notesEl) {
+        notesEl.innerHTML = `<textarea class="inline-edit" id="edit-notes-${ideaId}">${oldNotes}</textarea>`;
+    } else {
+        const top = card.querySelector('.idea-card-top');
+        top.insertAdjacentHTML('afterend', `<div class="idea-notes"><textarea class="inline-edit" id="edit-notes-${ideaId}" placeholder="Add notes..."></textarea></div>`);
+    }
+
+    const editBtn = card.querySelector('.edit-btn');
+    editBtn.textContent = '💾';
+    editBtn.onclick = async () => {
+        const newTitle = document.getElementById(`edit-title-${ideaId}`).value.trim();
+        const newNotes = document.getElementById(`edit-notes-${ideaId}`).value.trim();
+        if (!newTitle) return;
+        try {
+            await fetch(`/api/newsletter/idea/${ideaId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title: newTitle, notes: newNotes })
+            });
+            titleEl.textContent = newTitle;
+            const notesContainer = card.querySelector('.idea-notes');
+            if (newNotes) {
+                notesContainer.textContent = newNotes;
+            } else if (notesContainer) {
+                notesContainer.remove();
+            }
+            editBtn.textContent = '✏️';
+            editBtn.onclick = () => editIdea(ideaId);
+        } catch (err) { alert('Error saving'); }
+    };
+}
+
+// Filter by category
+function filterIdeas(category, btn) {
+    document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    const showUsed = document.getElementById('showUsed').checked;
+
+    document.querySelectorAll('#ideasList .idea-card').forEach(card => {
+        const matchesCat = category === 'all' || card.dataset.category === category;
+        const matchesStatus = showUsed || card.dataset.status !== 'used';
+        card.style.display = (matchesCat && matchesStatus) ? '' : 'none';
+    });
+}
+
+// Toggle show used ideas
+function toggleUsed() {
+    const activeFilter = document.querySelector('.filter-pill.active');
+    const category = activeFilter ? activeFilter.dataset.filter : 'all';
+    filterIdeas(category, activeFilter);
+    updateIdeasCount();
+}
+
+function updateIdeasCount() {
+    const visible = document.querySelectorAll('#ideasList .idea-card:not([style*="display: none"])').length;
+    document.getElementById('ideasCount').textContent = visible;
+}
+
+function showNotification(msg) {
+    const n = document.createElement('div');
+    n.className = 'nutrition-notification';
+    n.textContent = msg;
+    document.body.appendChild(n);
+    setTimeout(() => n.classList.add('show'), 10);
+    setTimeout(() => { n.classList.remove('show'); setTimeout(() => n.remove(), 300); }, 2500);
+}
+
+// Mailing list
+document.getElementById('addSubscriberForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('subName').value.trim();
+    const email = document.getElementById('subEmail').value.trim();
+    if (!email) return;
+
+    try {
+        const resp = await fetch('/api/newsletter/subscriber', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email, language: 'en' })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            const sub = data.subscriber;
+            const list = document.getElementById('listEN');
+            const empty = list.querySelector('.sub-empty');
+            if (empty) empty.remove();
+
+            const row = document.createElement('div');
+            row.className = 'subscriber-row';
+            row.dataset.id = sub.id;
+            row.dataset.email = sub.email;
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'subscriber-name';
+            nameSpan.textContent = sub.name || '\u2014';
+            const emailSpan = document.createElement('span');
+            emailSpan.className = 'subscriber-email';
+            emailSpan.textContent = sub.email;
+            const delBtn = document.createElement('button');
+            delBtn.className = 'idea-btn delete-btn';
+            delBtn.title = 'Remove';
+            delBtn.textContent = '\u00d7';
+            delBtn.onclick = () => removeSubscriber(sub.id);
+            row.appendChild(nameSpan);
+            row.appendChild(emailSpan);
+            row.appendChild(delBtn);
+            list.appendChild(row);
+            updateSubCount();
+
+            document.getElementById('subName').value = '';
+            document.getElementById('subEmail').value = '';
+            showNotification(data.reactivated ? 'Reactivated!' : 'Added!');
+        } else {
+            showNotification(data.error || 'Error');
+        }
+    } catch (err) { alert('Error adding subscriber'); }
+});
+
+async function removeSubscriber(id) {
+    if (!confirm('Remove this subscriber?')) return;
+    try {
+        await fetch(`/api/newsletter/subscriber/${id}`, { method: 'DELETE' });
+        const row = document.querySelector(`.subscriber-row[data-id="${id}"]`);
+        if (row) row.remove();
+        updateSubCount();
+    } catch (err) { alert('Error removing subscriber'); }
+}
+
+async function copyEmails() {
+    const emails = Array.from(document.querySelectorAll('#listEN .subscriber-row'))
+        .map(r => r.dataset.email)
+        .filter(Boolean);
+    if (!emails.length) {
+        showNotification('No emails to copy');
+        return;
+    }
+    try {
+        await navigator.clipboard.writeText(emails.join(', '));
+    } catch (err) {
+        const ta = document.createElement('textarea');
+        ta.value = emails.join(', ');
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+    }
+    showNotification(`Copied ${emails.length} emails!`);
+}
+
+function updateSubCount() {
+    const count = document.querySelectorAll('#listEN .subscriber-row').length;
+    document.querySelector('.column-count').textContent = count + ' total';
+}
+
+async function syncNetlify() {
+    const btn = document.getElementById('syncNetlifyBtn');
+    btn.disabled = true;
+    btn.textContent = 'Syncing...';
+    try {
+        const resp = await fetch('/api/newsletter/sync-netlify', { method: 'POST' });
+        const data = await resp.json();
+        if (data.success) {
+            if (data.added > 0) {
+                showNotification(`Synced ${data.added} new subscriber${data.added > 1 ? 's' : ''}!`);
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showNotification('No new subscribers to sync');
+            }
+        } else {
+            showNotification(data.error || 'Sync failed');
+        }
+    } catch (err) {
+        showNotification('Sync failed — check connection');
+    }
+    btn.disabled = false;
+    btn.textContent = 'Sync Netlify';
+}
+</script>
+{% endblock %}

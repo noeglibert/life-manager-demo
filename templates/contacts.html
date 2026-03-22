@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Contacts - Life Manager{% endblock %}
+
+{% block content %}
+<div class="contacts-page">
+    <div class="page-header">
+        <h1>Contacts</h1>
+        <a href="{{ url_for('contact_new') }}" class="btn-primary">Add New Contact</a>
+    </div>
+
+    <div class="filters">
+        <form method="GET" class="filter-form">
+            <input type="text" name="search" placeholder="Search contacts..." value="{{ request.args.get('search', '') }}">
+            <select name="category">
+                <option value="">All Categories</option>
+                {% for cat in categories %}
+                    <option value="{{ cat }}" {% if request.args.get('category') == cat %}selected{% endif %}>
+                        {{ cat }}
+                    </option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn-secondary">Filter</button>
+            <a href="{{ url_for('contacts_list') }}" class="btn-secondary">Clear</a>
+        </form>
+    </div>
+
+    {% if contacts %}
+        <div class="contacts-table-wrapper">
+            <table class="contacts-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Category</th>
+                        <th>Language</th>
+                        <th>Contact Info</th>
+                        <th>Last Contacted</th>
+                        <th>Days Since</th>
+                        <th>Journal Mention</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for contact in contacts %}
+                        <tr class="{% if contact.days_since_contact and contact.days_since_contact > 30 %}needs-attention{% elif contact.days_since_contact and contact.days_since_contact > 14 %}warning-row{% endif %}">
+                            <td class="name-cell">
+                                <a href="{{ url_for('contact_detail', contact_id=contact.id) }}">
+                                    {{ contact.full_name }}
+                                </a>
+                            </td>
+                            <td class="category-cell">
+                                <span class="category-badge">{% if contact.relationship_category == 'MAKB' %}{{ svg_icon('skull', 'inline-icon') }} {% endif %}{{ contact.relationship_category or 'Uncategorized' }}</span>
+                            </td>
+                            <td class="language-cell">
+                                {{ contact.preferred_language or '-' }}
+                            </td>
+                            <td class="contact-info-cell">
+                                {% if contact.email %}
+                                    <div>{{ svg_icon('envelope', 'inline-icon') }} {{ contact.email }}</div>
+                                {% endif %}
+                                {% if contact.phone %}
+                                    <div>{{ svg_icon('phone', 'inline-icon') }} {{ contact.phone }}</div>
+                                {% endif %}
+                                {% if not contact.email and not contact.phone %}
+                                    <span class="no-info">No contact info</span>
+                                {% endif %}
+                            </td>
+                            <td class="date-cell">
+                                {% if contact.last_contacted_date %}
+                                    {{ contact.last_contacted_date.strftime('%b %d, %Y') }}
+                                {% else %}
+                                    <span class="never-contacted">Never</span>
+                                {% endif %}
+                            </td>
+                            <td class="days-cell">
+                                {% if contact.days_since_contact %}
+                                    <span class="days-badge {% if contact.days_since_contact > 30 %}urgent{% elif contact.days_since_contact > 14 %}warning{% else %}good{% endif %}">
+                                        {{ contact.days_since_contact }} days
+                                    </span>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td class="notes-cell">
+                                {% if contact.id in contact_mentions %}
+                                    <div class="recent-mention">
+                                        <span class="mention-date">{{ contact_mentions[contact.id].date.strftime('%b %d') }}:</span>
+                                        "{{ contact_mentions[contact.id].sentence[:80] }}{% if contact_mentions[contact.id].sentence|length > 80 %}...{% endif %}"
+                                    </div>
+                                {% else %}
+                                    <span class="no-mentions">No journal mentions yet</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p class="empty-state">No contacts found. <a href="{{ url_for('contact_new') }}">Add your first contact</a></p>
+    {% endif %}
+</div>
+{% endblock %}

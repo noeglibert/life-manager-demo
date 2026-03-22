@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <filter id="pencilTexture">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+  <g filter="url(#pencilTexture)">
+    <!-- Main horizontal line -->
+    <path d="M28 60 L88 60" stroke="#5D4037" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M29 61 L89 61" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <!-- Arrowhead -->
+    <path d="M72 42 L90 60 L72 78" stroke="#5D4037" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M73 43 L91 61 L73 79" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+    <!-- Gold highlight on arrowhead -->
+    <path d="M76 46 Q84 50 88 58" stroke="#D4A574" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+  </g>
+  <path d="M10 105 L12 103" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+</svg>

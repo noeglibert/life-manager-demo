@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+
+{% block title %}Nutrition Setup - Life Manager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="nutrition-setup-page">
+        <div class="page-header">
+            <h1>{{ 'Update' if profile else 'Set Up' }} Your Nutrition Profile</h1>
+            <p class="subtitle">Enter your body stats and we'll calculate your daily calorie target</p>
+        </div>
+
+        <div class="setup-form-card">
+            <form id="nutritionSetupForm" class="nutrition-setup-form">
+                <div class="form-section">
+                    <h3>Body Stats</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="height">Height (cm)</label>
+                            <input type="number" id="height" name="height_cm" value="{{ profile.height_cm|default(170) if profile else 170 }}" min="100" max="250" step="0.5" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="weight">Weight (kg)</label>
+                            <input type="number" id="weight" name="weight_kg" value="{{ profile.weight_kg|default(70) if profile else 70 }}" min="30" max="300" step="0.1" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="age">Age</label>
+                            <input type="number" id="age" name="age" value="{{ profile.age|default(25) if profile else 25 }}" min="10" max="120" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="sex">Sex</label>
+                            <select id="sex" name="sex">
+                                <option value="male" {{ 'selected' if profile and profile.sex == 'male' }}>Male</option>
+                                <option value="female" {{ 'selected' if profile and profile.sex == 'female' }}>Female</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="activity">Activity Level</label>
+                        <select id="activity" name="activity_level">
+                            <option value="sedentary" {{ 'selected' if profile and profile.activity_level == 'sedentary' }}>Sedentary (office job, little exercise)</option>
+                            <option value="light" {{ 'selected' if profile and profile.activity_level == 'light' }}>Light (1-3 days/week exercise)</option>
+                            <option value="moderate" {{ 'selected' if profile and profile.activity_level == 'moderate' }}>Moderate (3-5 days/week exercise)</option>
+                            <option value="active" {{ 'selected' if profile and profile.activity_level == 'active' }}>Active (6-7 days/week exercise)</option>
+                            <option value="very_active" {{ 'selected' if profile and profile.activity_level == 'very_active' }}>Very Active (athlete, physical job)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Dietary Preferences</h3>
+                    <div class="form-group">
+                        <label for="preferences">Preferences & restrictions (optional)</label>
+                        <textarea id="preferences" name="dietary_preferences" rows="3" placeholder="e.g., vegetarian, no nuts, Mediterranean style, low-carb...">{{ profile.dietary_preferences if profile else '' }}</textarea>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Macro Split</h3>
+                    <p class="hint">Adjust how your calories should be distributed</p>
+                    <div class="macro-sliders">
+                        <div class="macro-slider-group">
+                            <label>Protein: <span id="proteinVal">{{ profile.protein_target_pct if profile else 30 }}%</span></label>
+                            <input type="range" id="proteinSlider" min="10" max="60" value="{{ profile.protein_target_pct if profile else 30 }}" class="macro-slider protein-slider">
+                        </div>
+                        <div class="macro-slider-group">
+                            <label>Carbs: <span id="carbsVal">{{ profile.carbs_target_pct if profile else 40 }}%</span></label>
+                            <input type="range" id="carbsSlider" min="10" max="70" value="{{ profile.carbs_target_pct if profile else 40 }}" class="macro-slider carbs-slider">
+                        </div>
+                        <div class="macro-slider-group">
+                            <label>Fat: <span id="fatVal">{{ profile.fat_target_pct if profile else 30 }}%</span></label>
+                            <input type="range" id="fatSlider" min="10" max="60" value="{{ profile.fat_target_pct if profile else 30 }}" class="macro-slider fat-slider">
+                        </div>
+                        <div class="macro-total" id="macroTotal">Total: 100%</div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Calorie Target (optional override)</h3>
+                    <p class="hint">Leave at 0 to use the calculated TDEE</p>
+                    <div class="form-group">
+                        <input type="number" id="calorieOverride" name="calorie_target" value="0" min="0" max="10000" placeholder="0 = auto-calculate">
+                    </div>
+                </div>
+
+                <div class="setup-result" id="setupResult" style="display:none;">
+                    <div class="result-card">
+                        <div class="result-item">
+                            <span class="result-label">BMR</span>
+                            <span class="result-value" id="resultBMR">-</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="result-label">TDEE</span>
+                            <span class="result-value" id="resultTDEE">-</span>
+                        </div>
+                        <div class="result-item highlight">
+                            <span class="result-label">Your Daily Target</span>
+                            <span class="result-value" id="resultTarget">-</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn-secondary" onclick="calculatePreview()">Calculate Preview</button>
+                    <button type="submit" class="btn-primary">Save & Start Tracking</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const proteinSlider = document.getElementById('proteinSlider');
+const carbsSlider = document.getElementById('carbsSlider');
+const fatSlider = document.getElementById('fatSlider');
+const macroTotal = document.getElementById('macroTotal');
+
+function updateMacros() {
+    const p = parseInt(proteinSlider.value);
+    const c = parseInt(carbsSlider.value);
+    const f = parseInt(fatSlider.value);
+    document.getElementById('proteinVal').textContent = p + '%';
+    document.getElementById('carbsVal').textContent = c + '%';
+    document.getElementById('fatVal').textContent = f + '%';
+    const total = p + c + f;
+    macroTotal.textContent = `Total: ${total}%`;
+    macroTotal.className = 'macro-total' + (total !== 100 ? ' warning' : '');
+}
+
+proteinSlider.addEventListener('input', updateMacros);
+carbsSlider.addEventListener('input', updateMacros);
+fatSlider.addEventListener('input', updateMacros);
+
+function calculatePreview() {
+    const height = parseFloat(document.getElementById('height').value);
+    const weight = parseFloat(document.getElementById('weight').value);
+    const age = parseInt(document.getElementById('age').value);
+    const sex = document.getElementById('sex').value;
+    const activity = document.getElementById('activity').value;
+
+    let bmr;
+    if (sex === 'male') {
+        bmr = 10 * weight + 6.25 * height - 5 * age + 5;
+    } else {
+        bmr = 10 * weight + 6.25 * height - 5 * age - 161;
+    }
+
+    const multipliers = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
+    const tdee = Math.round(bmr * (multipliers[activity] || 1.55));
+
+    const override = parseInt(document.getElementById('calorieOverride').value) || 0;
+    const target = override > 0 ? override : tdee;
+
+    document.getElementById('resultBMR').textContent = Math.round(bmr) + ' cal';
+    document.getElementById('resultTDEE').textContent = tdee + ' cal';
+    document.getElementById('resultTarget').textContent = target + ' cal/day';
+    document.getElementById('setupResult').style.display = 'block';
+}
+
+document.getElementById('nutritionSetupForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const total = parseInt(proteinSlider.value) + parseInt(carbsSlider.value) + parseInt(fatSlider.value);
+    if (total !== 100) {
+        alert('Macro percentages must add up to 100%');
+        return;
+    }
+
+    const data = {
+        height_cm: parseFloat(document.getElementById('height').value),
+        weight_kg: parseFloat(document.getElementById('weight').value),
+        age: parseInt(document.getElementById('age').value),
+        sex: document.getElementById('sex').value,
+        activity_level: document.getElementById('activity').value,
+        dietary_preferences: document.getElementById('preferences').value,
+        protein_pct: parseInt(proteinSlider.value),
+        carbs_pct: parseInt(carbsSlider.value),
+        fat_pct: parseInt(fatSlider.value),
+        calorie_target: parseInt(document.getElementById('calorieOverride').value) || 0
+    };
+
+    try {
+        const resp = await fetch('/api/nutrition/setup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        const result = await resp.json();
+        if (result.success) {
+            window.location.href = '/nutrition';
+        } else {
+            alert(result.error || 'Error saving profile');
+        }
+    } catch (err) {
+        alert('Error saving profile');
+    }
+});
+</script>
+{% endblock %}

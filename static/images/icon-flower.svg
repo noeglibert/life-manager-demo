@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs><filter id="pencilTexture"><feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G"/></filter></defs>
+  <g filter="url(#pencilTexture)">
+    <path d="M58 65 Q56 85 55 110" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M55 85 Q40 78 30 82" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M57 95 Q72 88 80 92" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <ellipse cx="60" cy="35" rx="12" ry="16" stroke="#5D4037" stroke-width="2" fill="none" transform="rotate(0 60 50)"/>
+    <ellipse cx="60" cy="35" rx="12" ry="16" stroke="#5D4037" stroke-width="2" fill="none" transform="rotate(72 60 50)"/>
+    <ellipse cx="60" cy="35" rx="12" ry="16" stroke="#5D4037" stroke-width="2" fill="none" transform="rotate(144 60 50)"/>
+    <ellipse cx="60" cy="35" rx="12" ry="16" stroke="#5D4037" stroke-width="2" fill="none" transform="rotate(216 60 50)"/>
+    <ellipse cx="60" cy="35" rx="12" ry="16" stroke="#5D4037" stroke-width="2" fill="none" transform="rotate(288 60 50)"/>
+    <circle cx="60" cy="50" r="8" stroke="#5D4037" stroke-width="2" fill="none"/>
+    <circle cx="60" cy="50" r="4" stroke="#D4A574" stroke-width="1.5" fill="none" opacity="0.6"/>
+    <path d="M50 22 Q55 18 62 20" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+  </g>
+</svg>

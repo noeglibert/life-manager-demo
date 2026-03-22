@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <filter id="pencilTexture">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+  <g filter="url(#pencilTexture)">
+    <circle cx="60" cy="20" r="8" stroke="#5D4037" stroke-width="2.5" fill="none"/>
+    <circle cx="85" cy="30" r="8" stroke="#5D4037" stroke-width="2.5" fill="none"/>
+    <circle cx="98" cy="55" r="8" stroke="#5D4037" stroke-width="2.5" fill="none"/>
+    <circle cx="90" cy="80" r="8" stroke="#5D4037" stroke-width="2.5" fill="none"/>
+    <circle cx="70" cy="95" r="8" stroke="#5D4037" stroke-width="2.5" fill="none"/>
+    <circle cx="50" cy="95" r="8" stroke="#5D4037" stroke-width="2.5" fill="none"/>
+    <circle cx="30" cy="80" r="8" stroke="#5D4037" stroke-width="2.5" fill="none"/>
+    <circle cx="22" cy="55" r="8" stroke="#5D4037" stroke-width="2.5" fill="none"/>
+    <circle cx="35" cy="30" r="8" stroke="#5D4037" stroke-width="2.5" fill="none"/>
+    <path d="M68 20 Q78 22 85 22" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M92 34 Q96 42 98 47" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M96 63 Q94 72 92 74" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M84 86 Q78 92 74 94" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M42 95 Q36 92 32 86" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M24 74 Q22 66 22 63" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M26 47 Q28 40 32 36" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M43 24 Q48 20 52 20" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M60 100 L60 112" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <circle cx="60" cy="115" r="3" stroke="#D4A574" stroke-width="2" fill="none" opacity="0.6"/>
+    <path d="M55 15 Q58 12 62 14" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+  </g>
+</svg>

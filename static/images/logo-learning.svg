@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <filter id="pencilTexture">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+  
+  <g filter="url(#pencilTexture)">
+    <!-- Lightbulb main shape -->
+    <!-- Outer bulb -->
+    <path d="M60 12 Q90 12 90 50 Q90 70 75 80 L75 92 L45 92 L45 80 Q30 70 30 50 Q30 12 60 12" 
+          stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M60 13 Q89 13 89 50 Q89 69 74 79 L74 91 L46 91 L46 79 Q31 69 31 50 Q31 13 60 13" 
+          stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M60 11 Q91 11 91 50 Q91 71 76 81 L76 93 L44 93 L44 81 Q29 71 29 50 Q29 11 60 11" 
+          stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.3"/>
+    
+    <!-- Bulb base/screw -->
+    <path d="M45 92 L45 100 Q45 105 50 105 L70 105 Q75 105 75 100 L75 92" 
+          stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M46 93 L46 99 Q46 104 51 104 L69 104 Q74 104 74 99 L74 93" 
+          stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.5"/>
+    
+    <!-- Screw threads -->
+    <path d="M47 96 L73 96" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M48 100 L72 100" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    
+    <!-- Filament inside -->
+    <path d="M52 70 Q52 55 60 55 Q68 55 68 70" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M53 69 Q53 56 60 56 Q67 56 67 69" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M56 55 L56 48" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M64 55 L64 48" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M56 48 Q60 44 64 48" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    
+    <!-- Glow/shine rays -->
+    <path d="M60 5 L60 10" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M95 50 L100 50" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M20 50 L25 50" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M85 25 L90 20" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M35 25 L30 20" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M88 70 L93 75" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <path d="M32 70 L27 75" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.4"/>
+    
+    <!-- Glass highlight -->
+    <path d="M42 30 Q48 22 55 32" stroke="#D4A574" stroke-width="3.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M38 45 Q42 40 44 48" stroke="#D4A574" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+  </g>
+  
+  <!-- Extra sketch marks -->
+  <path d="M18 35 L20 37" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+  <path d="M100 35 L102 33" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+</svg>

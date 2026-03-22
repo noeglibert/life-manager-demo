@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Layout D: Command Center</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Manrope:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+    --bg: #111118;
+    --surface: #1a1a24;
+    --surface-raised: #222230;
+    --border: #2a2a3a;
+    --border-focus: #3a3a50;
+    --text: #eeeef0;
+    --text-secondary: #8888a0;
+    --text-muted: #55556a;
+    --green: #10b981;
+    --green-dim: rgba(16,185,129,0.12);
+    --red: #ef4444;
+    --red-dim: rgba(239,68,68,0.12);
+    --yellow: #eab308;
+    --yellow-dim: rgba(234,179,8,0.12);
+    --blue: #3b82f6;
+    --blue-dim: rgba(59,130,246,0.12);
+    --purple: #a78bfa;
+    --purple-dim: rgba(167,139,250,0.12);
+    --teal: #14b8a6;
+    --teal-dim: rgba(20,184,166,0.12);
+    --orange: #f59e0b;
+    --orange-dim: rgba(245,158,11,0.12);
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Manrope', -apple-system, sans-serif;
+    --radius: 8px;
+}
+
+body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+/* ===== HEADER BAR ===== */
+.header {
+    display: grid;
+    grid-template-columns: 200px 1fr auto;
+    align-items: center;
+    padding: 0 16px;
+    height: 48px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+}
+
+.header-brand {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--green);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.header-brand .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px rgba(16,185,129,0.4);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.header-tabs {
+    display: flex;
+    gap: 0;
+    list-style: none;
+    height: 100%;
+}
+
+.header-tabs a {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 16px;
+    height: 100%;
+    text-decoration: none;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 600;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+}
+
+.header-tabs a:hover {
+    color: var(--text-secondary);
+    background: rgba(255,255,255,0.02);
+}
+
+.header-tabs a.active {
+    color: var(--green);
+    border-bottom-color: var(--green);
+}
+
+.header-tabs .tab-emoji { font-size: 13px; }
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.h-btn {
+    padding: 5px 12px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--mono);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.h-btn:hover { border-color: var(--border-focus); color: var(--text); }
+.h-btn.primary { background: var(--green-dim); color: var(--green); border-color: rgba(16,185,129,0.3); }
+.h-btn.primary:hover { background: rgba(16,185,129,0.2); }
+
+/* ===== LAYOUT ===== */
+.layout {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    height: calc(100vh - 48px);
+}
+
+/* ===== LEFT PANEL ===== */
+.left-panel {
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    padding: 16px 12px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.panel-section h4 {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    padding: 0 8px;
+}
+
+.panel-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.panel-list a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.1s;
+}
+
+.panel-list a:hover { background: var(--surface-raised); color: var(--text); }
+.panel-list a.active { background: var(--green-dim); color: var(--green); }
+.panel-list .p-emoji { font-size: 14px; width: 20px; text-align: center; }
+
+.panel-list .p-badge {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.panel-list .p-badge.active { color: var(--orange); }
+
+/* XP in sidebar */
+.xp-compact {
+    padding: 12px;
+    background: var(--surface-raised);
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+}
+
+.xp-compact .xp-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.xp-compact .xp-level {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--purple);
+}
+
+.xp-compact .xp-val {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+}
+
+.xp-compact .xp-track {
+    height: 3px;
+    background: var(--border);
+    border-radius: 99px;
+    overflow: hidden;
+}
+
+.xp-compact .xp-fill {
+    height: 100%;
+    width: 83%;
+    background: linear-gradient(90deg, var(--purple), var(--blue));
+    border-radius: 99px;
+}
+
+/* ===== MAIN GRID ===== */
+.main-grid {
+    padding: 16px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: auto auto auto auto;
+    gap: 12px;
+    align-content: start;
+}
+
+/* ===== CARD ===== */
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.card-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+}
+
+.card-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.card-badge.green { background: var(--green-dim); color: var(--green); }
+.card-badge.blue { background: var(--blue-dim); color: var(--blue); }
+
+/* Grid spans */
+.span-2 { grid-column: span 2; }
+.span-3 { grid-column: span 3; }
+
+/* ===== HABITS STRIP ===== */
+.habits-strip {
+    grid-column: span 3;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+}
+
+.h-tile {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.h-tile:hover { border-color: var(--border-focus); }
+
+.h-tile.done { border-color: rgba(16,185,129,0.3); }
+.h-tile.done .h-status { background: var(--green); }
+
+.h-tile .h-emoji { font-size: 22px; }
+
+.h-tile .h-info { flex: 1; }
+.h-tile .h-name { font-size: 12px; font-weight: 600; }
+.h-tile .h-detail { font-size: 10px; color: var(--text-muted); font-family: var(--mono); }
+
+.h-tile .h-status {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+}
+
+.h-tile .h-streak {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--orange);
+    font-weight: 600;
+}
+
+/* ===== STREAKS ===== */
+.streaks-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+}
+
+.streak-item { text-align: center; }
+
+.streak-item .s-val {
+    font-family: var(--mono);
+    font-size: 24px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.streak-item .s-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.streak-item:nth-child(1) .s-val { color: var(--blue); }
+.streak-item:nth-child(2) .s-val { color: var(--green); }
+.streak-item:nth-child(3) .s-val { color: var(--purple); }
+.streak-item:nth-child(4) .s-val { color: var(--orange); }
+.streak-item:nth-child(5) .s-val { color: var(--teal); }
+
+/* ===== CHALLENGE ===== */
+.ch-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.ch-row .ch-icon { font-size: 24px; }
+.ch-row .ch-body { flex: 1; }
+.ch-row .ch-name { font-size: 13px; font-weight: 600; }
+.ch-row .ch-desc { font-size: 11px; color: var(--text-secondary); }
+
+.ch-row .ch-xp {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--yellow);
+    padding: 4px 10px;
+    background: var(--yellow-dim);
+    border-radius: 4px;
+}
+
+/* ===== JOURNAL ===== */
+.j-entry {
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 6px;
+    border-left: 2px solid var(--border);
+    transition: all 0.15s;
+    cursor: pointer;
+}
+
+.j-entry:hover {
+    background: var(--surface-raised);
+    border-left-color: var(--blue);
+}
+
+.j-entry .j-date {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+}
+
+.j-entry .j-text { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+
+.j-entry .j-tags { display: flex; gap: 4px; margin-top: 6px; }
+.j-entry .j-tag {
+    font-family: var(--mono);
+    font-size: 9px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: var(--blue-dim);
+    color: var(--blue);
+}
+
+/* ===== CHART ===== */
+.bar-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 80px;
+}
+
+.bar {
+    flex: 1;
+    border-radius: 2px 2px 0 0;
+    min-height: 2px;
+}
+
+.bar.green { background: var(--green); }
+.bar.blue { background: var(--blue); }
+.bar.teal { background: var(--teal); }
+.bar.purple { background: var(--purple); }
+
+/* ===== CONTACTS ===== */
+.c-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+
+.c-row:last-child { border-bottom: none; }
+.c-row .c-name { font-size: 12px; }
+
+.c-row .c-pill {
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 3px;
+}
+
+.c-row .c-pill.warn { background: var(--orange-dim); color: var(--orange); }
+.c-row .c-pill.danger { background: var(--red-dim); color: var(--red); }
+
+/* ===== HEATMAP ===== */
+.heatmap-grid {
+    display: grid;
+    grid-template-columns: repeat(26, 1fr);
+    gap: 2px;
+}
+
+.hm {
+    aspect-ratio: 1;
+    border-radius: 2px;
+    background: var(--surface-raised);
+}
+
+.hm.a { background: rgba(16,185,129,0.15); }
+.hm.b { background: rgba(16,185,129,0.3); }
+.hm.c { background: rgba(16,185,129,0.5); }
+.hm.d { background: rgba(16,185,129,0.7); }
+.hm.e { background: var(--green); }
+
+/* ===== ACHIEVEMENTS ===== */
+.ach-mini {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.ach-chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: var(--surface-raised);
+    border: 1px solid var(--border);
+    font-size: 11px;
+}
+
+.ach-chip.locked { opacity: 0.25; }
+.ach-chip .ac-icon { font-size: 14px; }
+.ach-chip .ac-name { font-size: 10px; font-weight: 600; }
+
+/* ===== MOCKUP LABEL ===== */
+.mockup-label {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    background: var(--green);
+    color: var(--bg);
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    z-index: 999;
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+    <div class="header-brand">
+        <span class="dot"></span>
+        life-manager
+    </div>
+    <ul class="header-tabs">
+        <li><a href="#" class="active"><span class="tab-emoji">&#x1F3E0;</span> Dashboard</a></li>
+        <li><a href="#"><span class="tab-emoji">&#x1F4DD;</span> Journal</a></li>
+        <li><a href="#"><span class="tab-emoji">&#x1F9D8;</span> Meditate</a></li>
+        <li><a href="#"><span class="tab-emoji">&#x1F4DA;</span> Learn</a></li>
+        <li><a href="#"><span class="tab-emoji">&#x1F957;</span> Nutrition</a></li>
+        <li><a href="#"><span class="tab-emoji">&#x1F3C3;</span> Activity</a></li>
+        <li><a href="#"><span class="tab-emoji">&#x2B50;</span> Highlights</a></li>
+        <li><a href="#"><span class="tab-emoji">&#x1F465;</span> Contacts</a></li>
+    </ul>
+    <div class="header-actions">
+        <button class="h-btn">&#x1F512; lock</button>
+        <button class="h-btn primary">+ write</button>
+    </div>
+</div>
+
+<!-- LAYOUT -->
+<div class="layout">
+    <!-- LEFT PANEL -->
+    <div class="left-panel">
+        <div class="panel-section">
+            <h4>Quick Access</h4>
+            <ul class="panel-list">
+                <li><a href="#" class="active"><span class="p-emoji">&#x1F3E0;</span> Dashboard</a></li>
+                <li><a href="#"><span class="p-emoji">&#x1F4DD;</span> Today's Entry<span class="p-badge active">draft</span></a></li>
+                <li><a href="#"><span class="p-emoji">&#x1F3AF;</span> Challenge<span class="p-badge active">+25xp</span></a></li>
+            </ul>
+        </div>
+
+        <div class="panel-section">
+            <h4>Tools</h4>
+            <ul class="panel-list">
+                <li><a href="#"><span class="p-emoji">&#x1F4E8;</span> Newsletter</a></li>
+                <li><a href="#"><span class="p-emoji">&#x1F4C8;</span> Portfolio</a></li>
+                <li><a href="#"><span class="p-emoji">&#x1F3AE;</span> Wordle</a></li>
+                <li><a href="#"><span class="p-emoji">&#x2699;&#xFE0F;</span> API Costs</a></li>
+            </ul>
+        </div>
+
+        <div class="xp-compact">
+            <div class="xp-header">
+                <span class="xp-level">Lv.5 Historian</span>
+                <span class="xp-val">1245/1500</span>
+            </div>
+            <div class="xp-track"><div class="xp-fill"></div></div>
+        </div>
+    </div>
+
+    <!-- MAIN GRID -->
+    <div class="main-grid">
+
+        <!-- ROW 1: Habits -->
+        <div class="habits-strip">
+            <div class="h-tile done">
+                <span class="h-emoji">&#x1F4DD;</span>
+                <div class="h-info"><div class="h-name">Journal</div><div class="h-detail">452 words</div></div>
+                <span class="h-streak">5d</span>
+                <span class="h-status"></span>
+            </div>
+            <div class="h-tile done">
+                <span class="h-emoji">&#x1F9D8;</span>
+                <div class="h-info"><div class="h-name">Meditate</div><div class="h-detail">15 min</div></div>
+                <span class="h-streak">12d</span>
+                <span class="h-status"></span>
+            </div>
+            <div class="h-tile">
+                <span class="h-emoji">&#x1F4DA;</span>
+                <div class="h-info"><div class="h-name">Learn</div><div class="h-detail">--</div></div>
+                <span class="h-status"></span>
+            </div>
+            <div class="h-tile done">
+                <span class="h-emoji">&#x1F957;</span>
+                <div class="h-info"><div class="h-name">Nutrition</div><div class="h-detail">2 meals</div></div>
+                <span class="h-streak">8d</span>
+                <span class="h-status"></span>
+            </div>
+            <div class="h-tile">
+                <span class="h-emoji">&#x1F3C3;</span>
+                <div class="h-info"><div class="h-name">Activity</div><div class="h-detail">--</div></div>
+                <span class="h-status"></span>
+            </div>
+        </div>
+
+        <!-- ROW 2: Streaks + Challenge -->
+        <div class="card span-2">
+            <div class="card-header">
+                <span class="card-title">Streaks</span>
+                <span class="card-badge green">5 active</span>
+            </div>
+            <div class="streaks-grid">
+                <div class="streak-item"><div class="s-val">5</div><div class="s-label">Journal</div></div>
+                <div class="streak-item"><div class="s-val">12</div><div class="s-label">Meditate</div></div>
+                <div class="streak-item"><div class="s-val">3</div><div class="s-label">Learn</div></div>
+                <div class="streak-item"><div class="s-val">8</div><div class="s-label">Nutrition</div></div>
+                <div class="streak-item"><div class="s-val">4</div><div class="s-label">Activity</div></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Challenge</span>
+            </div>
+            <div class="ch-row">
+                <div class="ch-icon">&#x1F3AF;</div>
+                <div class="ch-body">
+                    <div class="ch-name">Precision Writer</div>
+                    <div class="ch-desc">Exactly 100 words</div>
+                </div>
+                <div class="ch-xp">+25</div>
+            </div>
+        </div>
+
+        <!-- ROW 3: Journal + Chart + Contacts -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Recent Journal</span>
+            </div>
+            <div class="j-entry">
+                <div class="j-date">2026-02-21</div>
+                <div class="j-text">Spent the morning working on the marathon training plan...</div>
+                <div class="j-tags"><span class="j-tag">Sarah</span><span class="j-tag">David</span></div>
+            </div>
+            <div class="j-entry">
+                <div class="j-date">2026-02-20</div>
+                <div class="j-text">Great meditation session. Tried the 4-7-8 breathing...</div>
+            </div>
+            <div class="j-entry">
+                <div class="j-date">2026-02-19</div>
+                <div class="j-text">Productive day. Chat with team about Q2 roadmap...</div>
+                <div class="j-tags"><span class="j-tag">Alex</span><span class="j-tag">Tom</span></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Weekly Volume</span>
+                <span class="card-badge blue">W8</span>
+            </div>
+            <div class="bar-chart">
+                <div class="bar green" style="height:30%"></div>
+                <div class="bar blue" style="height:55%"></div>
+                <div class="bar green" style="height:20%"></div>
+                <div class="bar teal" style="height:70%"></div>
+                <div class="bar green" style="height:45%"></div>
+                <div class="bar blue" style="height:35%"></div>
+                <div class="bar teal" style="height:80%"></div>
+                <div class="bar green" style="height:60%"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Reach Out</span>
+            </div>
+            <div class="c-row">
+                <span class="c-name">David Park</span>
+                <span class="c-pill danger">32d</span>
+            </div>
+            <div class="c-row">
+                <span class="c-name">Alex Rivera</span>
+                <span class="c-pill warn">21d</span>
+            </div>
+            <div class="c-row">
+                <span class="c-name">Sarah Chen</span>
+                <span class="c-pill warn">18d</span>
+            </div>
+            <div class="c-row">
+                <span class="c-name">Tom Wilson</span>
+                <span class="c-pill" style="color:var(--text-muted)">8d</span>
+            </div>
+        </div>
+
+        <!-- ROW 4: Heatmap + Achievements -->
+        <div class="card span-2">
+            <div class="card-header">
+                <span class="card-title">Heatmap</span>
+            </div>
+            <div class="heatmap-grid" id="heatmap"></div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Achievements</span>
+                <span class="card-badge green">28/44</span>
+            </div>
+            <div class="ach-mini">
+                <div class="ach-chip"><span class="ac-icon">&#x1F525;</span><span class="ac-name">Week Warrior</span></div>
+                <div class="ach-chip"><span class="ac-icon">&#x1F4DC;</span><span class="ac-name">Wordsmith</span></div>
+                <div class="ach-chip"><span class="ac-icon">&#x1F9D8;</span><span class="ac-name">First Breath</span></div>
+                <div class="ach-chip"><span class="ac-icon">&#x1F3C3;</span><span class="ac-name">First Steps</span></div>
+                <div class="ach-chip"><span class="ac-icon">&#x1F957;</span><span class="ac-name">First Bite</span></div>
+                <div class="ach-chip locked"><span class="ac-icon">&#x1F451;</span><span class="ac-name">Centurion</span></div>
+                <div class="ach-chip locked"><span class="ac-icon">&#x1F3C6;</span><span class="ac-name">Legend</span></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mockup-label">Layout D: Command Center</div>
+
+<script>
+const hm = document.getElementById('heatmap');
+for (let i = 0; i < 182; i++) {
+    const c = document.createElement('div');
+    c.className = 'hm';
+    const r = Math.random();
+    if (r > 0.3) {
+        const l = ['a','b','c','d','e'];
+        const w = r > 0.85 ? 4 : r > 0.7 ? 3 : r > 0.55 ? 2 : r > 0.4 ? 1 : 0;
+        c.classList.add(l[w]);
+    }
+    hm.appendChild(c);
+}
+</script>
+</body>
+</html>

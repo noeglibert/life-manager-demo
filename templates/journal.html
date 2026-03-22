@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Journal - Life Manager{% endblock %}
+
+{% block content %}
+<div class="journal-page">
+    <div class="page-header">
+        <h1>Journal</h1>
+        <div class="actions">
+            <div class="export-dropdown" id="exportDropdown">
+                <button class="btn-secondary export-btn" onclick="document.getElementById('exportDropdown').classList.toggle('open'); event.stopPropagation();">Export ▾</button>
+                <div class="export-menu">
+                    <a href="{{ url_for('journal_export', format='html') }}">HTML (opens in Word)</a>
+                    <a href="{{ url_for('journal_export', format='markdown') }}">Markdown (.md)</a>
+                    <a href="{{ url_for('journal_export', format='txt') }}">Plain Text (.txt)</a>
+                </div>
+            </div>
+            <a href="{{ url_for('journal_today') }}" class="btn-primary">Today's Entry</a>
+        </div>
+    </div>
+
+    {% if entries %}
+        <div class="journal-entries-list">
+            {% for entry in entries %}
+                <div class="journal-entry-preview">
+                    <a href="{{ url_for('journal_entry', date_str=entry.date.strftime('%Y-%m-%d')) }}">
+                        <div class="entry-header">
+                            <h2>{{ entry.date.strftime('%A, %B %d, %Y') }}</h2>
+                            {% if entry.mood %}
+                                <span class="mood-badge">{{ entry.mood }}</span>
+                            {% endif %}
+                        </div>
+                        
+                        {% if entry.content %}
+                            <p class="entry-preview-text">
+                                {{ entry.content[:300] }}{% if entry.content|length > 300 %}...{% endif %}
+                            </p>
+                        {% else %}
+                            <p class="entry-preview-text empty">No content</p>
+                        {% endif %}
+                        
+                        {% if entry.mentioned_contacts %}
+                            <div class="entry-mentions">
+                                <strong>Mentioned:</strong>
+                                {% for contact in entry.mentioned_contacts %}
+                                    <span class="mention-badge">{{ contact.full_name }}</span>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </a>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="empty-state-large">
+            <h2>No journal entries yet</h2>
+            <p>Start documenting your life and connections!</p>
+            <a href="{{ url_for('journal_today') }}" class="btn-primary btn-large">Write Your First Entry</a>
+        </div>
+    {% endif %}
+</div>
+<script>
+document.addEventListener('click', function() {
+    var dd = document.getElementById('exportDropdown');
+    if (dd) dd.classList.remove('open');
+});
+</script>
+{% endblock %}

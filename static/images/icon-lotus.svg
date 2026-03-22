@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <filter id="pencilTexture">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.5" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+  <g filter="url(#pencilTexture)">
+    <!-- Center petal -->
+    <path d="M60 28 Q66 48 60 68 Q54 48 60 28" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M59 30 Q65 49 59 67" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <!-- Left petal -->
+    <path d="M38 42 Q50 46 56 66 Q42 52 38 42" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M39 43 Q49 47 55 65" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <!-- Right petal -->
+    <path d="M82 42 Q70 46 64 66 Q78 52 82 42" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M81 43 Q71 47 65 65" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <!-- Far left petal -->
+    <path d="M24 56 Q40 54 56 68 Q34 62 24 56" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M25 57 Q39 55 54 67" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <!-- Far right petal -->
+    <path d="M96 56 Q80 54 64 68 Q86 62 96 56" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M95 57 Q81 55 66 67" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <!-- Base / water line -->
+    <path d="M28 78 Q44 72 60 74 Q76 72 92 78" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M32 82 Q48 76 60 78 Q72 76 88 82" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <!-- Gold highlights on petals -->
+    <path d="M58 35 Q62 42 60 50" stroke="#D4A574" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M44 48 Q50 50 54 58" stroke="#D4A574" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <path d="M76 48 Q70 50 66 58" stroke="#D4A574" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+  </g>
+</svg>

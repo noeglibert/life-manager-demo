@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+
+{% block title %}Garmin Dashboard - Life Manager{% endblock %}
+
+{% block content %}
+<div class="garmin-page">
+    <div class="page-header">
+        <div>
+            <h1>Garmin Dashboard</h1>
+            <p class="page-subtitle">Forerunner 255 — day-by-day health metrics</p>
+        </div>
+        <div class="garmin-header-actions">
+            <div class="garmin-range-toggle">
+                <a href="?days=7" class="range-btn {{ 'active' if days_back == 7 }}">7d</a>
+                <a href="?days=14" class="range-btn {{ 'active' if days_back == 14 }}">14d</a>
+                <a href="?days=30" class="range-btn {{ 'active' if days_back == 30 }}">30d</a>
+            </div>
+            <button class="btn-garmin-sync" id="btn-garmin-sync" onclick="syncGarmin()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                <span id="sync-label">Sync</span>
+            </button>
+        </div>
+    </div>
+
+    {% if not stats %}
+    <div class="garmin-empty-state">
+        <h3>No data yet</h3>
+        <p>Click <strong>Sync</strong> to pull your Garmin data for the last {{ days_back }} days.</p>
+    </div>
+    {% else %}
+
+    <!-- ===== TODAY'S SNAPSHOT ===== -->
+    {% set today = stats[0] if stats else none %}
+    {% if today %}
+    <div class="garmin-today-card">
+        <h3>Today — {{ today.date.strftime('%A, %B %d') }}</h3>
+        <div class="garmin-today-grid">
+            <div class="garmin-metric">
+                <div class="metric-value">{{ '{:,}'.format(today.steps or 0) }}</div>
+                <div class="metric-label">Steps</div>
+                {% if today.step_goal %}
+                <div class="metric-bar"><div class="metric-bar-fill" style="width: {{ [((today.steps or 0) / today.step_goal * 100), 100]|min }}%"></div></div>
+                <div class="metric-sub">Goal: {{ '{:,}'.format(today.step_goal) }}</div>
+                {% endif %}
+            </div>
+            <div class="garmin-metric">
+                <div class="metric-value">{{ today.resting_hr or '—' }} <span class="metric-unit">bpm</span></div>
+                <div class="metric-label">Resting HR</div>
+                {% if today.avg_resting_hr_7day %}
+                <div class="metric-sub">7-day avg: {{ today.avg_resting_hr_7day }}</div>
+                {% endif %}
+            </div>
+            <div class="garmin-metric">
+                <div class="metric-value">{{ today.body_battery_high or '—' }}</div>
+                <div class="metric-label">Body Battery Peak</div>
+                <div class="metric-sub">Low: {{ today.body_battery_low or '—' }} | Wake: {{ today.body_battery_at_wake or '—' }}</div>
+            </div>
+            <div class="garmin-metric">
+                <div class="metric-value">{{ today.avg_stress or '—' }}</div>
+                <div class="metric-label">Avg Stress</div>
+                <div class="metric-sub">{{ today.stress_qualifier or '' }}</div>
+            </div>
+            <div class="garmin-metric">
+                <div class="metric-value">{% if today.sleep_seconds %}{{ today.sleep_seconds // 3600 }}h {{ (today.sleep_seconds % 3600) // 60 }}m{% else %}—{% endif %}</div>
+                <div class="metric-label">Sleep</div>
+                {% if today.sleep_score %}
+                <div class="metric-sub">Score: {{ today.sleep_score }}</div>
+                {% endif %}
+            </div>
+            <div class="garmin-metric">
+                <div class="metric-value">{{ '{:,}'.format((today.calories or 0)|int) }}</div>
+                <div class="metric-label">Calories Burned</div>
+                <div class="metric-sub">Active: {{ (today.active_calories or 0)|int }} | BMR: {{ (today.bmr_calories or 0)|int }}</div>
+            </div>
+            <div class="garmin-metric">
+                <div class="metric-value">{{ (today.moderate_intensity_min or 0) + (today.vigorous_intensity_min or 0) }} <span class="metric-unit">min</span></div>
+                <div class="metric-label">Active Time</div>
+                <div class="metric-sub">{{ today.moderate_intensity_min or 0 }}m moderate · {{ today.vigorous_intensity_min or 0 }}m vigorous</div>
+            </div>
+            <div class="garmin-metric">
+                <div class="metric-value">{{ today.floors_climbed|round(0)|int if today.floors_climbed else '—' }}</div>
+                <div class="metric-label">Floors</div>
+                <div class="metric-sub">{{ (today.distance_meters / 1000)|round(1) if today.distance_meters else 0 }} km walked</div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- ===== TREND CHARTS ===== -->
+    <div class="garmin-charts-section">
+        <h3>Trends</h3>
+        <div class="garmin-charts-grid">
+            <div class="garmin-chart-card">
+                <h4>Steps</h4>
+                <div class="chart-container" id="chart-steps"></div>
+            </div>
+            <div class="garmin-chart-card">
+                <h4>Resting Heart Rate</h4>
+                <div class="chart-container" id="chart-hr"></div>
+            </div>
+            <div class="garmin-chart-card">
+                <h4>Body Battery</h4>
+                <div class="chart-container" id="chart-battery"></div>
+            </div>
+            <div class="garmin-chart-card">
+                <h4>Sleep</h4>
+                <div class="chart-container" id="chart-sleep"></div>
+            </div>
+            <div class="garmin-chart-card">
+                <h4>Stress</h4>
+                <div class="chart-container" id="chart-stress"></div>
+            </div>
+            <div class="garmin-chart-card">
+                <h4>Active Minutes</h4>
+                <div class="chart-container" id="chart-active"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== DAY-BY-DAY TABLE ===== -->
+    <div class="garmin-table-section">
+        <h3>Day by Day</h3>
+        <div class="garmin-table-wrapper">
+            <table class="garmin-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Steps</th>
+                        <th>Dist</th>
+                        <th>Cal</th>
+                        <th>RHR</th>
+                        <th>Battery</th>
+                        <th>Stress</th>
+                        <th>Sleep</th>
+                        <th>Score</th>
+                        <th>Active</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in stats %}
+                    <tr>
+                        <td class="td-date">{{ s.date.strftime('%a %b %d') }}</td>
+                        <td>
+                            <span class="td-steps {{ 'goal-met' if s.steps and s.step_goal and s.steps >= s.step_goal }}">{{ '{:,}'.format(s.steps or 0) }}</span>
+                        </td>
+                        <td>{{ (s.distance_meters / 1000)|round(1) if s.distance_meters else '—' }}km</td>
+                        <td>{{ (s.calories or 0)|int }}</td>
+                        <td class="td-hr">{{ s.resting_hr or '—' }}</td>
+                        <td>
+                            <span class="td-battery-high">{{ s.body_battery_high or '—' }}</span>
+                            <span class="td-battery-sep">/</span>
+                            <span class="td-battery-low">{{ s.body_battery_low or '—' }}</span>
+                        </td>
+                        <td>
+                            <span class="stress-badge stress-{{ (s.stress_qualifier or 'unknown')|lower }}">{{ s.avg_stress or '—' }}</span>
+                        </td>
+                        <td>{% if s.sleep_seconds %}{{ s.sleep_seconds // 3600 }}h{{ (s.sleep_seconds % 3600) // 60 }}m{% else %}—{% endif %}</td>
+                        <td>{{ s.sleep_score or '—' }}</td>
+                        <td>{{ s.active_minutes or 0 }}m</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% endif %}
+
+    <div class="garmin-back-link">
+        <a href="{{ url_for('activity') }}">&larr; Back to Activity</a>
+    </div>
+</div>
+
+<script>
+const chartData = {{ chart_data|safe }};
+
+function renderBarChart(containerId, data, valueKey, opts = {}) {
+    const el = document.getElementById(containerId);
+    if (!data.length) { el.innerHTML = '<span class="no-data">No data</span>'; return; }
+
+    const values = data.map(d => d[valueKey] || 0);
+    const maxVal = Math.max(...values, 1);
+    const goalKey = opts.goalKey;
+    const color = opts.color || 'var(--accent)';
+    const unit = opts.unit || '';
+    const secondaryKey = opts.secondaryKey;
+    const secondaryColor = opts.secondaryColor || 'rgba(255,255,255,0.3)';
+
+    el.innerHTML = data.map((d, i) => {
+        const val = d[valueKey] || 0;
+        const pct = Math.max((val / maxVal) * 100, val > 0 ? 3 : 0);
+        const goalVal = goalKey ? (d[goalKey] || 0) : 0;
+        const metGoal = goalKey && val >= goalVal;
+        const barColor = metGoal ? '#27ae60' : color;
+
+        let secondaryHtml = '';
+        if (secondaryKey) {
+            const secVal = d[secondaryKey] || 0;
+            const secPct = Math.max((secVal / maxVal) * 100, secVal > 0 ? 2 : 0);
+            secondaryHtml = `<div class="mini-bar" style="height:${secPct}%;background:${secondaryColor}" title="${secondaryKey}: ${secVal}"></div>`;
+        }
+
+        return `<div class="mini-col" title="${d.date}: ${val}${unit}">
+            <div class="mini-val">${val}${unit}</div>
+            <div class="mini-bar-wrap">
+                <div class="mini-bar" style="height:${pct}%;background:${barColor}"></div>
+                ${secondaryHtml}
+            </div>
+            <div class="mini-label">${d.date.split(' ')[1] || d.date}</div>
+        </div>`;
+    }).join('');
+}
+
+function renderRangeChart(containerId, data, highKey, lowKey, opts = {}) {
+    const el = document.getElementById(containerId);
+    if (!data.length) { el.innerHTML = '<span class="no-data">No data</span>'; return; }
+
+    const allVals = data.flatMap(d => [d[highKey], d[lowKey]]).filter(v => v != null);
+    const maxVal = Math.max(...allVals, 1);
+    const minVal = Math.min(...allVals, 0);
+    const range = maxVal - minVal || 1;
+
+    el.innerHTML = data.map(d => {
+        const high = d[highKey];
+        const low = d[lowKey];
+        if (high == null || low == null) return `<div class="mini-col"><div class="mini-val">—</div><div class="mini-bar-wrap"></div><div class="mini-label">${d.date.split(' ')[1] || d.date}</div></div>`;
+
+        const highPct = ((high - minVal) / range) * 100;
+        const lowPct = ((low - minVal) / range) * 100;
+        const barHeight = highPct - lowPct;
+        const barBottom = lowPct;
+
+        return `<div class="mini-col" title="${d.date}: ${high}/${low}">
+            <div class="mini-val">${high}/${low}</div>
+            <div class="mini-bar-wrap">
+                <div class="mini-bar range-bar" style="height:${barHeight}%;bottom:${barBottom}%;background:linear-gradient(to top, #e74c3c, #27ae60)"></div>
+            </div>
+            <div class="mini-label">${d.date.split(' ')[1] || d.date}</div>
+        </div>`;
+    }).join('');
+}
+
+function renderSleepChart(containerId, data) {
+    const el = document.getElementById(containerId);
+    if (!data.length) { el.innerHTML = '<span class="no-data">No data</span>'; return; }
+
+    const maxHours = Math.max(...data.map(d => d.sleep_hours || 0), 1);
+
+    el.innerHTML = data.map(d => {
+        const total = d.sleep_hours || 0;
+        const pct = (total / maxHours) * 100;
+        const deep = d.sleep_deep_min || 0;
+        const rem = d.sleep_rem_min || 0;
+        const light = d.sleep_light_min || 0;
+        const totalMin = deep + rem + light || 1;
+
+        return `<div class="mini-col" title="${d.date}: ${total}h (Deep: ${deep}m, REM: ${rem}m)">
+            <div class="mini-val">${total}h</div>
+            <div class="mini-bar-wrap">
+                <div class="mini-bar sleep-bar" style="height:${pct}%">
+                    <div class="sleep-deep" style="height:${deep/totalMin*100}%"></div>
+                    <div class="sleep-rem" style="height:${rem/totalMin*100}%"></div>
+                    <div class="sleep-light" style="height:${light/totalMin*100}%"></div>
+                </div>
+            </div>
+            <div class="mini-label">${d.date.split(' ')[1] || d.date}</div>
+        </div>`;
+    }).join('');
+}
+
+// Render all charts
+renderBarChart('chart-steps', chartData, 'steps', { goalKey: 'step_goal', color: 'var(--accent)' });
+renderBarChart('chart-hr', chartData, 'resting_hr', { color: '#e74c3c', unit: '' });
+renderRangeChart('chart-battery', chartData, 'body_battery_high', 'body_battery_low');
+renderSleepChart('chart-sleep', chartData);
+renderBarChart('chart-stress', chartData, 'avg_stress', { color: '#e67e22' });
+renderBarChart('chart-active', chartData, 'active_minutes', {
+    color: '#3498db',
+    unit: 'm',
+    secondaryKey: 'vigorous_intensity_min',
+    secondaryColor: '#8e44ad'
+});
+
+// Sync function
+async function syncGarmin() {
+    const btn = document.getElementById('btn-garmin-sync');
+    const label = document.getElementById('sync-label');
+    btn.disabled = true;
+    label.textContent = 'Syncing...';
+    btn.classList.add('syncing');
+
+    try {
+        const resp = await fetch('/api/garmin/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ days_back: {{ days_back }} }),
+        });
+        const data = await resp.json();
+
+        if (data.error) {
+            alert('Sync failed: ' + data.error);
+        } else {
+            label.textContent = `Done! ${data.synced_days} days`;
+            setTimeout(() => location.reload(), 1200);
+        }
+    } catch (e) {
+        alert('Sync error: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.classList.remove('syncing');
+    }
+}
+</script>
+{% endblock %}

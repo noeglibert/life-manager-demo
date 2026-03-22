@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <filter id="pencilTexture">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+  
+  <g filter="url(#pencilTexture)">
+    <!-- Main person (center, larger) -->
+    <!-- Head -->
+    <circle cx="60" cy="35" r="14" fill="none" stroke="#5D4037" stroke-width="2.5"/>
+    <circle cx="60" cy="35" r="15" fill="none" stroke="#8B5A2B" stroke-width="1.5" opacity="0.5"/>
+    <circle cx="60" cy="35" r="13" fill="none" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+    <!-- Head highlight -->
+    <path d="M52 30 Q58 26 66 32" stroke="#D4A574" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.5"/>
+    
+    <!-- Body/shoulders -->
+    <path d="M35 75 Q35 55 60 52 Q85 55 85 75" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M36 74 Q36 56 60 53 Q84 56 84 74" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M34 76 Q34 54 60 51 Q86 54 86 76" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.3"/>
+    <!-- Body highlight -->
+    <path d="M42 60 Q50 58 55 62" stroke="#D4A574" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    
+    <!-- Left person (smaller, behind) -->
+    <!-- Head -->
+    <circle cx="25" cy="50" r="9" fill="none" stroke="#5D4037" stroke-width="2"/>
+    <circle cx="25" cy="50" r="10" fill="none" stroke="#8B5A2B" stroke-width="1" opacity="0.5"/>
+    <path d="M20 47 Q24 44 29 48" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+    
+    <!-- Body -->
+    <path d="M12 85 Q12 68 25 65 Q38 68 38 85" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M13 84 Q13 69 25 66 Q37 69 37 84" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.5"/>
+    
+    <!-- Right person (smaller, behind) -->
+    <!-- Head -->
+    <circle cx="95" cy="50" r="9" fill="none" stroke="#5D4037" stroke-width="2"/>
+    <circle cx="95" cy="50" r="10" fill="none" stroke="#8B5A2B" stroke-width="1" opacity="0.5"/>
+    <path d="M90 47 Q94 44 99 48" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+    
+    <!-- Body -->
+    <path d="M82 85 Q82 68 95 65 Q108 68 108 85" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M83 84 Q83 69 95 66 Q107 69 107 84" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.5"/>
+    
+    <!-- Connection lines between people (subtle) -->
+    <path d="M38 60 Q48 65 50 58" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <path d="M82 60 Q72 65 70 58" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.4"/>
+  </g>
+  
+  <!-- Extra sketch marks for authenticity -->
+  <path d="M15 42 L17 44" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+  <path d="M103 42 L105 40" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+  <path d="M58 22 L62 20" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+</svg>

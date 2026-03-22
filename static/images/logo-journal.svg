@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <filter id="pencilTexture">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+  
+  <g filter="url(#pencilTexture)">
+    <!-- Book/Journal outline - multiple strokes for sketchy feel -->
+    <!-- Outer book shape -->
+    <path d="M25 18 L25 102 Q25 107 30 107 L90 107 Q95 107 95 102 L95 18 Q95 13 90 13 L30 13 Q25 13 25 18" 
+          stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M26 19 L26 101 Q26 106 31 106 L89 106 Q94 106 94 101 L94 19 Q94 14 89 14 L31 14 Q26 14 26 19" 
+          stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    
+    <!-- Book spine -->
+    <path d="M35 13 L35 107" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M36 14 L36 106" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M34 15 L34 105" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.3"/>
+    
+    <!-- Spine binding marks -->
+    <path d="M28 25 L35 25" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M28 35 L35 35" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M28 95 L35 95" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M28 85 L35 85" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    
+    <!-- Page lines - sketchy writing lines -->
+    <path d="M45 32 Q62 31 82 32" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+    <path d="M45 44 Q65 43 80 44" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+    <path d="M45 56 Q60 55 78 56" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+    <path d="M45 68 Q63 67 75 68" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+    <path d="M45 80 Q58 79 70 80" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+    
+    <!-- Highlight/shading on cover -->
+    <path d="M38 20 Q42 18 46 22" stroke="#D4A574" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M85 18 Q90 20 88 25" stroke="#D4A574" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+    
+    <!-- Bookmark ribbon -->
+    <path d="M75 13 L75 30 L70 25 L65 30 L65 13" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M74 14 L74 28 L70 24 L66 28 L66 14" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+  </g>
+  
+  <!-- Extra sketch marks -->
+  <path d="M92 30 L94 32" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+  <path d="M22 60 L24 58" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+</svg>

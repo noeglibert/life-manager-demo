@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}My Highlights - Life Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ svg_icon('pin', 'inline-icon') }} My Highlights</h1>
+    <div class="actions">
+        <span class="highlights-total">{{ total }} highlight{{ 's' if total != 1 else '' }} saved</span>
+    </div>
+</div>
+
+{% if grouped %}
+    {% for interest_id, group in grouped.items() %}
+    <div class="highlights-subject-group">
+        <div class="subject-group-header">
+            <span class="subject-icon">{{ learn_icon(group.interest.icon, 'stat-icon-svg') }}</span>
+            <h2>{{ group.interest.name }}</h2>
+            <span class="level-badge {{ group.interest.current_level }}">{{ group.interest.current_level|title }}</span>
+            <span class="highlight-count">{{ group.highlights|length }} highlight{{ 's' if group.highlights|length != 1 else '' }}</span>
+        </div>
+
+        {# Sub-group highlights by session (article) for context #}
+        {% set current_session_id = [None] %}
+        {% for h in group.highlights %}
+            {% if h.session.id != current_session_id[0] %}
+                {% if current_session_id[0] is not none %}
+                    </div>{# close previous highlights-session-list #}
+                {% endif %}
+                {% if current_session_id.append(h.session.id) %}{% endif %}
+                {% if current_session_id.pop(0) or true %}{% endif %}
+                <div class="highlights-session-subgroup">
+                    <div class="session-subheader">
+                        <span class="session-subheader-title">{{ svg_icon('book', 'inline-icon') }} {{ h.session.topic_title }}</span>
+                        <span class="session-subheader-date">{{ h.session.date.strftime('%b %d, %Y') }}</span>
+                        <span class="session-subheader-level">{{ h.session.difficulty_level|title }}</span>
+                    </div>
+                </div>
+                <div class="highlights-session-list">
+            {% endif %}
+            <div class="highlight-card" id="highlight-{{ h.id }}">
+                <div class="highlight-quote-mark">"</div>
+                <blockquote class="highlight-text">{{ h.text }}</blockquote>
+                <div class="highlight-meta">
+                    <span class="highlight-date">{{ h.created_at.strftime('%b %d, %Y') }}</span>
+                    <button type="button" class="highlight-delete-btn" onclick="deleteHighlight({{ h.id }})" title="Remove highlight">&times;</button>
+                </div>
+            </div>
+        {% endfor %}
+        {% if group.highlights %}
+            </div>{# close last highlights-session-list #}
+        {% endif %}
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="empty-highlights">
+        <div class="empty-icon">{{ svg_icon('pin', 'challenge-icon-svg') }}</div>
+        <h3>No highlights yet</h3>
+        <p>Select text during your learning sessions to save quotes you want to remember.</p>
+        <a href="{{ url_for('learn') }}" class="btn-primary">Start Learning</a>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function deleteHighlight(id) {
+    if (!confirm('Remove this highlight?')) return;
+
+    try {
+        const response = await fetch(`/api/learn/highlight/${id}`, { method: 'DELETE' });
+        const data = await response.json();
+        if (data.success) {
+            const card = document.getElementById(`highlight-${id}`);
+            card.style.opacity = '0';
+            card.style.transform = 'translateX(-20px)';
+            setTimeout(() => card.remove(), 300);
+        }
+    } catch (e) {
+        alert('Error removing highlight');
+    }
+}
+</script>
+{% endblock %}

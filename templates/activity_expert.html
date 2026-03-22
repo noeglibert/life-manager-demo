@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+
+{% block title %}Sport Expert - Life Manager{% endblock %}
+
+{% block content %}
+<div class="activity-page">
+    <div class="page-header">
+        <h1>{{ svg_icon('robot', 'inline-icon') }} Sport Expert Coach</h1>
+        {% if days_until is not none %}
+        <span class="countdown-badge">{{ svg_icon('flag', 'inline-icon') }} {{ days_until }} days until marathon</span>
+        {% endif %}
+    </div>
+
+    <div class="coach-layout">
+        <!-- Chat Area -->
+        <div class="coach-chat-area">
+            <!-- Suggested Prompts -->
+            <div class="coach-suggestions" id="coach-suggestions">
+                <button class="suggestion-pill" onclick="sendSuggestion(this)">Review my last week</button>
+                <button class="suggestion-pill" onclick="sendSuggestion(this)">Am I on track for the marathon?</button>
+                <button class="suggestion-pill" onclick="sendSuggestion(this)">What should I do this week?</button>
+                <button class="suggestion-pill" onclick="sendSuggestion(this)">I'm feeling sore, should I rest?</button>
+                <button class="suggestion-pill" onclick="sendSuggestion(this)">Help me adjust my training plan</button>
+            </div>
+
+            <!-- Chat Messages -->
+            <div class="coach-messages" id="coach-messages">
+                {% if chat_history %}
+                    {% for msg in chat_history %}
+                    <div class="chat-message {{ 'user-message' if msg.role == 'user' else 'coach-message' }}">
+                        {% if msg.role == 'assistant' %}<span class="coach-avatar">{{ svg_icon('muscle', 'inline-icon') }}</span>{% endif %}
+                        <div class="message-content">{{ msg.content }}</div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                <div class="coach-welcome">
+                    <div class="welcome-icon">{{ svg_icon('muscle', 'inline-icon') }}</div>
+                    <h3>Your Sport Expert Coach</h3>
+                    <p>Ask me about your training, get advice on recovery, discuss your marathon preparation, or get a plan review. I have access to your recent workouts and training plan.</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Input Area -->
+            <div class="coach-input-area">
+                <textarea id="coach-input" rows="2" placeholder="Ask your coach anything..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); sendCoachMessage();}"></textarea>
+                <button class="btn-primary" id="btn-send-coach" onclick="sendCoachMessage()">Send</button>
+            </div>
+        </div>
+
+        <!-- Context Sidebar -->
+        <div class="coach-sidebar">
+            <h4>Your Stats</h4>
+            <div class="sidebar-stat">
+                <span class="sidebar-stat-label">Streak</span>
+                <span class="sidebar-stat-value">{{ game_stats.activity_streak or 0 }} days</span>
+            </div>
+            <div class="sidebar-stat">
+                <span class="sidebar-stat-label">Total Sessions</span>
+                <span class="sidebar-stat-value">{{ game_stats.activity_sessions_total or 0 }}</span>
+            </div>
+            <div class="sidebar-stat">
+                <span class="sidebar-stat-label">This Week</span>
+                <span class="sidebar-stat-value">{{ week_sessions }} sessions · {{ week_km }}km</span>
+            </div>
+            {% if current_phase %}
+            <div class="sidebar-stat">
+                <span class="sidebar-stat-label">Current Phase</span>
+                <span class="sidebar-stat-value">{{ current_phase }}</span>
+            </div>
+            {% endif %}
+            {% if days_until is not none %}
+            <div class="sidebar-stat">
+                <span class="sidebar-stat-label">Marathon</span>
+                <span class="sidebar-stat-value">{{ days_until }} days</span>
+            </div>
+            {% endif %}
+
+            <div class="sidebar-links">
+                <a href="{{ url_for('activity') }}">← Activity Dashboard</a>
+                <a href="{{ url_for('activity_plan') }}">{{ svg_icon('clipboard', 'inline-icon') }} Training Plan</a>
+                <a href="{{ url_for('activity_log') }}">+ Log Workout</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function scrollToBottom() {
+    const messages = document.getElementById('coach-messages');
+    messages.scrollTop = messages.scrollHeight;
+}
+scrollToBottom();
+
+function sendSuggestion(btn) {
+    document.getElementById('coach-input').value = btn.textContent;
+    sendCoachMessage();
+}
+
+async function sendCoachMessage() {
+    const input = document.getElementById('coach-input');
+    const message = input.value.trim();
+    if (!message) return;
+
+    const btn = document.getElementById('btn-send-coach');
+    btn.disabled = true;
+    input.value = '';
+
+    // Hide suggestions after first message
+    const suggestions = document.getElementById('coach-suggestions');
+    if (suggestions) suggestions.style.display = 'none';
+
+    // Hide welcome
+    const welcome = document.querySelector('.coach-welcome');
+    if (welcome) welcome.remove();
+
+    // Add user message
+    const messagesEl = document.getElementById('coach-messages');
+    messagesEl.innerHTML += `<div class="chat-message user-message"><div class="message-content">${escapeHtml(message)}</div></div>`;
+    scrollToBottom();
+
+    // Add loading indicator
+    const loadingId = 'loading-' + Date.now();
+    messagesEl.innerHTML += `<div class="chat-message coach-message" id="${loadingId}"><span class="coach-avatar">{{ svg_icon('muscle', 'inline-icon') }}</span><div class="message-content"><em>Thinking...</em></div></div>`;
+    scrollToBottom();
+
+    try {
+        const response = await fetch('/api/activity/coach', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: message })
+        });
+        const result = await response.json();
+        const loadingEl = document.getElementById(loadingId);
+
+        if (result.success) {
+            loadingEl.querySelector('.message-content').innerHTML = result.reply_html;
+            if (result.plan_updates && result.plan_updates.length > 0) {
+                const updateNotice = document.createElement('div');
+                updateNotice.className = 'plan-update-notice';
+                updateNotice.innerHTML = '<strong>📋 Plan updated:</strong> ' + result.plan_updates.join(' · ');
+                loadingEl.querySelector('.message-content').appendChild(updateNotice);
+            }
+            if (result.trigger_regenerate) {
+                const regenNotice = document.createElement('div');
+                regenNotice.className = 'plan-update-notice';
+                regenNotice.innerHTML = '<strong>🔄 Regenerating full schedule...</strong> This may take a minute.';
+                loadingEl.querySelector('.message-content').appendChild(regenNotice);
+                scrollToBottom();
+                try {
+                    const regenResp = await fetch('/api/activity/generate-schedule', { method: 'POST' });
+                    const regenData = await regenResp.json();
+                    if (regenData.success) {
+                        regenNotice.innerHTML = `<strong>✅ Schedule regenerated!</strong> ${regenData.count} days created. <a href="/activity" style="color: var(--accent); text-decoration: underline;">View calendar</a>`;
+                    } else {
+                        regenNotice.innerHTML = `<strong>❌ Regeneration failed:</strong> ${regenData.error}`;
+                    }
+                } catch (regenErr) {
+                    regenNotice.innerHTML = `<strong>❌ Regeneration error:</strong> ${regenErr.message}`;
+                }
+                scrollToBottom();
+            }
+        } else {
+            loadingEl.querySelector('.message-content').innerHTML = `<em>Error: ${result.error || 'Unknown error'}</em>`;
+        }
+    } catch (err) {
+        const loadingEl = document.getElementById(loadingId);
+        if (loadingEl) {
+            loadingEl.querySelector('.message-content').innerHTML = `<em>Error: ${err.message}</em>`;
+        }
+    }
+
+    btn.disabled = false;
+    input.focus();
+    scrollToBottom();
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+</script>
+{% endblock %}

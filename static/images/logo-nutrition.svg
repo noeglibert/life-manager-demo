@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <filter id="pencilTexture">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#pencilTexture)">
+    <!-- Apple body -->
+    <path d="M60 95 Q35 95 28 70 Q22 48 40 35 Q50 28 60 32 Q70 28 80 35 Q98 48 92 70 Q85 95 60 95"
+          stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M60 94 Q36 94 29 70 Q23 49 41 36 Q51 29 60 33 Q69 29 79 36 Q97 49 91 70 Q84 94 60 94"
+          stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+
+    <!-- Apple indent at top -->
+    <path d="M52 35 Q56 40 60 35 Q64 40 68 35"
+          stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+    <!-- Stem -->
+    <path d="M60 32 Q62 22 58 15"
+          stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M60 33 Q63 23 59 16"
+          stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+
+    <!-- Leaf -->
+    <path d="M62 22 Q75 15 80 20 Q72 25 62 22"
+          stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M63 22 Q74 16 79 20 Q71 24 63 22"
+          stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.4"/>
+
+    <!-- Leaf vein -->
+    <path d="M65 22 Q72 19 77 20"
+          stroke="#D4A574" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+
+    <!-- Apple highlight -->
+    <path d="M42 50 Q38 60 40 72"
+          stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M45 48 Q42 55 43 65"
+          stroke="#D4A574" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+
+    <!-- Small shine dot -->
+    <circle cx="44" cy="52" r="2" stroke="#D4A574" stroke-width="1.5" fill="none" opacity="0.6"/>
+  </g>
+
+  <!-- Extra sketch marks -->
+  <path d="M15 100 L17 98" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+  <path d="M103 100 L105 102" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+</svg>

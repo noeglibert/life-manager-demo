@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Life Manager - Layout Explorer</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: #0f0f0f;
+    color: #e4e4e4;
+    min-height: 100vh;
+}
+
+.header {
+    text-align: center;
+    padding: 48px 24px 32px;
+}
+
+.header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 8px;
+}
+
+.header p {
+    color: #888;
+    font-size: 15px;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.gallery {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+}
+
+.card {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.3s;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.card:hover {
+    border-color: #444;
+    transform: translateY(-4px);
+    box-shadow: 0 16px 48px rgba(0,0,0,0.4);
+}
+
+.card-preview {
+    width: 100%;
+    height: 400px;
+    border: none;
+    pointer-events: none;
+    background: #111;
+}
+
+.card-info {
+    padding: 20px 24px;
+    border-top: 1px solid #2a2a2a;
+}
+
+.card-info h2 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 4px;
+    letter-spacing: -0.02em;
+}
+
+.card-info .subtitle {
+    color: #888;
+    font-size: 13px;
+    margin-bottom: 12px;
+}
+
+.card-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.tag {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 99px;
+    background: rgba(255,255,255,0.06);
+    color: #aaa;
+}
+
+.tag.nav-sidebar { background: rgba(99,102,241,0.12); color: #818cf8; }
+.tag.nav-top { background: rgba(20,184,166,0.12); color: #5eead4; }
+.tag.light { background: rgba(245,158,11,0.12); color: #fbbf24; }
+.tag.dark { background: rgba(129,140,248,0.12); color: #a5b4fc; }
+.tag.minimal { background: rgba(244,63,94,0.12); color: #fb7185; }
+.tag.dense { background: rgba(16,185,129,0.12); color: #6ee7b7; }
+.tag.glass { background: rgba(168,85,247,0.12); color: #c084fc; }
+.tag.mono { background: rgba(59,130,246,0.12); color: #93c5fd; }
+
+.open-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 12px;
+    font-size: 12px;
+    color: #666;
+}
+
+.open-hint span {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 4px;
+    text-align: center;
+    line-height: 20px;
+    font-size: 10px;
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Layout Explorer</h1>
+    <p>Seven design directions for Life Manager. The top 3 (E, F, G) combine the sidebar from A with the styles from B &amp; C. Click any card to open full size.</p>
+</div>
+
+<div class="gallery">
+
+    <!-- ===== NEW HYBRIDS (featured) ===== -->
+
+    <a class="card" href="layout-e-sidebar-minimal.html" target="_blank">
+        <iframe class="card-preview" src="layout-e-sidebar-minimal.html" loading="lazy" scrolling="no" style="transform: scale(0.5); transform-origin: top left; width: 200%; height: 800px;"></iframe>
+        <div class="card-info">
+            <h2>E: Sidebar + Minimal</h2>
+            <div class="subtitle">A's dark sidebar navigation paired with B's warm serif typography, generous whitespace, and clean card borders. Light and elegant.</div>
+            <div class="card-tags">
+                <span class="tag nav-sidebar">Sidebar Nav</span>
+                <span class="tag light">Light Theme</span>
+                <span class="tag minimal">Minimal / Serif</span>
+            </div>
+            <div class="open-hint"><span>&nearr;</span> Click to open full size</div>
+        </div>
+    </a>
+
+    <a class="card" href="layout-f-sidebar-glass.html" target="_blank">
+        <iframe class="card-preview" src="layout-f-sidebar-glass.html" loading="lazy" scrolling="no" style="transform: scale(0.5); transform-origin: top left; width: 200%; height: 800px;"></iframe>
+        <div class="card-info">
+            <h2>F: Sidebar + Glassmorphism</h2>
+            <div class="subtitle">A's sidebar structure with C's full dark glassmorphism aesthetic &mdash; frosted cards, gradient orbs, neon XP bar, and bento grid.</div>
+            <div class="card-tags">
+                <span class="tag nav-sidebar">Sidebar Nav</span>
+                <span class="tag dark">Dark First</span>
+                <span class="tag glass">Glassmorphism</span>
+            </div>
+            <div class="open-hint"><span>&nearr;</span> Click to open full size</div>
+        </div>
+    </a>
+
+    <a class="card" href="layout-g-sidebar-hybrid.html" target="_blank">
+        <iframe class="card-preview" src="layout-g-sidebar-hybrid.html" loading="lazy" scrolling="no" style="transform: scale(0.5); transform-origin: top left; width: 200%; height: 800px;"></iframe>
+        <div class="card-info">
+            <h2>G: Sidebar + Warm Glass Hybrid</h2>
+            <div class="subtitle">The best of both &mdash; A's sidebar, B's warm serif typography on a creamy background, with C's translucent glass-blur cards. Refined and unique.</div>
+            <div class="card-tags">
+                <span class="tag nav-sidebar">Sidebar Nav</span>
+                <span class="tag light">Warm Light</span>
+                <span class="tag glass">Glass Cards</span>
+                <span class="tag minimal">Serif</span>
+            </div>
+            <div class="open-hint"><span>&nearr;</span> Click to open full size</div>
+        </div>
+    </a>
+
+    <!-- ===== DIVIDER ===== -->
+    <div style="grid-column: span 2; text-align: center; padding: 24px 0 8px; border-top: 1px solid #222; margin-top: 8px;">
+        <span style="color: #555; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;">Original Concepts</span>
+    </div>
+
+    <!-- ===== ORIGINALS ===== -->
+
+    <a class="card" href="layout-a-sidebar-bento.html" target="_blank">
+        <iframe class="card-preview" src="layout-a-sidebar-bento.html" loading="lazy" scrolling="no" style="transform: scale(0.5); transform-origin: top left; width: 200%; height: 800px;"></iframe>
+        <div class="card-info">
+            <h2>A: Sidebar + Bento Grid</h2>
+            <div class="subtitle">Persistent left sidebar with categorized navigation. Dashboard uses a flexible bento-box grid layout with cards of varying sizes.</div>
+            <div class="card-tags">
+                <span class="tag nav-sidebar">Sidebar Nav</span>
+                <span class="tag light">Light Theme</span>
+                <span class="tag dense">Info Dense</span>
+            </div>
+            <div class="open-hint"><span>&nearr;</span> Click to open full size</div>
+        </div>
+    </a>
+
+    <a class="card" href="layout-b-minimal-focus.html" target="_blank">
+        <iframe class="card-preview" src="layout-b-minimal-focus.html" loading="lazy" scrolling="no" style="transform: scale(0.5); transform-origin: top left; width: 200%; height: 800px;"></iframe>
+        <div class="card-info">
+            <h2>B: Minimal Focus</h2>
+            <div class="subtitle">Clean single-column layout with serif headings, pill-shaped habit indicators, and generous whitespace. Centered reading experience.</div>
+            <div class="card-tags">
+                <span class="tag nav-top">Top Nav</span>
+                <span class="tag light">Light Theme</span>
+                <span class="tag minimal">Minimal</span>
+            </div>
+            <div class="open-hint"><span>&nearr;</span> Click to open full size</div>
+        </div>
+    </a>
+
+    <a class="card" href="layout-c-glass-dark.html" target="_blank">
+        <iframe class="card-preview" src="layout-c-glass-dark.html" loading="lazy" scrolling="no" style="transform: scale(0.5); transform-origin: top left; width: 200%; height: 800px;"></iframe>
+        <div class="card-info">
+            <h2>C: Glassmorphism Dark</h2>
+            <div class="subtitle">Dark-first design with frosted glass cards, gradient accent orbs, and neon-tinted XP bar. Modern and immersive.</div>
+            <div class="card-tags">
+                <span class="tag nav-top">Top Nav Pills</span>
+                <span class="tag dark">Dark First</span>
+                <span class="tag glass">Glassmorphism</span>
+            </div>
+            <div class="open-hint"><span>&nearr;</span> Click to open full size</div>
+        </div>
+    </a>
+
+    <a class="card" href="layout-d-command-center.html" target="_blank">
+        <iframe class="card-preview" src="layout-d-command-center.html" loading="lazy" scrolling="no" style="transform: scale(0.5); transform-origin: top left; width: 200%; height: 800px;"></iframe>
+        <div class="card-info">
+            <h2>D: Command Center</h2>
+            <div class="subtitle">Developer-style layout with monospace typography, IDE-like tab bar, left panel for quick access, and dense 3-column dashboard grid.</div>
+            <div class="card-tags">
+                <span class="tag nav-sidebar">Panel + Tabs</span>
+                <span class="tag dark">Dark Theme</span>
+                <span class="tag mono">Monospace</span>
+                <span class="tag dense">Dense</span>
+            </div>
+            <div class="open-hint"><span>&nearr;</span> Click to open full size</div>
+        </div>
+    </a>
+
+</div>
+
+</body>
+</html>

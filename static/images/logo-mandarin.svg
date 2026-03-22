@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <filter id="pencilTexture">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#pencilTexture)">
+    <!-- Speech bubble -->
+    <path d="M20 25 Q20 15 35 15 L85 15 Q100 15 100 25 L100 65 Q100 75 85 75 L50 75 L35 95 L40 75 L35 75 Q20 75 20 65 Z"
+          stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M21 26 Q21 16 36 16 L84 16 Q99 16 99 26 L99 64 Q99 74 84 74 L49 74 L36 93 L41 74 L36 74 Q21 74 21 64 Z"
+          stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+
+    <!-- Chinese character 中 (zhōng) inside bubble -->
+    <path d="M50 30 L70 30" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M60 25 L60 60" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M45 35 L45 55 L75 55 L75 35 Z" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M46 36 L46 54 L74 54 L74 36 Z" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.4"/>
+
+    <!-- Tone marks above -->
+    <path d="M35 22 L40 20 L45 22" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M75 20 L80 22" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+
+    <!-- Sound waves -->
+    <path d="M105 35 Q112 45 105 55" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M110 30 Q120 45 110 60" stroke="#D4A574" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.3"/>
+  </g>
+
+  <!-- Extra sketch marks -->
+  <path d="M15 40 L17 42" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+  <path d="M25 90 L27 88" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+</svg>

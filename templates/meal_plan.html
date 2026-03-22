@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Meal Plan - Life Manager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="meal-plan-page">
+        <div class="page-header">
+            <h1>Weekly Meal Plan</h1>
+            <p class="subtitle">{{ profile.calorie_target }} cal/day &middot; {{ profile.protein_target_pct }}% protein, {{ profile.carbs_target_pct }}% carbs, {{ profile.fat_target_pct }}% fat</p>
+        </div>
+
+        <div class="meal-plan-actions">
+            <button id="generateBtn" class="btn-primary" onclick="generatePlan()">Generate New Plan</button>
+            <a href="{{ url_for('nutrition') }}" class="btn-outline">Back to Dashboard</a>
+        </div>
+
+        <div id="planLoading" class="plan-loading" style="display:none;">
+            <div class="loading-spinner"></div>
+            <p>Claude is creating your personalized meal plan...</p>
+            <p class="loading-sub">This may take 30-60 seconds</p>
+        </div>
+
+        <div id="planContent" class="plan-content">
+            {% if plan %}
+                <div class="plan-dates">
+                    {{ plan.start_date.strftime('%b %d') }} - {{ plan.end_date.strftime('%b %d, %Y') }}
+                    &middot; {{ plan.calorie_target }} cal/day
+                </div>
+                <div class="plan-body markdown-content">
+                    {{ plan_content_html|safe }}
+                </div>
+                {% if plan_grocery_html %}
+                <div class="grocery-section">
+                    <div class="grocery-body markdown-content">
+                        {{ plan_grocery_html|safe }}
+                    </div>
+                </div>
+                {% endif %}
+            {% else %}
+                <div class="empty-plan">
+                    <p>No meal plan generated yet.</p>
+                    <p>Click "Generate New Plan" to create a personalized weekly meal plan based on your profile.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function generatePlan() {
+    const btn = document.getElementById('generateBtn');
+    const loading = document.getElementById('planLoading');
+    const content = document.getElementById('planContent');
+
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+    loading.style.display = 'block';
+    content.style.opacity = '0.3';
+
+    try {
+        const resp = await fetch('/api/nutrition/generate-plan', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await resp.json();
+
+        if (data.success) {
+            const plan = data.plan;
+            content.innerHTML = `
+                <div class="plan-dates">
+                    ${plan.start_date} - ${plan.end_date} &middot; ${plan.calorie_target} cal/day
+                </div>
+                <div class="plan-body markdown-content">${plan.content}</div>
+                ${plan.grocery_list ? `<div class="grocery-section"><div class="grocery-body markdown-content">${plan.grocery_list}</div></div>` : ''}
+            `;
+
+            if (data.xp_earned) {
+                const n = document.createElement('div');
+                n.className = 'nutrition-notification show';
+                n.textContent = `+${data.xp_earned} XP`;
+                document.body.appendChild(n);
+                setTimeout(() => { n.classList.remove('show'); setTimeout(() => n.remove(), 300); }, 2500);
+            }
+        } else {
+            alert(data.error || 'Error generating plan');
+        }
+    } catch (err) {
+        alert('Error generating plan');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generate New Plan';
+        loading.style.display = 'none';
+        content.style.opacity = '1';
+    }
+}
+</script>
+{% endblock %}

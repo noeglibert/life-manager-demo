@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs><filter id="pencilTexture"><feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G"/></filter></defs>
+  <g filter="url(#pencilTexture)">
+    <path d="M60 8 L68 48 L108 60 L68 72 L60 112 L52 72 L12 60 L52 48 Z" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M60 9 L69 49 L107 60 L69 71 L60 111 L51 71 L13 60 L51 49 Z" stroke="#8B5A2B" stroke-width="1.5" fill="none" opacity="0.4"/>
+    <path d="M60 25 L63 50" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M48 52 Q54 46 60 48" stroke="#D4A574" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <circle cx="38" cy="30" r="2" stroke="#D4A574" stroke-width="1.5" fill="none" opacity="0.4"/>
+    <circle cx="88" cy="35" r="1.5" stroke="#D4A574" stroke-width="1" fill="none" opacity="0.3"/>
+  </g>
+  <path d="M10 108 L12 106" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+</svg>

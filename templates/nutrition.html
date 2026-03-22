@@ -1,0 +1,585 @@
+{% extends "base.html" %}
+
+{% block title %}Nutrition - Life Manager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="nutrition-page">
+        <!-- Stats Banner -->
+        <div class="nutrition-stats-banner">
+            <div class="nutrition-stats-row">
+                <div class="nutrition-stat">
+                    <span class="nutrition-stat-value">{{ game_stats.nutrition_streak or 0 }}</span>
+                    <span class="nutrition-stat-label">Day Streak</span>
+                </div>
+                <div class="nutrition-stat">
+                    <span class="nutrition-stat-value">{{ game_stats.nutrition_entries_total or 0 }}</span>
+                    <span class="nutrition-stat-label">Meals Logged</span>
+                </div>
+                <div class="nutrition-stat">
+                    <span class="nutrition-stat-value">{{ game_stats.nutrition_xp_total or 0 }}</span>
+                    <span class="nutrition-stat-label">XP Earned</span>
+                </div>
+                <div class="nutrition-stat">
+                    <span class="nutrition-stat-value">{{ profile.calorie_target }}</span>
+                    <span class="nutrition-stat-label">Daily Target</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="nutrition-grid">
+            <!-- Left Column: Progress + Quick Log -->
+            <div class="nutrition-left">
+                <!-- Calorie Progress Ring -->
+                <div class="nutrition-card calorie-ring-card">
+                    <h3>Today's Calories</h3>
+                    <div class="calorie-ring-container">
+                        <svg class="calorie-ring" viewBox="0 0 140 140">
+                            <circle class="calorie-ring-bg" cx="70" cy="70" r="60" />
+                            <circle class="calorie-ring-progress" cx="70" cy="70" r="60"
+                                id="calorieRing"
+                                stroke-dasharray="377"
+                                stroke-dashoffset="{{ 377 - (377 * [today_calories / profile.calorie_target, 1.0]|min) }}"
+                            />
+                        </svg>
+                        <div class="calorie-ring-text">
+                            <span class="calorie-ring-current" id="caloriesCurrent">{{ today_calories }}</span>
+                            <span class="calorie-ring-divider">/</span>
+                            <span class="calorie-ring-target">{{ profile.calorie_target }}</span>
+                        </div>
+                    </div>
+                    <div class="calorie-remaining" id="calorieRemaining">
+                        {% set remaining = profile.calorie_target - today_calories %}
+                        {% if remaining > 0 %}
+                            {{ remaining }} cal remaining
+                        {% elif remaining == 0 %}
+                            Target reached!
+                        {% else %}
+                            {{ -remaining }} cal over target
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Macro Bars -->
+                <div class="nutrition-card macro-card">
+                    <h3>Macros</h3>
+                    <div class="macro-bar-group">
+                        <div class="macro-bar-header">
+                            <span class="macro-label protein-color">Protein</span>
+                            <span class="macro-values">{{ today_protein|round(1) }}g / {{ protein_target_g }}g</span>
+                        </div>
+                        <div class="macro-bar">
+                            <div class="macro-bar-fill protein-bar" style="width: {{ [today_protein / protein_target_g * 100, 100]|min }}%"></div>
+                        </div>
+                    </div>
+                    <div class="macro-bar-group">
+                        <div class="macro-bar-header">
+                            <span class="macro-label carbs-color">Carbs</span>
+                            <span class="macro-values">{{ today_carbs|round(1) }}g / {{ carbs_target_g }}g</span>
+                        </div>
+                        <div class="macro-bar">
+                            <div class="macro-bar-fill carbs-bar" style="width: {{ [today_carbs / carbs_target_g * 100, 100]|min }}%"></div>
+                        </div>
+                    </div>
+                    <div class="macro-bar-group">
+                        <div class="macro-bar-header">
+                            <span class="macro-label fat-color">Fat</span>
+                            <span class="macro-values">{{ today_fat|round(1) }}g / {{ fat_target_g }}g</span>
+                        </div>
+                        <div class="macro-bar">
+                            <div class="macro-bar-fill fat-bar" style="width: {{ [today_fat / fat_target_g * 100, 100]|min }}%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Log -->
+                <div class="nutrition-card quick-log-card">
+                    <h3>Log a Meal</h3>
+                    <form id="quickLogForm" class="quick-log-form">
+                        <div class="meal-type-pills">
+                            <button type="button" class="meal-pill active" data-type="breakfast">Breakfast</button>
+                            <button type="button" class="meal-pill" data-type="lunch">Lunch</button>
+                            <button type="button" class="meal-pill" data-type="dinner">Dinner</button>
+                            <button type="button" class="meal-pill" data-type="snack">Snack</button>
+                        </div>
+                        <div class="log-input-row">
+                            <input type="text" id="mealInput" placeholder="Describe your meal... (e.g., grilled chicken with rice and salad)" required>
+                            <button type="submit" class="btn-primary log-btn" id="logBtn">Log</button>
+                        </div>
+                        <div class="log-hint">Claude will estimate calories and macros for you</div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Right Column: Today's Meals + Weekly Chart -->
+            <div class="nutrition-right">
+                <!-- Today's Meals -->
+                <div class="nutrition-card meals-card">
+                    <h3>Today's Meals</h3>
+                    <div id="todayMeals" class="meals-list">
+                        {% if today_entries %}
+                            {% for entry in today_entries %}
+                            <div class="meal-entry" data-id="{{ entry.id }}">
+                                <div class="meal-entry-icon">
+                                    {% if entry.meal_type == 'breakfast' %}{{ svg_icon('sun', 'inline-icon') }}
+                                    {% elif entry.meal_type == 'lunch' %}{{ svg_icon('sun', 'inline-icon') }}
+                                    {% elif entry.meal_type == 'dinner' %}{{ svg_icon('moon', 'inline-icon') }}
+                                    {% else %}{{ svg_icon('seedling', 'inline-icon') }}{% endif %}
+                                </div>
+                                <div class="meal-entry-info">
+                                    <span class="meal-entry-name">{{ entry.description }}</span>
+                                    <span class="meal-entry-macros">P: {{ entry.protein_grams }}g &middot; C: {{ entry.carbs_grams }}g &middot; F: {{ entry.fat_grams }}g</span>
+                                </div>
+                                <div class="meal-entry-calories">{{ entry.calories }} cal</div>
+                                <button class="meal-delete-btn" onclick="deleteEntry({{ entry.id }})" title="Delete">&times;</button>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="empty-meals">No meals logged yet today. Start logging!</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Weekly Chart -->
+                <div class="nutrition-card chart-card">
+                    <h3>Weekly Calories</h3>
+                    <div class="nutrition-weekly-chart">
+                        {% set max_cal = weekly_data.values()|max if weekly_data.values()|max > 0 else 1 %}
+                        {% for day, cals in weekly_data.items() %}
+                        <div class="nutrition-chart-bar-group">
+                            <div class="nutrition-chart-bar-container">
+                                <div class="nutrition-chart-bar {% if cals > profile.calorie_target %}over-target{% endif %}" style="height: {{ (cals / [max_cal, profile.calorie_target]|max * 100)|int }}%">
+                                    {% if cals > 0 %}<span class="chart-bar-value">{{ cals }}</span>{% endif %}
+                                </div>
+                            </div>
+                            <span class="nutrition-chart-label">{{ day }}</span>
+                        </div>
+                        {% endfor %}
+                        <div class="chart-target-line" style="bottom: {{ (profile.calorie_target / [max_cal, profile.calorie_target]|max * 100)|int }}%">
+                            <span class="chart-target-label">{{ profile.calorie_target }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="nutrition-actions">
+                    <a href="{{ url_for('nutrition_plan') }}" class="btn-secondary">View Meal Plan</a>
+                    <a href="{{ url_for('nutrition_setup') }}" class="btn-outline">Edit Profile</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Weight Tracker (full width) -->
+        <div class="nutrition-card weight-tracker-card">
+            <div class="weight-tracker-header">
+                <h3>Weight Tracker</h3>
+                <div class="weight-range-pills">
+                    <button type="button" class="weight-range-pill" data-range="week">7D</button>
+                    <button type="button" class="weight-range-pill active" data-range="month">30D</button>
+                    <button type="button" class="weight-range-pill" data-range="3month">3M</button>
+                    <button type="button" class="weight-range-pill" data-range="6month">6M</button>
+                    <button type="button" class="weight-range-pill" data-range="year">1Y</button>
+                    <button type="button" class="weight-range-pill" data-range="all">All</button>
+                </div>
+            </div>
+
+            <div class="weight-stats-row">
+                <div class="weight-stat">
+                    <span class="weight-stat-label">Current</span>
+                    <span class="weight-stat-value" id="weightCurrent">
+                        {{ latest_weight.weight_kg if latest_weight else '--' }} kg
+                    </span>
+                </div>
+                {% if profile.target_weight_kg %}
+                <div class="weight-stat">
+                    <span class="weight-stat-label">Target</span>
+                    <span class="weight-stat-value">{{ profile.target_weight_kg }} kg</span>
+                </div>
+                <div class="weight-stat">
+                    <span class="weight-stat-label">To Go</span>
+                    <span class="weight-stat-value" id="weightToGo">
+                        {% if latest_weight %}
+                            {{ (latest_weight.weight_kg - profile.target_weight_kg)|round(1) }} kg
+                        {% else %}
+                            --
+                        {% endif %}
+                    </span>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="weight-chart-container">
+                <canvas id="weightChart" height="220"></canvas>
+            </div>
+
+            <form id="weightLogForm" class="weight-log-form">
+                <div class="weight-log-row">
+                    <input type="number" id="weightInput" step="0.01" min="30" max="300"
+                        placeholder="Enter weight (kg)"
+                        value="{{ today_weight.weight_kg if today_weight else '' }}"
+                        required>
+                    <input type="date" id="weightDate" value="{{ today_weight.date.isoformat() if today_weight else '' }}">
+                    <button type="submit" class="btn-primary weight-log-btn" id="weightLogBtn">
+                        {{ 'Update' if today_weight else 'Log Weight' }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Meal type selection
+let selectedMealType = 'breakfast';
+document.querySelectorAll('.meal-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+        document.querySelectorAll('.meal-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        selectedMealType = pill.dataset.type;
+    });
+});
+
+// Quick log form
+document.getElementById('quickLogForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('mealInput');
+    const btn = document.getElementById('logBtn');
+    const desc = input.value.trim();
+    if (!desc) return;
+
+    btn.disabled = true;
+    btn.textContent = '...';
+
+    try {
+        const resp = await fetch('/api/nutrition/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ description: desc, meal_type: selectedMealType })
+        });
+        const data = await resp.json();
+
+        if (data.success) {
+            const entry = data.entry;
+            const icons = { breakfast: '<img class="inline-icon" src="/static/images/icon-sun.svg" alt="">', lunch: '<img class="inline-icon" src="/static/images/icon-sun.svg" alt="">', dinner: '<img class="inline-icon" src="/static/images/icon-moon.svg" alt="">', snack: '<img class="inline-icon" src="/static/images/icon-seedling.svg" alt="">' };
+            const emptyMsg = document.querySelector('.empty-meals');
+            if (emptyMsg) emptyMsg.remove();
+
+            const mealHtml = `
+                <div class="meal-entry" data-id="${entry.id}">
+                    <div class="meal-entry-icon">${icons[entry.meal_type] || '<img class="inline-icon" src="/static/images/icon-seedling.svg" alt="">'}</div>
+                    <div class="meal-entry-info">
+                        <span class="meal-entry-name">${entry.description}</span>
+                        <span class="meal-entry-macros">P: ${entry.protein}g &middot; C: ${entry.carbs}g &middot; F: ${entry.fat}g</span>
+                    </div>
+                    <div class="meal-entry-calories">${entry.calories} cal</div>
+                    <button class="meal-delete-btn" onclick="deleteEntry(${entry.id})" title="Delete">&times;</button>
+                </div>`;
+            document.getElementById('todayMeals').insertAdjacentHTML('beforeend', mealHtml);
+
+            // Update calorie ring
+            updateCalorieRing(entry.calories);
+
+            // Show XP notification
+            if (data.xp_earned) {
+                showNotification(`+${data.xp_earned} XP`);
+            }
+            if (data.achievements && data.achievements.length) {
+                data.achievements.forEach(a => showNotification(`${a}`));
+            }
+
+            input.value = '';
+        } else {
+            alert(data.error || 'Error logging meal');
+        }
+    } catch (err) {
+        alert('Error logging meal');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Log';
+    }
+});
+
+let runningTotal = {{ today_calories }};
+const calorieTarget = {{ profile.calorie_target }};
+
+function updateCalorieRing(addedCals) {
+    runningTotal += addedCals;
+    const pct = Math.min(runningTotal / calorieTarget, 1.0);
+    const offset = 377 - (377 * pct);
+    const ring = document.getElementById('calorieRing');
+    ring.style.strokeDashoffset = offset;
+    document.getElementById('caloriesCurrent').textContent = runningTotal;
+
+    // Color code — warm earth tones
+    if (runningTotal > calorieTarget) {
+        ring.style.stroke = '#A0402A';
+    } else if (runningTotal > calorieTarget * 0.85) {
+        ring.style.stroke = '#C2692A';
+    } else {
+        ring.style.stroke = '#4A7C59';
+    }
+
+    // Update remaining text
+    const remaining = calorieTarget - runningTotal;
+    const el = document.getElementById('calorieRemaining');
+    if (remaining > 0) {
+        el.textContent = remaining + ' cal remaining';
+    } else if (remaining === 0) {
+        el.textContent = 'Target reached!';
+    } else {
+        el.textContent = (-remaining) + ' cal over target';
+    }
+}
+
+async function deleteEntry(id) {
+    if (!confirm('Delete this meal entry?')) return;
+    try {
+        const resp = await fetch(`/api/nutrition/entry/${id}`, { method: 'DELETE' });
+        const data = await resp.json();
+        if (data.success) {
+            const el = document.querySelector(`.meal-entry[data-id="${id}"]`);
+            if (el) {
+                const cals = parseInt(el.querySelector('.meal-entry-calories').textContent);
+                runningTotal -= cals;
+                updateCalorieRing(0);
+                el.remove();
+            }
+        }
+    } catch (err) {
+        alert('Error deleting entry');
+    }
+}
+
+function showNotification(msg) {
+    const n = document.createElement('div');
+    n.className = 'nutrition-notification';
+    n.textContent = msg;
+    document.body.appendChild(n);
+    setTimeout(() => n.classList.add('show'), 10);
+    setTimeout(() => { n.classList.remove('show'); setTimeout(() => n.remove(), 300); }, 2500);
+}
+
+// Initial ring color
+(function() {
+    const ring = document.getElementById('calorieRing');
+    if (runningTotal > calorieTarget) ring.style.stroke = '#A0402A';
+    else if (runningTotal > calorieTarget * 0.85) ring.style.stroke = '#C2692A';
+    else ring.style.stroke = '#4A7C59';
+})();
+
+// ========== Weight Tracker ==========
+let weightChart = null;
+let currentRange = 'month';
+
+// Set default date to today
+const weightDateInput = document.getElementById('weightDate');
+if (!weightDateInput.value) {
+    weightDateInput.value = new Date().toISOString().split('T')[0];
+}
+
+async function loadWeightChart(range) {
+    currentRange = range;
+    try {
+        const resp = await fetch(`/api/nutrition/weight?range=${range}`);
+        const data = await resp.json();
+        renderWeightChart(data.entries, data.target_weight);
+    } catch (err) {
+        console.error('Error loading weight data:', err);
+    }
+}
+
+function renderWeightChart(entries, targetWeight) {
+    const canvas = document.getElementById('weightChart');
+    const ctx = canvas.getContext('2d');
+
+    // High-DPI support
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const W = rect.width;
+    const H = rect.height;
+
+    ctx.clearRect(0, 0, W, H);
+
+    if (entries.length === 0) {
+        ctx.fillStyle = '#8B7E6A';
+        ctx.font = '14px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('No weight data yet. Log your first entry below!', W / 2, H / 2);
+        return;
+    }
+
+    const padding = { top: 20, right: 20, bottom: 40, left: 50 };
+    const chartW = W - padding.left - padding.right;
+    const chartH = H - padding.top - padding.bottom;
+
+    const weights = entries.map(e => e.weight_kg);
+    let minW = Math.min(...weights);
+    let maxW = Math.max(...weights);
+    if (targetWeight) {
+        minW = Math.min(minW, targetWeight);
+        maxW = Math.max(maxW, targetWeight);
+    }
+    const range = maxW - minW || 1;
+    minW -= range * 0.1;
+    maxW += range * 0.1;
+
+    const toX = (i) => padding.left + (i / Math.max(entries.length - 1, 1)) * chartW;
+    const toY = (w) => padding.top + (1 - (w - minW) / (maxW - minW)) * chartH;
+
+    // Grid lines
+    ctx.strokeStyle = 'rgba(139, 126, 106, 0.15)';
+    ctx.lineWidth = 1;
+    const gridSteps = 5;
+    for (let i = 0; i <= gridSteps; i++) {
+        const y = padding.top + (i / gridSteps) * chartH;
+        ctx.beginPath();
+        ctx.moveTo(padding.left, y);
+        ctx.lineTo(W - padding.right, y);
+        ctx.stroke();
+
+        const val = maxW - (i / gridSteps) * (maxW - minW);
+        ctx.fillStyle = '#8B7E6A';
+        ctx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(val.toFixed(1), padding.left - 8, y + 4);
+    }
+
+    // Target weight line
+    if (targetWeight && targetWeight >= minW && targetWeight <= maxW) {
+        const ty = toY(targetWeight);
+        ctx.strokeStyle = '#4A7C59';
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(padding.left, ty);
+        ctx.lineTo(W - padding.right, ty);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#4A7C59';
+        ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText('Target', W - padding.right + 2, ty - 4);
+    }
+
+    // Area fill
+    ctx.beginPath();
+    ctx.moveTo(toX(0), toY(entries[0].weight_kg));
+    for (let i = 1; i < entries.length; i++) {
+        ctx.lineTo(toX(i), toY(entries[i].weight_kg));
+    }
+    ctx.lineTo(toX(entries.length - 1), padding.top + chartH);
+    ctx.lineTo(toX(0), padding.top + chartH);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartH);
+    grad.addColorStop(0, 'rgba(74, 124, 89, 0.2)');
+    grad.addColorStop(1, 'rgba(74, 124, 89, 0.02)');
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    ctx.moveTo(toX(0), toY(entries[0].weight_kg));
+    for (let i = 1; i < entries.length; i++) {
+        ctx.lineTo(toX(i), toY(entries[i].weight_kg));
+    }
+    ctx.strokeStyle = '#4A7C59';
+    ctx.lineWidth = 2;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+
+    // Data points
+    entries.forEach((e, i) => {
+        const x = toX(i);
+        const y = toY(e.weight_kg);
+        ctx.beginPath();
+        ctx.arc(x, y, entries.length > 60 ? 2 : 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = '#4A7C59';
+        ctx.fill();
+        ctx.strokeStyle = '#FFF';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+    });
+
+    // X-axis labels
+    ctx.fillStyle = '#8B7E6A';
+    ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+    ctx.textAlign = 'center';
+    const maxLabels = Math.min(entries.length, 8);
+    const step = Math.max(1, Math.floor(entries.length / maxLabels));
+    for (let i = 0; i < entries.length; i += step) {
+        const d = new Date(entries[i].date);
+        const label = d.toLocaleDateString('en', { month: 'short', day: 'numeric' });
+        ctx.fillText(label, toX(i), H - padding.bottom + 20);
+    }
+    // Always show last label
+    if (entries.length > 1) {
+        const last = entries.length - 1;
+        const d = new Date(entries[last].date);
+        const label = d.toLocaleDateString('en', { month: 'short', day: 'numeric' });
+        ctx.fillText(label, toX(last), H - padding.bottom + 20);
+    }
+}
+
+// Range pill selection
+document.querySelectorAll('.weight-range-pill').forEach(pill => {
+    pill.addEventListener('click', () => {
+        document.querySelectorAll('.weight-range-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+        loadWeightChart(pill.dataset.range);
+    });
+});
+
+// Weight log form
+document.getElementById('weightLogForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const input = document.getElementById('weightInput');
+    const dateInput = document.getElementById('weightDate');
+    const btn = document.getElementById('weightLogBtn');
+    const weight = parseFloat(input.value);
+    if (!weight) return;
+
+    btn.disabled = true;
+    btn.textContent = '...';
+
+    try {
+        const resp = await fetch('/api/nutrition/weight', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ weight_kg: weight, date: dateInput.value })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            document.getElementById('weightCurrent').textContent = data.entry.weight_kg + ' kg';
+            const toGoEl = document.getElementById('weightToGo');
+            if (toGoEl) {
+                const target = {{ profile.target_weight_kg or 0 }};
+                if (target > 0) {
+                    toGoEl.textContent = (data.entry.weight_kg - target).toFixed(1) + ' kg';
+                }
+            }
+            btn.textContent = 'Update';
+            showNotification('Weight logged!');
+            loadWeightChart(currentRange);
+        } else {
+            alert(data.error || 'Error logging weight');
+        }
+    } catch (err) {
+        alert('Error logging weight');
+    } finally {
+        btn.disabled = false;
+        if (btn.textContent === '...') btn.textContent = 'Log Weight';
+    }
+});
+
+// Resize handler
+window.addEventListener('resize', () => loadWeightChart(currentRange));
+
+// Initial load
+loadWeightChart('month');
+</script>
+{% endblock %}

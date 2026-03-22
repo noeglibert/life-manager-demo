@@ -1,0 +1,325 @@
+{% extends "base.html" %}
+
+{% block title %}Log Workout - Life Manager{% endblock %}
+
+{% block content %}
+<div class="activity-page">
+    <div class="page-header">
+        <h1>Log Workout</h1>
+    </div>
+
+    <!-- Type Switcher -->
+    <div class="type-switcher">
+        <button class="type-switcher-btn active" data-type="run" onclick="switchWorkoutType('run')">{{ svg_icon('muscle', 'btn-icon-svg') }} Run</button>
+        <button class="type-switcher-btn" data-type="gym" onclick="switchWorkoutType('gym')">{{ svg_icon('dumbbell', 'btn-icon-svg') }} Gym</button>
+        <button class="type-switcher-btn" data-type="cross-training" onclick="switchWorkoutType('cross-training')">{{ svg_icon('cycling', 'btn-icon-svg') }} Cross-training</button>
+    </div>
+
+    <form id="workout-form" class="workout-form">
+        <!-- Common fields -->
+        <div class="form-group">
+            <label for="workout-date">Date</label>
+            <input type="date" id="workout-date" value="{{ today if today else '' }}" required>
+        </div>
+
+        <!-- ===== RUN FIELDS ===== -->
+        <div class="workout-type-fields" id="fields-run">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="distance-km">Distance (km)</label>
+                    <input type="number" id="distance-km" step="0.01" min="0" placeholder="e.g. 5.43">
+                </div>
+                <div class="form-group">
+                    <label for="duration-minutes">Duration (mm:ss)</label>
+                    <input type="text" id="duration-minutes" placeholder="e.g. 55:30 or 55.5" inputmode="decimal">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="effort">Effort</label>
+                    <select id="effort">
+                        <option value="easy">Easy</option>
+                        <option value="moderate">Moderate</option>
+                        <option value="hard">Hard</option>
+                        <option value="race">Race</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="heart-rate">Avg Heart Rate (optional)</label>
+                    <input type="number" id="heart-rate" min="0" max="220" placeholder="e.g. 145">
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== GYM FIELDS ===== -->
+        <div class="workout-type-fields" id="fields-gym" style="display:none">
+            <div class="form-group">
+                <label for="gym-duration">Duration (mm:ss)</label>
+                <input type="text" id="gym-duration" placeholder="e.g. 60:00 or 60" inputmode="decimal">
+            </div>
+
+            <div class="exercises-section">
+                <label>Exercises</label>
+                <div id="exercises-container">
+                    <!-- Exercise blocks will be added here by JS -->
+                </div>
+                <button type="button" class="btn-add-exercise" onclick="addExerciseBlock()">+ Add Exercise</button>
+            </div>
+
+            <div class="form-group">
+                <label>Muscle Groups</label>
+                <div class="muscle-group-checkboxes">
+                    <label class="checkbox-label"><input type="checkbox" value="Chest"> Chest</label>
+                    <label class="checkbox-label"><input type="checkbox" value="Back"> Back</label>
+                    <label class="checkbox-label"><input type="checkbox" value="Legs"> Legs</label>
+                    <label class="checkbox-label"><input type="checkbox" value="Shoulders"> Shoulders</label>
+                    <label class="checkbox-label"><input type="checkbox" value="Arms"> Arms</label>
+                    <label class="checkbox-label"><input type="checkbox" value="Core"> Core</label>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== CROSS-TRAINING FIELDS ===== -->
+        <div class="workout-type-fields" id="fields-cross-training" style="display:none">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="activity-name">Activity</label>
+                    <input type="text" id="activity-name" placeholder="e.g. Swimming, Cycling, Yoga">
+                </div>
+                <div class="form-group">
+                    <label for="cross-duration">Duration (mm:ss)</label>
+                    <input type="text" id="cross-duration" placeholder="e.g. 45:00 or 45" inputmode="decimal">
+                </div>
+            </div>
+        </div>
+
+        <!-- Common: Title override & Notes -->
+        <div class="form-group">
+            <label for="workout-title">Title (optional — auto-generated if empty)</label>
+            <input type="text" id="workout-title" placeholder="e.g. Morning easy run">
+        </div>
+        <div class="form-group">
+            <label for="workout-notes">Notes (optional)</label>
+            <textarea id="workout-notes" rows="3" placeholder="How did you feel? Any pain or observations?"></textarea>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-primary" id="btn-submit-workout">Save Workout</button>
+            <a href="{{ url_for('activity') }}" class="btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Set today's date as default
+document.getElementById('workout-date').value = new Date().toISOString().split('T')[0];
+
+let currentType = 'run';
+let setCounter = 0;
+
+function switchWorkoutType(type) {
+    currentType = type;
+    document.querySelectorAll('.type-switcher-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.type-switcher-btn[data-type="${type}"]`).classList.add('active');
+    document.querySelectorAll('.workout-type-fields').forEach(f => f.style.display = 'none');
+    document.getElementById(`fields-${type}`).style.display = '';
+    // Add initial exercise block if gym and container is empty
+    if (type === 'gym' && document.getElementById('exercises-container').children.length === 0) {
+        addExerciseBlock();
+    }
+}
+
+// ===== Per-Set Exercise Block System =====
+
+function createSetRowHTML(setNum) {
+    const id = ++setCounter;
+    return `<tr class="set-row" data-set="${setNum}">
+        <td>${setNum}</td>
+        <td><input type="number" class="set-weight" placeholder="kg" min="0" step="0.5"></td>
+        <td><input type="number" class="set-reps" placeholder="reps" min="0"></td>
+        <td class="set-failed-toggle">
+            <input type="checkbox" id="fail-${id}" class="set-failed-cb">
+            <label for="fail-${id}" title="Failed set">✕</label>
+        </td>
+        <td><button type="button" class="btn-remove-set" onclick="removeSetRow(this)" title="Remove set">×</button></td>
+    </tr>`;
+}
+
+function addExerciseBlock() {
+    const container = document.getElementById('exercises-container');
+    const block = document.createElement('div');
+    block.className = 'exercise-block';
+    block.innerHTML = `
+        <div class="exercise-block-header">
+            <input type="text" placeholder="Exercise name (e.g. Bench Press)" class="exercise-name">
+            <button type="button" class="btn-remove-block" onclick="removeExerciseBlock(this)" title="Remove exercise">×</button>
+        </div>
+        <table class="set-table">
+            <thead>
+                <tr><th>Set</th><th>Weight</th><th>Reps</th><th>Fail</th><th></th></tr>
+            </thead>
+            <tbody>
+                ${createSetRowHTML(1)}
+            </tbody>
+        </table>
+        <button type="button" class="btn-add-set" onclick="addSetRow(this)">+ Add Set</button>
+    `;
+    container.appendChild(block);
+    // Focus the exercise name
+    block.querySelector('.exercise-name').focus();
+    // Set up failed-toggle listeners
+    setupFailedToggles(block);
+}
+
+function addSetRow(addBtn) {
+    const block = addBtn.closest('.exercise-block');
+    const tbody = block.querySelector('.set-table tbody');
+    const setNum = tbody.querySelectorAll('.set-row').length + 1;
+
+    // Copy weight from previous set as convenience
+    const prevRow = tbody.querySelector('.set-row:last-child');
+    const prevWeight = prevRow ? prevRow.querySelector('.set-weight').value : '';
+
+    const tr = document.createElement('tr');
+    tr.className = 'set-row';
+    tr.dataset.set = setNum;
+    const id = ++setCounter;
+    tr.innerHTML = `
+        <td>${setNum}</td>
+        <td><input type="number" class="set-weight" placeholder="kg" min="0" step="0.5" value="${prevWeight}"></td>
+        <td><input type="number" class="set-reps" placeholder="reps" min="0"></td>
+        <td class="set-failed-toggle">
+            <input type="checkbox" id="fail-${id}" class="set-failed-cb">
+            <label for="fail-${id}" title="Failed set">✕</label>
+        </td>
+        <td><button type="button" class="btn-remove-set" onclick="removeSetRow(this)" title="Remove set">×</button></td>
+    `;
+    tbody.appendChild(tr);
+    tr.querySelector('.set-reps').focus();
+    setupFailedToggles(block);
+}
+
+function removeSetRow(btn) {
+    const block = btn.closest('.exercise-block');
+    const tbody = block.querySelector('.set-table tbody');
+    if (tbody.querySelectorAll('.set-row').length > 1) {
+        btn.closest('.set-row').remove();
+        renumberSets(tbody);
+    }
+}
+
+function removeExerciseBlock(btn) {
+    const container = document.getElementById('exercises-container');
+    if (container.children.length > 1) {
+        btn.closest('.exercise-block').remove();
+    }
+}
+
+function renumberSets(tbody) {
+    tbody.querySelectorAll('.set-row').forEach((row, i) => {
+        row.dataset.set = i + 1;
+        row.querySelector('td:first-child').textContent = i + 1;
+    });
+}
+
+function setupFailedToggles(block) {
+    block.querySelectorAll('.set-failed-cb').forEach(cb => {
+        cb.onchange = function() {
+            const row = this.closest('.set-row');
+            row.classList.toggle('set-row-failed', this.checked);
+        };
+    });
+}
+
+function getExercises() {
+    const blocks = document.querySelectorAll('#exercises-container .exercise-block');
+    const exercises = [];
+    blocks.forEach(block => {
+        const name = block.querySelector('.exercise-name').value.trim();
+        if (!name) return;
+        const sets = [];
+        block.querySelectorAll('.set-table tbody .set-row').forEach((row, i) => {
+            const weight = parseFloat(row.querySelector('.set-weight').value) || 0;
+            const reps = parseInt(row.querySelector('.set-reps').value) || 0;
+            const failed = row.querySelector('.set-failed-cb').checked;
+            if (weight > 0 || reps > 0) {
+                sets.push({ set: i + 1, weight_kg: weight, reps: reps, failed: failed });
+            }
+        });
+        if (sets.length > 0) {
+            exercises.push({ name: name, sets: sets });
+        }
+    });
+    return exercises;
+}
+
+function getMuscleGroups() {
+    return Array.from(document.querySelectorAll('.muscle-group-checkboxes input:checked')).map(cb => cb.value);
+}
+
+// ===== Duration Parser (mm:ss or decimal) =====
+function parseDuration(val) {
+    if (!val) return 0;
+    val = val.trim();
+    if (val.includes(':')) {
+        const parts = val.split(':');
+        const mins = parseInt(parts[0]) || 0;
+        const secs = parseInt(parts[1]) || 0;
+        return mins + secs / 60;
+    }
+    return parseFloat(val) || 0;
+}
+
+// ===== Form Submit =====
+
+document.getElementById('workout-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('btn-submit-workout');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    const data = {
+        type: currentType,
+        date: document.getElementById('workout-date').value,
+        title: document.getElementById('workout-title').value,
+        notes: document.getElementById('workout-notes').value,
+    };
+
+    if (currentType === 'run') {
+        data.distance_km = document.getElementById('distance-km').value;
+        data.duration_minutes = parseDuration(document.getElementById('duration-minutes').value);
+        data.effort = document.getElementById('effort').value;
+        data.heart_rate_avg = document.getElementById('heart-rate').value;
+    } else if (currentType === 'gym') {
+        data.duration_minutes = parseDuration(document.getElementById('gym-duration').value);
+        data.exercises = getExercises();
+        data.muscle_groups = getMuscleGroups();
+    } else {
+        data.activity_name = document.getElementById('activity-name').value;
+        data.duration_minutes = parseDuration(document.getElementById('cross-duration').value);
+    }
+
+    try {
+        const response = await fetch('/api/activity/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        const result = await response.json();
+        if (result.success) {
+            window.location.href = '/activity';
+        } else {
+            alert('Error: ' + (result.error || 'Unknown error'));
+            btn.disabled = false;
+            btn.textContent = 'Save Workout';
+        }
+    } catch (err) {
+        alert('Error saving workout: ' + err.message);
+        btn.disabled = false;
+        btn.textContent = 'Save Workout';
+    }
+});
+</script>
+{% endblock %}

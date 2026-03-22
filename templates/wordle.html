@@ -1,0 +1,371 @@
+{% extends "base.html" %}
+
+{% block title %}LoL Wordle - Life Manager{% endblock %}
+
+{% block content %}
+<div class="wordle-page">
+    <div class="wordle-header">
+        <h1>LoL Wordle</h1>
+        <p class="wordle-subtitle">Guess the League of Legends word in 6 tries</p>
+        <div class="wordle-actions">
+            <button class="btn-secondary btn-sm" onclick="showStats()">Stats</button>
+            <button class="btn-secondary btn-sm" onclick="showHelp()">How to Play</button>
+        </div>
+    </div>
+
+    <!-- Message area -->
+    <div id="wordle-message" class="wordle-message" style="display:none;"></div>
+
+    <!-- Game board -->
+    <div class="wordle-board" id="wordle-board">
+        {% for row in range(6) %}
+        <div class="wordle-row" id="row-{{ row }}">
+            {% for col in range(5) %}
+            <div class="wordle-tile" id="tile-{{ row }}-{{ col }}"></div>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- On-screen keyboard -->
+    <div class="wordle-keyboard" id="wordle-keyboard">
+        <div class="keyboard-row">
+            {% for key in ['q','w','e','r','t','y','u','i','o','p'] %}
+            <button class="key-btn" data-key="{{ key }}" onclick="handleKey('{{ key }}')">{{ key }}</button>
+            {% endfor %}
+        </div>
+        <div class="keyboard-row">
+            <div class="key-spacer-half"></div>
+            {% for key in ['a','s','d','f','g','h','j','k','l'] %}
+            <button class="key-btn" data-key="{{ key }}" onclick="handleKey('{{ key }}')">{{ key }}</button>
+            {% endfor %}
+            <div class="key-spacer-half"></div>
+        </div>
+        <div class="keyboard-row">
+            <button class="key-btn key-wide" onclick="handleKey('Enter')">Enter</button>
+            {% for key in ['z','x','c','v','b','n','m'] %}
+            <button class="key-btn" data-key="{{ key }}" onclick="handleKey('{{ key }}')">{{ key }}</button>
+            {% endfor %}
+            <button class="key-btn key-wide" onclick="handleKey('Backspace')">
+                <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 0 24 24" width="20" fill="currentColor">
+                    <path d="M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H7.07L2.4 12l4.66-7H22v14zm-11.59-2L14 13.41 17.59 17 19 15.59 15.41 12 19 8.41 17.59 7 14 10.59 10.41 7 9 8.41 12.59 12 9 15.59z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats Modal -->
+    <div class="wordle-modal" id="stats-modal" style="display:none;" onclick="if(event.target===this)closeModal('stats-modal')">
+        <div class="wordle-modal-content">
+            <button class="close-btn" onclick="closeModal('stats-modal')">&times;</button>
+            <h2>Statistics</h2>
+            <div class="stats-row">
+                <div class="stat-box">
+                    <div class="stat-value" id="stat-played">{{ stats.games_played or 0 }}</div>
+                    <div class="stat-label">Played</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="stat-win-pct">{% if stats.games_played %}{{ ((stats.games_won or 0) / stats.games_played * 100)|round|int }}{% else %}0{% endif %}</div>
+                    <div class="stat-label">Win %</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="stat-streak">{{ stats.current_streak or 0 }}</div>
+                    <div class="stat-label">Current Streak</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="stat-max-streak">{{ stats.max_streak or 0 }}</div>
+                    <div class="stat-label">Max Streak</div>
+                </div>
+            </div>
+
+            <h3>Guess Distribution</h3>
+            <div class="guess-distribution" id="guess-distribution">
+                {% for i in range(1, 7) %}
+                {% set count = guess_distribution.get(i|string, 0) %}
+                {% set max_count = guess_distribution.values()|list|max if guess_distribution.values()|list|max > 0 else 1 %}
+                <div class="dist-row">
+                    <span class="dist-label">{{ i }}</span>
+                    <div class="dist-bar-wrapper">
+                        <div class="dist-bar" style="width: {{ (count / max_count * 100)|round }}%;">
+                            <span class="dist-count">{{ count }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div id="share-section" style="display:none; margin-top: 16px;">
+                <button class="btn-primary" onclick="shareResult()">Share Result</button>
+                <div id="share-copied" style="display:none; color: var(--accent-green); margin-top: 8px;">Copied to clipboard!</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div class="wordle-modal" id="help-modal" style="display:none;" onclick="if(event.target===this)closeModal('help-modal')">
+        <div class="wordle-modal-content">
+            <button class="close-btn" onclick="closeModal('help-modal')">&times;</button>
+            <h2>How to Play</h2>
+            <p>Guess the <strong>League of Legends</strong> word in 6 tries.</p>
+            <ul class="help-rules">
+                <li>Each guess must be a valid 5-letter word.</li>
+                <li>Words can be champion names, items, game terms, or LoL slang.</li>
+                <li>The color of the tiles will change to show how close your guess was.</li>
+            </ul>
+
+            <h3>Examples</h3>
+            <div class="help-example">
+                <div class="wordle-row help-row">
+                    <div class="wordle-tile correct">S</div>
+                    <div class="wordle-tile">T</div>
+                    <div class="wordle-tile">O</div>
+                    <div class="wordle-tile">M</div>
+                    <div class="wordle-tile">P</div>
+                </div>
+                <p><strong>S</strong> is in the word and in the correct spot.</p>
+            </div>
+            <div class="help-example">
+                <div class="wordle-row help-row">
+                    <div class="wordle-tile">F</div>
+                    <div class="wordle-tile present">L</div>
+                    <div class="wordle-tile">A</div>
+                    <div class="wordle-tile">S</div>
+                    <div class="wordle-tile">H</div>
+                </div>
+                <p><strong>L</strong> is in the word but in the wrong spot.</p>
+            </div>
+            <div class="help-example">
+                <div class="wordle-row help-row">
+                    <div class="wordle-tile">B</div>
+                    <div class="wordle-tile">A</div>
+                    <div class="wordle-tile">R</div>
+                    <div class="wordle-tile absent">O</div>
+                    <div class="wordle-tile">N</div>
+                </div>
+                <p><strong>O</strong> is not in the word in any spot.</p>
+            </div>
+
+            <p class="help-footer">A new word is available each day. {{ word_count }} LoL words in the pool!</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Game state
+    let currentRow = 0;
+    let currentCol = 0;
+    let currentGuess = '';
+    let gameFinished = false;
+    let guessResults = []; // Store results for share
+
+    // Load existing game state
+    {% if game_state %}
+    (function() {
+        const state = {{ game_state|tojson }};
+        state.guesses.forEach(function(g, rowIdx) {
+            for (let col = 0; col < 5; col++) {
+                const tile = document.getElementById('tile-' + rowIdx + '-' + col);
+                tile.textContent = g.word[col].toUpperCase();
+                tile.classList.add('filled', g.result[col]);
+            }
+            // Update keyboard
+            for (let col = 0; col < 5; col++) {
+                updateKeyboard(g.word[col], g.result[col]);
+            }
+            guessResults.push(g.result);
+        });
+        currentRow = state.guesses.length;
+        gameFinished = state.finished;
+
+        if (state.finished) {
+            document.getElementById('share-section').style.display = 'block';
+            if (state.won) {
+                showMessage('Well played!', false);
+            }
+        }
+    })();
+    {% endif %}
+
+    // Keyboard input
+    document.addEventListener('keydown', function(e) {
+        if (gameFinished) return;
+        if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+        if (e.key === 'Enter') {
+            submitGuess();
+        } else if (e.key === 'Backspace') {
+            deleteLetter();
+        } else if (/^[a-zA-Z]$/.test(e.key)) {
+            addLetter(e.key.toLowerCase());
+        }
+    });
+
+    function handleKey(key) {
+        if (gameFinished) return;
+        if (key === 'Enter') {
+            submitGuess();
+        } else if (key === 'Backspace') {
+            deleteLetter();
+        } else {
+            addLetter(key);
+        }
+    }
+
+    function addLetter(letter) {
+        if (currentCol >= 5) return;
+        const tile = document.getElementById('tile-' + currentRow + '-' + currentCol);
+        tile.textContent = letter.toUpperCase();
+        tile.classList.add('filled');
+        currentGuess += letter;
+        currentCol++;
+    }
+
+    function deleteLetter() {
+        if (currentCol <= 0) return;
+        currentCol--;
+        const tile = document.getElementById('tile-' + currentRow + '-' + currentCol);
+        tile.textContent = '';
+        tile.classList.remove('filled');
+        currentGuess = currentGuess.slice(0, -1);
+    }
+
+    async function submitGuess() {
+        if (currentGuess.length !== 5) {
+            showMessage('Not enough letters', true);
+            shakeRow(currentRow);
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/wordle/guess', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({guess: currentGuess})
+            });
+            const data = await response.json();
+
+            if (data.error) {
+                showMessage(data.error, true);
+                shakeRow(currentRow);
+                return;
+            }
+
+            // Animate tiles
+            const row = currentRow;
+            const guessWord = currentGuess;
+            guessResults.push(data.result);
+
+            for (let col = 0; col < 5; col++) {
+                setTimeout(function() {
+                    const tile = document.getElementById('tile-' + row + '-' + col);
+                    tile.classList.add('flip');
+                    setTimeout(function() {
+                        tile.classList.add(data.result[col]);
+                        tile.classList.remove('flip');
+                        tile.classList.add('revealed');
+                        updateKeyboard(guessWord[col], data.result[col]);
+                    }, 250);
+                }, col * 300);
+            }
+
+            // Update keyboard colors immediately as well (backup for animation timing)
+            for (let col = 0; col < 5; col++) {
+                updateKeyboard(guessWord[col], data.result[col]);
+            }
+
+            // After all animations
+            setTimeout(function() {
+                if (data.won) {
+                    gameFinished = true;
+                    const messages = ['Genius!', 'Magnificent!', 'Impressive!', 'Splendid!', 'Great!', 'Phew!'];
+                    showMessage(messages[row] || 'Well played!', false);
+                    document.getElementById('share-section').style.display = 'block';
+                    refreshStats();
+                } else if (data.finished) {
+                    gameFinished = true;
+                    showMessage('The word was: ' + data.answer.toUpperCase(), false);
+                    document.getElementById('share-section').style.display = 'block';
+                    refreshStats();
+                }
+            }, 5 * 300 + 300);
+
+            currentRow++;
+            currentCol = 0;
+            currentGuess = '';
+
+        } catch (e) {
+            showMessage('Error: ' + e.message, true);
+        }
+    }
+
+    function updateKeyboard(letter, status) {
+        const key = document.querySelector('.key-btn[data-key="' + letter + '"]');
+        if (!key) return;
+
+        // Only upgrade status: absent < present < correct
+        const priority = {'absent': 1, 'present': 2, 'correct': 3};
+        const current = key.dataset.status || '';
+        if (!current || (priority[status] || 0) > (priority[current] || 0)) {
+            key.classList.remove('absent', 'present', 'correct');
+            key.classList.add(status);
+            key.dataset.status = status;
+        }
+    }
+
+    function showMessage(text, isError) {
+        const msg = document.getElementById('wordle-message');
+        msg.textContent = text;
+        msg.style.display = 'block';
+        msg.className = 'wordle-message' + (isError ? ' error' : ' success');
+        if (isError) {
+            setTimeout(function() { msg.style.display = 'none'; }, 2000);
+        }
+    }
+
+    function shakeRow(row) {
+        const rowEl = document.getElementById('row-' + row);
+        rowEl.classList.add('shake');
+        setTimeout(function() { rowEl.classList.remove('shake'); }, 600);
+    }
+
+    function showStats() {
+        document.getElementById('stats-modal').style.display = 'flex';
+    }
+
+    function showHelp() {
+        document.getElementById('help-modal').style.display = 'flex';
+    }
+
+    function closeModal(id) {
+        document.getElementById(id).style.display = 'none';
+    }
+
+    async function refreshStats() {
+        try {
+            const response = await fetch('/api/wordle/stats');
+            const data = await response.json();
+            document.getElementById('stat-played').textContent = data.games_played;
+            document.getElementById('stat-win-pct').textContent = data.win_pct;
+            document.getElementById('stat-streak').textContent = data.current_streak;
+            document.getElementById('stat-max-streak').textContent = data.max_streak;
+        } catch(e) {}
+    }
+
+    function shareResult() {
+        const emojis = {'correct': '🟩', 'present': '🟨', 'absent': '⬛'};
+        let text = 'LoL Wordle ' + (gameFinished ? guessResults.length : 'X') + '/6\n\n';
+        guessResults.forEach(function(row) {
+            text += row.map(function(s) { return emojis[s]; }).join('') + '\n';
+        });
+
+        navigator.clipboard.writeText(text.trim()).then(function() {
+            document.getElementById('share-copied').style.display = 'block';
+            setTimeout(function() {
+                document.getElementById('share-copied').style.display = 'none';
+            }, 2000);
+        });
+    }
+</script>
+{% endblock %}

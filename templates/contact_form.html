@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}{% if contact %}Edit{% else %}New{% endif %} Contact - Life Manager{% endblock %}
+
+{% block content %}
+<div class="form-page">
+    <h1>{% if contact %}Edit Contact{% else %}Add New Contact{% endif %}</h1>
+
+    <form method="POST" class="contact-form">
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="first_name">First Name *</label>
+                <input type="text" id="first_name" name="first_name" value="{{ contact.first_name if contact else '' }}" required autocomplete="given-name">
+            </div>
+
+            <div class="form-group">
+                <label for="last_name">Last Name</label>
+                <input type="text" id="last_name" name="last_name" value="{{ contact.last_name if contact else '' }}" autocomplete="family-name">
+            </div>
+
+            <div class="form-group">
+                <label for="phone">Phone</label>
+                <input type="tel" id="phone" name="phone" value="{{ contact.phone if contact else '' }}" autocomplete="tel">
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" value="{{ contact.email if contact else '' }}" autocomplete="email">
+            </div>
+
+            <div class="form-group">
+                <label for="birthday">Birthday</label>
+                <input type="date" id="birthday" name="birthday" value="{{ contact.birthday.strftime('%Y-%m-%d') if contact and contact.birthday else '' }}" autocomplete="bday">
+            </div>
+
+            <div class="form-group">
+                <label for="relationship_category">Category</label>
+                <select id="relationship_category" name="relationship_category">
+                    <option value="">Select category...</option>
+                    <option value="Family" {% if contact and contact.relationship_category == 'Family' %}selected{% endif %}>Family</option>
+                    <option value="Friend" {% if contact and contact.relationship_category == 'Friend' %}selected{% endif %}>Friend</option>
+                    <option value="Friend from University" {% if contact and contact.relationship_category == 'Friend from University' %}selected{% endif %}>Friend from University</option>
+                    <option value="MAKB" {% if contact and contact.relationship_category == 'MAKB' %}selected{% endif %}>MAKB</option>
+                    <option value="Professional" {% if contact and contact.relationship_category == 'Professional' %}selected{% endif %}>Professional</option>
+                    <option value="Acquaintance" {% if contact and contact.relationship_category == 'Acquaintance' %}selected{% endif %}>Acquaintance</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="preferred_language">Preferred Language</label>
+                <select id="preferred_language" name="preferred_language">
+                    <option value="">Select language...</option>
+                    <option value="English" {% if contact and contact.preferred_language == 'English' %}selected{% endif %}>English</option>
+                    <option value="French" {% if contact and contact.preferred_language == 'French' %}selected{% endif %}>French</option>
+                    <option value="Spanish" {% if contact and contact.preferred_language == 'Spanish' %}selected{% endif %}>Spanish</option>
+                    <option value="Other" {% if contact and contact.preferred_language == 'Other' %}selected{% endif %}>Other</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="contact_frequency">Contact Frequency (days)</label>
+                <input type="number" id="contact_frequency" name="contact_frequency" 
+                       value="{{ contact.contact_frequency if contact else '' }}" 
+                       placeholder="e.g., 30">
+                <small>How often you'd like to stay in touch</small>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="address">Address</label>
+            <textarea id="address" name="address" rows="2">{{ contact.address if contact else '' }}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="how_we_met">How We Met</label>
+            <textarea id="how_we_met" name="how_we_met" rows="3">{{ contact.how_we_met if contact else '' }}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="notes">Notes</label>
+            <textarea id="notes" name="notes" rows="5">{{ contact.notes if contact else '' }}</textarea>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-primary">{% if contact %}Update{% else %}Add{% endif %} Contact</button>
+            <a href="{{ url_for('contacts_list') }}" class="btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

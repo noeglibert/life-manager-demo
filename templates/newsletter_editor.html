@@ -1,0 +1,549 @@
+{% extends "base.html" %}
+
+{% block title %}{{ issue.title }} - Newsletter Editor{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="newsletter-editor-page">
+        <!-- Sticky editor top bar -->
+        <div class="nl-sticky-top">
+            <!-- Header -->
+            <div class="nl-editor-header">
+                <a href="{{ url_for('newsletter') }}" class="nl-back-link">{{ svg_icon('arrow-right', 'inline-icon nl-back-arrow') }} Back to Newsletter</a>
+                <div class="nl-header-main">
+                    <input type="text" id="issueTitle" class="nl-title-input" value="{{ issue.title }}" placeholder="Issue title...">
+                    <div class="nl-header-meta">
+                        <span class="nl-status-badge status-{{ issue.status }}">{{ issue.status|title }}</span>
+                        <span class="nl-autosave-status" id="autosaveStatus">Saved</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Write / Preview Toggle -->
+            <div class="nl-mode-bar">
+                <div class="nl-write-preview-toggle">
+                    <button class="nl-mode-btn active" id="btnWrite" onclick="switchMode('write')">{{ svg_icon('pencil', 'inline-icon') }} Write</button>
+                    <button class="nl-mode-btn" id="btnPreview" onclick="switchMode('preview')">{{ svg_icon('eye', 'inline-icon') }} Preview</button>
+                </div>
+                <div class="nl-mode-actions">
+                    <button class="btn-small" onclick="toggleIdeasPanel()">{{ svg_icon('lightbulb', 'inline-icon') }} Ideas</button>
+                </div>
+            </div>
+
+            <!-- Toolbar (inside sticky top so it stays fixed) -->
+            <div class="nl-toolbar" id="nlToolbar">
+                <button type="button" class="nl-tool-btn" onclick="insertMd('**', '**')" title="Bold"><strong>B</strong></button>
+                <button type="button" class="nl-tool-btn" onclick="insertMd('*', '*')" title="Italic"><em>I</em></button>
+                <span class="nl-tool-sep"></span>
+                <button type="button" class="nl-tool-btn" onclick="insertLine('## ')" title="Heading 2">H2</button>
+                <button type="button" class="nl-tool-btn" onclick="insertLine('### ')" title="Heading 3">H3</button>
+                <span class="nl-tool-sep"></span>
+                <button type="button" class="nl-tool-btn" onclick="insertLine('- ')" title="Bullet List">&#8226; List</button>
+                <button type="button" class="nl-tool-btn" onclick="insertLine('1. ')" title="Numbered List">1. List</button>
+                <span class="nl-tool-sep"></span>
+                <button type="button" class="nl-tool-btn" onclick="insertLink()" title="Link">Link</button>
+                <button type="button" class="nl-tool-btn" onclick="insertImage()" title="Upload Image">{{ svg_icon('image', 'btn-icon-svg') }} Img</button>
+                <span class="nl-tool-sep"></span>
+                <button type="button" class="nl-tool-btn" onclick="insertLine('> ')" title="Blockquote">" Quote</button>
+                <button type="button" class="nl-tool-btn" onclick="insertBlock('\n---\n')" title="Horizontal Rule">&mdash;</button>
+            </div>
+        </div>
+
+        <div class="nl-editor-body">
+            <!-- Write Mode -->
+            <div class="nl-write-pane" id="writePane">
+                <input type="file" id="imageUpload" accept="image/png,image/jpeg,image/gif,image/webp" style="display:none;">
+
+                <!-- Textarea -->
+                <textarea id="newsletterContent" class="nl-editor-textarea" placeholder="Start writing your newsletter...&#10;&#10;Use Markdown: **bold**, *italic*, ## headings, - bullets, [links](url)...">{{ issue.content or '' }}</textarea>
+            </div>
+
+            <!-- Preview Mode -->
+            <div class="nl-preview-pane" id="previewPane" style="display:none;">
+                <iframe id="previewFrame" style="width:100%; border:none; min-height:500px;"></iframe>
+            </div>
+
+            <!-- Ideas Reference Panel -->
+            <div class="nl-ideas-panel" id="ideasPanel" style="display:none;">
+                <div class="nl-ideas-panel-header">
+                    <h3>{{ svg_icon('lightbulb', 'inline-icon') }} Ideas Reference</h3>
+                    <button class="nl-ideas-close" onclick="toggleIdeasPanel()">&times;</button>
+                </div>
+                <div class="nl-ideas-panel-body">
+                    {% if all_ideas %}
+                        {% for idea in all_ideas %}
+                        <div class="nl-idea-ref {% if idea.status == 'used' %}nl-idea-used{% endif %}" data-category="{{ idea.category }}">
+                            <span class="category-dot cat-{{ idea.category }}"></span>
+                            <div class="nl-idea-ref-content">
+                                <span class="nl-idea-ref-title">{{ idea.title }}</span>
+                                {% if idea.notes %}
+                                <span class="nl-idea-ref-notes">{{ idea.notes }}</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="nl-ideas-empty">No ideas yet. Add some from the newsletter page!</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Export Section -->
+        <div class="nl-export-section">
+            <h3>{{ svg_icon('envelope', 'inline-icon') }} Export & Send</h3>
+            <div class="nl-export-actions">
+                <button class="btn-primary btn-small" onclick="copyHTML()">{{ svg_icon('clipboard', 'inline-icon') }} Copy HTML</button>
+                <div class="nl-export-email-group">
+                    <span style="font-size: 0.85rem; color: var(--slate-light);">{{ subscribers|length }} subscriber{{ 's' if subscribers|length != 1 }}</span>
+                    <button class="btn-small" onclick="copyBCC()">{{ svg_icon('clipboard', 'inline-icon') }} Copy BCC Emails</button>
+                    <button class="btn-small" onclick="openMailto()">{{ svg_icon('envelope', 'inline-icon') }} Open Email Client</button>
+                </div>
+            </div>
+            {% if issue.status != 'sent' %}
+            <div class="nl-export-finalize">
+                <button class="btn-primary" id="markSentBtn" onclick="markAsSent()">{{ svg_icon('check', 'inline-icon') }} Mark as Sent (+10 XP)</button>
+            </div>
+            {% else %}
+            <div class="nl-sent-badge">{{ svg_icon('check', 'inline-icon') }} This issue has been sent</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Hidden template for JS use -->
+<template id="sentBadgeTemplate">
+    <div class="nl-sent-badge">{{ svg_icon('check', 'inline-icon') }} This issue has been sent</div>
+</template>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const ISSUE_ID = {{ issue.id }};
+let autoSaveTimer = null;
+// Export uses English-only mailing list
+
+// ===== SCROLL PRESERVATION =====
+// ta.value = ... destroys scroll position; save/restore around every assignment
+function withScroll(ta, fn) {
+    const scrollTop = ta.scrollTop;
+    const pageScroll = window.scrollY;
+    fn();
+    ta.scrollTop = scrollTop;
+    requestAnimationFrame(() => {
+        window.scrollTo(0, pageScroll);
+        ta.scrollTop = scrollTop;
+    });
+}
+
+// ===== STATUS UPDATES (batched to avoid reflow in sticky bar) =====
+let _statusRAF = null;
+function setStatus(text, unsaved) {
+    if (_statusRAF) cancelAnimationFrame(_statusRAF);
+    _statusRAF = requestAnimationFrame(() => {
+        const el = document.getElementById('autosaveStatus');
+        el.textContent = text;
+        unsaved ? el.classList.add('unsaved') : el.classList.remove('unsaved');
+    });
+}
+
+// ===== MODE SWITCHING =====
+function switchMode(mode) {
+    const writePane = document.getElementById('writePane');
+    const previewPane = document.getElementById('previewPane');
+    const btnWrite = document.getElementById('btnWrite');
+    const btnPreview = document.getElementById('btnPreview');
+    const toolbar = document.getElementById('nlToolbar');
+
+    if (mode === 'write') {
+        writePane.style.display = '';
+        previewPane.style.display = 'none';
+        toolbar.style.display = '';
+        btnWrite.classList.add('active');
+        btnPreview.classList.remove('active');
+    } else {
+        writePane.style.display = 'none';
+        previewPane.style.display = '';
+        toolbar.style.display = 'none';
+        btnWrite.classList.remove('active');
+        btnPreview.classList.add('active');
+        loadPreview();
+    }
+}
+
+async function loadPreview() {
+    const iframe = document.getElementById('previewFrame');
+    try {
+        // Save first to make sure preview is up to date
+        await saveContent(true);
+        const resp = await fetch(`/api/newsletter/issue/${ISSUE_ID}/preview`);
+        const html = await resp.text();
+        iframe.srcdoc = html;
+        // Auto-resize iframe to content height
+        iframe.onload = () => {
+            try {
+                const h = iframe.contentDocument.body.scrollHeight;
+                iframe.style.height = Math.max(h + 40, 500) + 'px';
+            } catch (e) {}
+        };
+    } catch (err) {
+        iframe.srcdoc = '<p style="text-align:center;color:#78716c;padding:3rem;font-style:italic;">Error loading preview.</p>';
+    }
+}
+
+// ===== IDEAS PANEL =====
+function toggleIdeasPanel() {
+    const panel = document.getElementById('ideasPanel');
+    panel.style.display = panel.style.display === 'none' ? '' : 'none';
+}
+
+// ===== MARKDOWN TOOLBAR =====
+function insertMd(prefix, suffix) {
+    const ta = document.getElementById('newsletterContent');
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const selected = ta.value.substring(start, end);
+
+    // Toggle: if selection is already wrapped, unwrap it (guard against position 0)
+    if (start >= prefix.length) {
+        const before = ta.value.substring(start - prefix.length, start);
+        const after = ta.value.substring(end, end + suffix.length);
+        if (before === prefix && after === suffix) {
+            withScroll(ta, () => {
+                ta.value = ta.value.substring(0, start - prefix.length) + selected + ta.value.substring(end + suffix.length);
+                ta.selectionStart = start - prefix.length;
+                ta.selectionEnd = end - prefix.length;
+            });
+            ta.focus({ preventScroll: true });
+            triggerAutoSave();
+            return;
+        }
+    }
+
+    const placeholder = 'text';
+    const replacement = prefix + (selected || placeholder) + suffix;
+    withScroll(ta, () => {
+        ta.value = ta.value.substring(0, start) + replacement + ta.value.substring(end);
+        ta.selectionStart = start + prefix.length;
+        ta.selectionEnd = start + prefix.length + (selected.length || placeholder.length);
+    });
+    ta.focus({ preventScroll: true });
+    triggerAutoSave();
+}
+
+function insertLine(prefix) {
+    const ta = document.getElementById('newsletterContent');
+    const start = ta.selectionStart;
+    // Find the beginning of the current line
+    const before = ta.value.substring(0, start);
+    const lineStart = before.lastIndexOf('\n') + 1;
+    // Handle cursor sitting on a newline
+    const searchFrom = (ta.value[start] === '\n') ? start + 1 : start;
+    const lineEnd = ta.value.indexOf('\n', searchFrom);
+    const actualEnd = lineEnd === -1 ? ta.value.length : lineEnd;
+    const currentLine = ta.value.substring(lineStart, actualEnd);
+
+    // Toggle: if prefix already present, remove it
+    withScroll(ta, () => {
+        if (currentLine.startsWith(prefix)) {
+            ta.value = ta.value.substring(0, lineStart) + currentLine.slice(prefix.length) + ta.value.substring(actualEnd);
+            ta.selectionStart = ta.selectionEnd = Math.max(0, start - prefix.length);
+        } else {
+            ta.value = ta.value.substring(0, lineStart) + prefix + currentLine + ta.value.substring(actualEnd);
+            ta.selectionStart = lineStart + prefix.length;
+            ta.selectionEnd = lineStart + prefix.length + currentLine.length;
+        }
+    });
+    ta.focus({ preventScroll: true });
+    triggerAutoSave();
+}
+
+function insertLink() {
+    const ta = document.getElementById('newsletterContent');
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const selected = ta.value.substring(start, end);
+
+    if (selected) {
+        const url = prompt('Enter URL:', 'https://');
+        if (url && url.trim()) {
+            const replacement = `[${selected}](${url.trim()})`;
+            withScroll(ta, () => {
+                ta.value = ta.value.substring(0, start) + replacement + ta.value.substring(end);
+                ta.selectionStart = start;
+                ta.selectionEnd = start + replacement.length;
+            });
+        }
+    } else {
+        const text = prompt('Link text:', 'click here');
+        const url = prompt('Enter URL:', 'https://');
+        if (text && url && url.trim()) {
+            const replacement = `[${text}](${url})`;
+            withScroll(ta, () => {
+                ta.value = ta.value.substring(0, start) + replacement + ta.value.substring(end);
+                ta.selectionStart = start;
+                ta.selectionEnd = start + replacement.length;
+            });
+        }
+    }
+    ta.focus({ preventScroll: true });
+    triggerAutoSave();
+}
+
+function insertImage() {
+    document.getElementById('imageUpload').click();
+}
+
+document.getElementById('imageUpload').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = '';  // reset for next upload
+
+    const ta = document.getElementById('newsletterContent');
+    const start = ta.selectionStart;
+
+    // Show uploading placeholder
+    const placeholder = `![Uploading ${file.name}...]()`;
+    withScroll(ta, () => {
+        ta.value = ta.value.substring(0, start) + placeholder + ta.value.substring(start);
+    });
+    ta.focus({ preventScroll: true });
+
+    // Upload
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const resp = await fetch('/api/newsletter/upload-image', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await resp.json();
+        if (data.success) {
+            const alt = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
+            const imgMd = `![${alt}](${data.url})`;
+            withScroll(ta, () => {
+                ta.value = ta.value.replace(placeholder, imgMd);
+            });
+            const source = data.cloud_url ? 'Cloudinary' : 'local';
+            showNotification(`Image uploaded (${source})`);
+            triggerAutoSave();
+        } else {
+            withScroll(ta, () => {
+                ta.value = ta.value.replace(placeholder, '');
+            });
+            showNotification(data.error || 'Upload failed');
+        }
+    } catch (err) {
+        withScroll(ta, () => {
+            ta.value = ta.value.replace(placeholder, '');
+        });
+        showNotification('Upload failed');
+    }
+});
+
+function insertBlock(text) {
+    const ta = document.getElementById('newsletterContent');
+    const start = ta.selectionStart;
+    withScroll(ta, () => {
+        ta.value = ta.value.substring(0, start) + text + ta.value.substring(start);
+        ta.selectionStart = ta.selectionEnd = start + text.length;
+    });
+    ta.focus({ preventScroll: true });
+    triggerAutoSave();
+}
+
+// ===== AUTO-SAVE =====
+function triggerAutoSave() {
+    setStatus('Unsaved...', true);
+    if (autoSaveTimer) clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(() => saveContent(), 1500);
+}
+
+async function saveContent(silent) {
+    const content = document.getElementById('newsletterContent').value;
+    const title = document.getElementById('issueTitle').value.trim();
+
+    if (!silent) {
+        setStatus('Saving...', true);
+    }
+
+    try {
+        const resp = await fetch(`/api/newsletter/issue/${ISSUE_ID}/content`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content, title })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            setStatus('Saved', false);
+            // Update status badge if changed
+            const badge = document.querySelector('.nl-status-badge');
+            if (badge && data.status) {
+                badge.textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+                badge.className = 'nl-status-badge status-' + data.status;
+            }
+        }
+    } catch (err) {
+        setStatus('Save failed', true);
+    }
+}
+
+// Bind auto-save to textarea and title
+document.getElementById('newsletterContent').addEventListener('input', triggerAutoSave);
+document.getElementById('issueTitle').addEventListener('input', triggerAutoSave);
+
+// ===== EXPORT =====
+async function clipboardCopy(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+    } catch {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'absolute';
+        ta.style.top = '-9999px';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+    }
+}
+
+async function copyHTML() {
+    try {
+        await saveContent(true);
+        const resp = await fetch(`/api/newsletter/issue/${ISSUE_ID}/export-html`);
+        const data = await resp.json();
+        if (data.success) {
+            await clipboardCopy(data.html);
+            showNotification('HTML copied to clipboard!');
+        }
+    } catch (err) {
+        showNotification('Error copying HTML');
+    }
+}
+
+async function copyBCC() {
+    try {
+        const resp = await fetch(`/api/newsletter/issue/${ISSUE_ID}/export-mailto?lang=en`);
+        const data = await resp.json();
+        if (data.success && data.emails.length > 0) {
+            await clipboardCopy(data.bcc_string);
+            showNotification(`${data.count} emails copied!`);
+        } else {
+            showNotification('No subscribers yet');
+        }
+    } catch (err) {
+        showNotification('Error copying emails');
+    }
+}
+
+async function openMailto() {
+    try {
+        await saveContent(true);
+        const resp = await fetch(`/api/newsletter/issue/${ISSUE_ID}/export-mailto?lang=en`);
+        const data = await resp.json();
+        if (data.success && data.emails.length > 0) {
+            const subject = encodeURIComponent(data.subject);
+            const bcc = encodeURIComponent(data.bcc_string);
+            const mailto = `mailto:?bcc=${bcc}&subject=${subject}`;
+            if (mailto.length > 2000) {
+                await clipboardCopy(data.bcc_string);
+                showNotification('Email list too long for mailto. BCC emails copied to clipboard instead!');
+            } else {
+                const a = document.createElement('a');
+                a.href = mailto;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            }
+        } else {
+            showNotification('No subscribers yet');
+        }
+    } catch (err) {
+        showNotification('Error opening email client');
+    }
+}
+
+async function markAsSent() {
+    if (!confirm('Mark this issue as sent? This cannot be undone.')) return;
+    try {
+        const resp = await fetch(`/api/newsletter/issue/${ISSUE_ID}/mark-sent`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await resp.json();
+        if (data.success) {
+            // Update badge
+            const badge = document.querySelector('.nl-status-badge');
+            if (badge) {
+                badge.textContent = 'Sent';
+                badge.className = 'nl-status-badge status-sent';
+            }
+            // Replace button with sent badge
+            const btn = document.getElementById('markSentBtn');
+            if (btn) {
+                btn.parentElement.innerHTML = document.getElementById('sentBadgeTemplate').innerHTML;
+            }
+            if (data.xp_earned) {
+                const archiveMsg = data.archive_path ? ` Archived to ${data.archive_path}` : '';
+                showNotification(`+${data.xp_earned} XP - Newsletter sent!${archiveMsg}`);
+            }
+        } else {
+            showNotification(data.error || 'Could not mark as sent.');
+        }
+    } catch (err) {
+        showNotification('Error marking as sent');
+    }
+}
+
+// ===== NOTIFICATIONS =====
+function showNotification(msg) {
+    const n = document.createElement('div');
+    n.className = 'nutrition-notification';
+    n.textContent = msg;
+    document.body.appendChild(n);
+    setTimeout(() => n.classList.add('show'), 10);
+    setTimeout(() => { n.classList.remove('show'); setTimeout(() => n.remove(), 300); }, 2500);
+}
+
+// ===== UNSAVED CHANGES GUARD =====
+window.addEventListener('beforeunload', (e) => {
+    const status = document.getElementById('autosaveStatus');
+    if (status && status.classList.contains('unsaved')) {
+        e.preventDefault();
+        e.returnValue = '';
+    }
+});
+
+// ===== KEYBOARD SHORTCUTS =====
+document.getElementById('newsletterContent').addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+        e.preventDefault();
+        insertMd('**', '**');
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
+        e.preventDefault();
+        insertMd('*', '*');
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        insertLink();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        saveContent();
+    }
+});
+
+// Preview toggle — Ctrl+Shift+P (bound on document so it works from preview mode too)
+document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'P') {
+        e.preventDefault();
+        const isWrite = document.getElementById('btnWrite').classList.contains('active');
+        switchMode(isWrite ? 'preview' : 'write');
+    }
+});
+</script>
+{% endblock %}

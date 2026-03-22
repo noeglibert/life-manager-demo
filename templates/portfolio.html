@@ -1,0 +1,1233 @@
+{% extends "base.html" %}
+
+{% block title %}Portfolio Briefing - Life Manager{% endblock %}
+
+{% block content %}
+<div class="portfolio-page">
+    <div class="page-header">
+        <h1>Portfolio Briefing</h1>
+        <p class="portfolio-subtitle">AI Bull Market Portfolio &mdash; {{ today.strftime('%A, %B %d, %Y') }}</p>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="portfolio-tabs">
+        <button class="portfolio-tab active" onclick="switchPortfolioTab('overview', this)">Overview</button>
+        <button class="portfolio-tab" onclick="switchPortfolioTab('fundamentals', this)">Fundamentals</button>
+        <button class="portfolio-tab" onclick="switchPortfolioTab('compare', this)">Compare</button>
+        <button class="portfolio-tab" onclick="switchPortfolioTab('investing', this)">Investing</button>
+    </div>
+
+    <!-- ========== OVERVIEW TAB (existing content) ========== -->
+    <div id="panel-overview" class="portfolio-panel">
+
+    <!-- Portfolio Overview -->
+    <div class="portfolio-overview">
+        <div class="portfolio-stats-row">
+            <div class="portfolio-stat">
+                <div class="portfolio-stat-value">{{ holdings|length }}</div>
+                <div class="portfolio-stat-label">Holdings</div>
+            </div>
+            <div class="portfolio-stat">
+                <div class="portfolio-stat-value" id="stat-total-value">${{ "{:,.0f}".format(holdings|map(attribute='value')|sum) }}</div>
+                <div class="portfolio-stat-label">Total Value <span class="price-loading-dot" id="value-loading"></span></div>
+            </div>
+            <div class="portfolio-stat" id="stat-pnl-container" style="display:none;">
+                <div class="portfolio-stat-value" id="stat-total-pnl">--</div>
+                <div class="portfolio-stat-label">Total P&L</div>
+            </div>
+            <div class="portfolio-stat">
+                <div class="portfolio-stat-value">{{ layers|length }}</div>
+                <div class="portfolio-stat-label">Sectors</div>
+            </div>
+        </div>
+        <div class="portfolio-live-bar">
+            <span id="live-status" class="live-status">Loading live prices...</span>
+            <button class="btn-refresh-prices" id="btn-refresh" onclick="fetchLivePrices()" title="Refresh prices">Refresh</button>
+        </div>
+    </div>
+
+    <!-- Daily Briefing Section -->
+    <section class="briefing-section">
+        <div class="briefing-header">
+            <h2>Daily Briefing</h2>
+            {% if not has_newsapi %}
+            <div class="alert alert-warning" style="margin-bottom:12px;">
+                Add <code>NEWSAPI_KEY=your_key</code> to your <code>.env</code> file. Get a free key at <a href="https://newsapi.org/register" target="_blank">newsapi.org</a>
+            </div>
+            {% endif %}
+            <button class="btn-primary" id="btn-generate" onclick="generateBriefing()" {% if not has_newsapi %}disabled{% endif %}>
+                {% if briefing and briefing.summary_html %}Regenerate Briefing{% else %}Generate Today's Briefing{% endif %}
+            </button>
+        </div>
+
+        <div id="briefing-loading" style="display:none;" class="briefing-loading">
+            <div class="loading-spinner"></div>
+            <p>Fetching news and generating your briefing...</p>
+            <p class="loading-detail">This may take 30-60 seconds (fetching news for {{ holdings|length }} holdings)</p>
+        </div>
+
+        <div id="briefing-content" class="briefing-content">
+            {% if briefing and briefing.summary_html %}
+                {{ briefing.summary_html|safe }}
+            {% else %}
+                <div class="briefing-empty">
+                    <p>No briefing generated yet today. Click "Generate Today's Briefing" to get your daily portfolio summary.</p>
+                </div>
+            {% endif %}
+        </div>
+    </section>
+
+    <!-- Holdings Table -->
+    <section class="holdings-section">
+        <h2>Holdings</h2>
+        <div class="holdings-table-wrapper">
+            <table class="holdings-table">
+                <thead>
+                    <tr>
+                        <th>Ticker</th>
+                        <th>Company</th>
+                        <th>Sector</th>
+                        <th>Value</th>
+                        <th>P&L</th>
+                        <th>Weight</th>
+                        <th>Conviction</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for h in holdings|sort(attribute='weight', reverse=True) %}
+                    <tr class="holding-row" data-ticker="{{ h.ticker }}" data-id="{{ h.id }}">
+                        <td class="holding-ticker-cell">{{ h.ticker }}</td>
+                        <td class="holding-name-cell">{{ h.company }}</td>
+                        <td class="holding-layer-cell">{{ h.layer }}</td>
+                        <td class="holding-value-cell">${{ "{:,.0f}".format(h.value or 0) }}</td>
+                        <td class="holding-pnl-cell">--</td>
+                        <td class="holding-weight-cell">
+                            <div class="weight-bar-bg">
+                                <div class="weight-bar-fill" style="width: {{ (h.weight / 30 * 100)|int }}%"></div>
+                            </div>
+                            <span>{{ h.weight }}%</span>
+                        </td>
+                        <td><span class="holding-conviction conviction-{{ h.conviction|lower|replace(' ', '-') }}">{{ h.conviction }}</span></td>
+                        <td class="holding-actions-cell">
+                            <button class="btn-deep-dive" onclick="deepDive('{{ h.ticker }}', this)" title="Deep dive">Analyze</button>
+                            <button class="btn-sell" onclick="sellStock({{ h.id }}, '{{ h.ticker }}')" title="Sold — remove from portfolio">Sell</button>
+                        </td>
+                    </tr>
+                    <tr class="deep-dive-row" id="dive-row-{{ h.ticker }}" style="display:none;">
+                        <td colspan="8">
+                            <div class="deep-dive-content" id="dive-{{ h.ticker }}"></div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <!-- AI Watchlist Table -->
+    <section class="holdings-section watchlist-section">
+        <h2>AI Watchlist <span class="watchlist-badge">Tracking</span></h2>
+
+        <!-- Add to watchlist form -->
+        <form id="addStockForm" class="add-stock-form">
+            <input type="text" id="stockTicker" placeholder="Ticker" required class="stock-input stock-ticker-input">
+            <input type="text" id="stockCompany" placeholder="Company" required class="stock-input stock-company-input">
+            <input type="text" id="stockLayer" placeholder="Sector" class="stock-input stock-layer-input">
+            <select id="stockVerdict" class="stock-input stock-verdict-input">
+                <option value="HOLD">HOLD</option>
+                <option value="BUY">BUY</option>
+                <option value="STRONG BUY">STRONG BUY</option>
+                <option value="CONTRARIAN BUY">CONTRARIAN BUY</option>
+                <option value="SPECULATIVE">SPECULATIVE</option>
+                <option value="AVOID">AVOID</option>
+            </select>
+            <button type="submit" class="btn-primary btn-small">+ Add</button>
+        </form>
+
+        <div class="holdings-table-wrapper">
+            <table class="holdings-table watchlist-table">
+                <thead>
+                    <tr>
+                        <th>Ticker</th>
+                        <th>Company</th>
+                        <th>Sector</th>
+                        <th>Verdict</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="watchlistBody">
+                    {% for w in watchlist %}
+                    <tr class="holding-row watchlist-row" data-ticker="{{ w.ticker }}" data-id="{{ w.id }}">
+                        <td class="holding-ticker-cell">{{ w.ticker }}</td>
+                        <td class="holding-name-cell">{{ w.company }}</td>
+                        <td class="holding-layer-cell">{{ w.layer }}</td>
+                        <td><span class="verdict-badge verdict-{{ w.verdict|lower|replace(' ', '-') }}">{{ w.verdict }}</span></td>
+                        <td class="watchlist-actions-cell">
+                            <button class="btn-deep-dive" onclick="deepDive('{{ w.ticker }}', this)" title="Analyze">Analyze</button>
+                            <button class="btn-promote" onclick="showPromote({{ w.id }}, '{{ w.ticker }}')" title="Move to portfolio">&#x2197;</button>
+                            <button class="btn-remove" onclick="removeStock({{ w.id }})" title="Remove">&times;</button>
+                        </td>
+                    </tr>
+                    <tr class="deep-dive-row" id="dive-row-{{ w.ticker }}" style="display:none;">
+                        <td colspan="5">
+                            <div class="deep-dive-content" id="dive-{{ w.ticker }}"></div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    </div><!-- /panel-overview -->
+
+    <!-- ========== FUNDAMENTALS TAB ========== -->
+    <div id="panel-fundamentals" class="portfolio-panel" style="display:none;">
+        <div class="fundamentals-selector">
+            <div class="selector-row">
+                <select id="fundTickerSelect" class="stock-input" onchange="onFundTickerSelect()">
+                    <option value="">Select from portfolio...</option>
+                </select>
+                <span class="selector-or">or</span>
+                <input type="text" id="fundTickerInput" class="stock-input stock-ticker-input" placeholder="Enter ticker" maxlength="10">
+                <button class="btn-primary" onclick="loadFundamentals()">Analyze</button>
+            </div>
+        </div>
+
+        <div id="fund-loading" class="fund-loading" style="display:none;">
+            <div class="loading-spinner"></div>
+            <p>Fetching fundamental data...</p>
+        </div>
+
+        <div id="fund-error" class="fund-error" style="display:none;"></div>
+
+        <div id="fund-result" style="display:none;">
+            <!-- Header -->
+            <div class="fund-header">
+                <div class="fund-header-info">
+                    <h2 id="fund-ticker"></h2>
+                    <p id="fund-company" class="fund-company"></p>
+                    <p id="fund-sector" class="fund-sector"></p>
+                </div>
+                <div class="fund-score-container">
+                    <canvas id="scoreChart" width="160" height="160"></canvas>
+                    <div class="fund-score-label">Value Score</div>
+                </div>
+            </div>
+
+            <!-- Price Bar -->
+            <div class="fund-price-bar">
+                <div class="price-item">
+                    <span class="price-label">Price</span>
+                    <span class="price-value" id="fund-price"></span>
+                </div>
+                <div class="price-item">
+                    <span class="price-label">Market Cap</span>
+                    <span class="price-value" id="fund-mcap"></span>
+                </div>
+                <div class="price-item">
+                    <span class="price-label">52w High</span>
+                    <span class="price-value" id="fund-52high"></span>
+                </div>
+                <div class="price-item">
+                    <span class="price-label">52w Low</span>
+                    <span class="price-value" id="fund-52low"></span>
+                </div>
+            </div>
+
+            <!-- KPI Sections -->
+            <div class="kpi-section" id="kpi-valuation">
+                <h3>Valuation</h3>
+                <div class="kpi-grid" id="kpi-grid-valuation"></div>
+            </div>
+            <div class="kpi-section" id="kpi-profitability">
+                <h3>Profitability</h3>
+                <div class="kpi-grid" id="kpi-grid-profitability"></div>
+            </div>
+            <div class="kpi-section" id="kpi-financial_health">
+                <h3>Financial Health</h3>
+                <div class="kpi-grid" id="kpi-grid-financial_health"></div>
+            </div>
+            <div class="kpi-section" id="kpi-growth">
+                <h3>Growth</h3>
+                <div class="kpi-grid" id="kpi-grid-growth"></div>
+            </div>
+            <div class="kpi-section" id="kpi-dividends">
+                <h3>Dividends</h3>
+                <div class="kpi-grid" id="kpi-grid-dividends"></div>
+            </div>
+        </div>
+
+        <!-- Fundamentals Guide -->
+        <div class="fund-guide">
+            <button class="fund-guide-toggle" onclick="this.parentElement.classList.toggle('open')">
+                <span class="fund-guide-toggle-text">Understanding These Metrics</span>
+                <span class="fund-guide-chevron"></span>
+            </button>
+            <div class="fund-guide-content">
+
+                <div class="fund-guide-section">
+                    <h3>Value Score (0 &ndash; 100)</h3>
+                    <p>A composite score that rates a stock's attractiveness as a value investment. Each metric below is scored green (100), yellow (50), or red (0) against historical benchmarks, then combined using category weights.</p>
+                    <div class="fund-guide-scale">
+                        <div class="fund-guide-scale-item scale-green"><strong>70 &ndash; 100</strong> Strong value candidate. Most fundamentals look attractive.</div>
+                        <div class="fund-guide-scale-item scale-yellow"><strong>40 &ndash; 69</strong> Mixed signals. Some strengths, some weaknesses.</div>
+                        <div class="fund-guide-scale-item scale-red"><strong>0 &ndash; 39</strong> Expensive or weak fundamentals. Proceed with caution.</div>
+                    </div>
+                    <p class="fund-guide-note">The score is a starting point, not a buy/sell signal. A low score for a high-growth tech stock may be normal &mdash; growth stocks trade at premium valuations by design.</p>
+                </div>
+
+                <div class="fund-guide-section">
+                    <h3>Valuation (35% of score)</h3>
+                    <p>Measures how expensive the stock is relative to its earnings, assets, and cash flow. Lower is generally cheaper.</p>
+                    <table class="fund-guide-table">
+                        <thead><tr><th>Metric</th><th>What it means</th><th class="guide-green">Green</th><th class="guide-yellow">Yellow</th><th class="guide-red">Red</th></tr></thead>
+                        <tbody>
+                            <tr><td><strong>P/E (Trailing)</strong></td><td>Price per dollar of last-12-month earnings. A P/E of 20 means you pay $20 for $1 of earnings.</td><td>&lt; 15</td><td>15 &ndash; 25</td><td>&gt; 25</td></tr>
+                            <tr><td><strong>P/E (Forward)</strong></td><td>Same as trailing P/E but uses analyst estimates for next year's earnings.</td><td>&lt; 12</td><td>12 &ndash; 20</td><td>&gt; 20</td></tr>
+                            <tr><td><strong>Price / Book</strong></td><td>Price relative to net assets (equity). Under 1.0 means the stock trades below book value.</td><td>&lt; 1.5</td><td>1.5 &ndash; 3.0</td><td>&gt; 3.0</td></tr>
+                            <tr><td><strong>EV / EBITDA</strong></td><td>Enterprise value (market cap + debt - cash) divided by operating earnings. More robust than P/E for comparing across capital structures.</td><td>&lt; 10</td><td>10 &ndash; 15</td><td>&gt; 15</td></tr>
+                            <tr><td><strong>PEG Ratio</strong></td><td>P/E divided by earnings growth rate. Adjusts valuation for growth &mdash; a PEG of 1.0 means you're paying fair price for the growth.</td><td>&lt; 1.0</td><td>1.0 &ndash; 2.0</td><td>&gt; 2.0</td></tr>
+                            <tr><td><strong>FCF Yield</strong></td><td>Free cash flow as a % of market cap. Think of it like a "cash return" the business generates. Higher is better.</td><td>&gt; 8%</td><td>4 &ndash; 8%</td><td>&lt; 4%</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="fund-guide-section">
+                    <h3>Profitability (25% of score)</h3>
+                    <p>How efficiently the company turns revenue and capital into profit. Higher margins and returns signal a competitive advantage.</p>
+                    <table class="fund-guide-table">
+                        <thead><tr><th>Metric</th><th>What it means</th><th class="guide-green">Green</th><th class="guide-yellow">Yellow</th><th class="guide-red">Red</th></tr></thead>
+                        <tbody>
+                            <tr><td><strong>Return on Equity</strong></td><td>Net income as a % of shareholder equity. How well the company uses your money to generate profit.</td><td>&gt; 15%</td><td>10 &ndash; 15%</td><td>&lt; 10%</td></tr>
+                            <tr><td><strong>Return on Assets</strong></td><td>Net income as a % of total assets. Useful for comparing companies with different debt levels.</td><td>&gt; 7%</td><td>4 &ndash; 7%</td><td>&lt; 4%</td></tr>
+                            <tr><td><strong>Gross Margin</strong></td><td>Revenue minus cost of goods, as a % of revenue. Shows pricing power and production efficiency.</td><td>&gt; 40%</td><td>20 &ndash; 40%</td><td>&lt; 20%</td></tr>
+                            <tr><td><strong>Operating Margin</strong></td><td>Operating income as a % of revenue. What's left after all operating costs (but before interest and taxes).</td><td>&gt; 20%</td><td>10 &ndash; 20%</td><td>&lt; 10%</td></tr>
+                            <tr><td><strong>Net Margin</strong></td><td>Bottom-line profit as a % of revenue. The final take-home after everything is paid.</td><td>&gt; 15%</td><td>5 &ndash; 15%</td><td>&lt; 5%</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="fund-guide-section">
+                    <h3>Financial Health (20% of score)</h3>
+                    <p>Can the company meet its obligations? Low debt and strong liquidity reduce risk of financial distress.</p>
+                    <table class="fund-guide-table">
+                        <thead><tr><th>Metric</th><th>What it means</th><th class="guide-green">Green</th><th class="guide-yellow">Yellow</th><th class="guide-red">Red</th></tr></thead>
+                        <tbody>
+                            <tr><td><strong>Debt / Equity</strong></td><td>Total debt divided by shareholder equity. A ratio of 100 means $1 of debt for every $1 of equity. Lower is safer.</td><td>&lt; 50</td><td>50 &ndash; 100</td><td>&gt; 100</td></tr>
+                            <tr><td><strong>Current Ratio</strong></td><td>Current assets / current liabilities. Above 1.0 means the company can cover short-term debts. Above 2.0 is comfortable.</td><td>&gt; 2.0</td><td>1.0 &ndash; 2.0</td><td>&lt; 1.0</td></tr>
+                            <tr><td><strong>Quick Ratio</strong></td><td>Like current ratio but excludes inventory (harder to liquidate). A stricter test of short-term solvency.</td><td>&gt; 1.5</td><td>0.8 &ndash; 1.5</td><td>&lt; 0.8</td></tr>
+                            <tr><td><strong>Interest Coverage</strong></td><td>Operating income / interest expenses. How many times over the company can pay its interest. Below 2 is risky.</td><td>&gt; 5x</td><td>2 &ndash; 5x</td><td>&lt; 2x</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="fund-guide-section">
+                    <h3>Growth (15% of score)</h3>
+                    <p>How fast the company is expanding. High growth can justify higher valuations.</p>
+                    <table class="fund-guide-table">
+                        <thead><tr><th>Metric</th><th>What it means</th><th class="guide-green">Green</th><th class="guide-yellow">Yellow</th><th class="guide-red">Red</th></tr></thead>
+                        <tbody>
+                            <tr><td><strong>Revenue Growth</strong></td><td>Year-over-year increase in total sales. Shows whether the business is expanding.</td><td>&gt; 15%</td><td>5 &ndash; 15%</td><td>&lt; 5%</td></tr>
+                            <tr><td><strong>Earnings Growth</strong></td><td>Year-over-year increase in net income. Revenue growth is good, but earnings growth is what matters to shareholders.</td><td>&gt; 15%</td><td>5 &ndash; 15%</td><td>&lt; 5%</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="fund-guide-section">
+                    <h3>Dividends (5% of score)</h3>
+                    <p>Cash returned directly to shareholders. Important for income-focused investors, less relevant for growth stocks.</p>
+                    <table class="fund-guide-table">
+                        <thead><tr><th>Metric</th><th>What it means</th><th class="guide-green">Green</th><th class="guide-yellow">Yellow</th><th class="guide-red">Red</th></tr></thead>
+                        <tbody>
+                            <tr><td><strong>Dividend Yield</strong></td><td>Annual dividend as a % of share price. A 3% yield means $3/year per $100 invested.</td><td>&gt; 3%</td><td>1 &ndash; 3%</td><td>&lt; 1%</td></tr>
+                            <tr><td><strong>Payout Ratio</strong></td><td>% of earnings paid as dividends. Above 80% may be unsustainable &mdash; the company is paying out more than it can comfortably afford.</td><td>&lt; 60%</td><td>60 &ndash; 80%</td><td>&gt; 80%</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="fund-guide-section fund-guide-tips">
+                    <h3>Tips for Interpreting</h3>
+                    <ul>
+                        <li><strong>Compare within sectors.</strong> A P/E of 30 is expensive for a bank but normal for a tech company. Always compare similar businesses.</li>
+                        <li><strong>No single metric tells the whole story.</strong> A cheap P/E with terrible margins might be a value trap. Look at the full picture.</li>
+                        <li><strong>Growth vs. value.</strong> High-growth companies (NVDA, AMZN) will almost always score lower &mdash; that doesn't mean they're bad investments.</li>
+                        <li><strong>Use the Compare tab.</strong> Side-by-side comparison of two stocks in the same sector is more insightful than absolute numbers.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div><!-- /panel-fundamentals -->
+
+    <!-- ========== COMPARE TAB ========== -->
+    <div id="panel-compare" class="portfolio-panel" style="display:none;">
+        <div class="compare-selector">
+            <div class="compare-inputs">
+                <input type="text" id="cmpTicker1" class="stock-input stock-ticker-input" placeholder="Ticker 1 *" maxlength="10">
+                <input type="text" id="cmpTicker2" class="stock-input stock-ticker-input" placeholder="Ticker 2 *" maxlength="10">
+                <input type="text" id="cmpTicker3" class="stock-input stock-ticker-input" placeholder="Ticker 3" maxlength="10">
+                <input type="text" id="cmpTicker4" class="stock-input stock-ticker-input" placeholder="Ticker 4" maxlength="10">
+            </div>
+            <button class="btn-primary" onclick="loadComparison()">Compare</button>
+        </div>
+
+        <div id="cmp-loading" class="fund-loading" style="display:none;">
+            <div class="loading-spinner"></div>
+            <p>Fetching comparison data...</p>
+        </div>
+
+        <div id="cmp-error" class="fund-error" style="display:none;"></div>
+
+        <div id="cmp-result" style="display:none;">
+            <!-- Value Scores -->
+            <div class="cmp-scores" id="cmp-scores"></div>
+
+            <!-- Radar Chart -->
+            <div class="cmp-radar-container">
+                <canvas id="radarChart" width="400" height="400"></canvas>
+            </div>
+
+            <!-- Comparison Table -->
+            <div class="cmp-table-wrapper">
+                <table class="cmp-table" id="cmp-table"></table>
+            </div>
+        </div>
+    </div><!-- /panel-compare -->
+
+    <!-- ========== INVESTING TAB ========== -->
+    <div id="panel-investing" class="portfolio-panel" style="display:none;">
+
+        <!-- Monthly Budget Overview -->
+        <div class="dca-finance-summary">
+            <div class="dca-finance-card">
+                <div class="dca-finance-label">Income this month</div>
+                <div class="dca-finance-value positive">{{ "%.0f"|format(month_income) }} &euro;</div>
+            </div>
+            <div class="dca-finance-card">
+                <div class="dca-finance-label">Expenses this month</div>
+                <div class="dca-finance-value negative">{{ "%.0f"|format(month_expenses) }} &euro;</div>
+            </div>
+            <div class="dca-finance-card">
+                <div class="dca-finance-label">Available to invest</div>
+                <div class="dca-finance-value {% if month_net >= 0 %}positive{% else %}negative{% endif %}">{{ "%.0f"|format(month_net) }} &euro;</div>
+            </div>
+            <div class="dca-finance-card highlight">
+                <div class="dca-finance-label">DCA Target</div>
+                <div class="dca-finance-value">{{ "%.0f"|format(dca_total_target) }} &euro;</div>
+            </div>
+        </div>
+
+        <!-- DCA Progress -->
+        <div class="dca-progress-section">
+            <div class="section-header" style="margin-bottom: 1rem;">
+                <h3 style="font-family: var(--font-heading); font-size: 1.1rem; color: var(--slate-dark);">Monthly DCA Plan</h3>
+                <span style="font-size: 0.85rem; color: var(--slate-light);">
+                    Invested: <strong style="color: var(--slate-dark);">{{ "%.0f"|format(invested_this_month) }} &euro;</strong>
+                    / {{ "%.0f"|format(dca_total_target) }} &euro; target
+                </span>
+            </div>
+
+            <!-- Overall progress bar -->
+            {% if dca_total_target > 0 %}
+            <div class="dca-overall-bar">
+                <div class="dca-overall-fill" style="width: {{ [invested_this_month / dca_total_target * 100, 100] | min }}%"></div>
+            </div>
+            {% endif %}
+
+            <!-- Per-stock DCA list -->
+            <div class="dca-stock-list" id="dcaStockList">
+                {% for dca in dca_schedules %}
+                <div class="dca-stock-item" id="dca-{{ dca.id }}">
+                    <div class="dca-stock-info">
+                        <span class="dca-ticker">{{ dca.ticker }}</span>
+                        <span class="dca-company">{{ dca.company }}</span>
+                    </div>
+                    <div class="dca-stock-target">
+                        <span class="dca-amount">{{ "%.0f"|format(dca.monthly_amount) }} &euro;/mo</span>
+                        <button class="dca-remove-btn" onclick="deleteDCA({{ dca.id }})">&times;</button>
+                    </div>
+                </div>
+                {% endfor %}
+                {% if not dca_schedules %}
+                <p class="dca-empty">No DCA plan set up yet. Add stocks below to start dollar-cost averaging.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- DCA Capacity Insight -->
+        {% if dca_total_target > 0 and month_income > 0 %}
+        <div class="dca-insight">
+            {% if month_net >= dca_total_target %}
+                <span class="dca-insight-icon good">&#10003;</span>
+                <span>You can comfortably hit your <strong>{{ "%.0f"|format(dca_total_target) }} &euro;</strong> DCA target this month.
+                After investing, you'd still have <strong>{{ "%.0f"|format(month_net - dca_total_target) }} &euro;</strong> left.</span>
+            {% elif month_net > 0 %}
+                <span class="dca-insight-icon warning">&#9888;</span>
+                <span>Your available budget ({{ "%.0f"|format(month_net) }} &euro;) is below your DCA target ({{ "%.0f"|format(dca_total_target) }} &euro;).
+                Consider investing <strong>{{ "%.0f"|format(month_net) }} &euro;</strong> this month.</span>
+            {% else %}
+                <span class="dca-insight-icon danger">&#10007;</span>
+                <span>Your expenses exceed your income this month. Consider skipping DCA or reducing the amount.</span>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Add DCA Schedule -->
+        <div class="dca-add-form">
+            <h3 style="font-family: var(--font-heading); font-size: 1rem; color: var(--slate-dark); margin-bottom: 0.75rem;">Add to DCA Plan</h3>
+            <div class="dca-form-row">
+                <select id="dcaStockSelect">
+                    <option value="">Select a stock...</option>
+                    <optgroup label="Holdings">
+                        {% for h in holdings %}
+                        <option value="{{ h.id }}">{{ h.ticker }} — {{ h.company }}</option>
+                        {% endfor %}
+                    </optgroup>
+                    <optgroup label="Watchlist">
+                        {% for w in watchlist %}
+                        <option value="{{ w.id }}">{{ w.ticker }} — {{ w.company }}</option>
+                        {% endfor %}
+                    </optgroup>
+                </select>
+                <input type="number" id="dcaAmount" placeholder="EUR/month" min="1" step="10">
+                <button class="btn-primary" onclick="addDCA()">Add</button>
+            </div>
+        </div>
+
+    </div><!-- /panel-investing -->
+
+    <!-- Promote Modal -->
+    <div class="promote-overlay" id="promoteOverlay" style="display:none;">
+        <div class="promote-card">
+            <h3>Move <span id="promoteTicker"></span> to Portfolio</h3>
+            <div class="promote-fields">
+                <label>Position Value ($)
+                    <input type="number" id="promoteValue" placeholder="e.g. 5000" min="1" step="0.01">
+                </label>
+                <p class="promote-hint">Weight will be auto-calculated from total portfolio value. Conviction will be determined by AI.</p>
+            </div>
+            <div class="promote-actions">
+                <button class="btn-primary" id="promoteBtn" onclick="confirmPromote()">Move to Portfolio</button>
+                <button class="btn-small" onclick="cancelPromote()">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+    // ===== LIVE PRICES =====
+    async function fetchLivePrices() {
+        const statusEl = document.getElementById('live-status');
+        const loadingEl = document.getElementById('value-loading');
+        const refreshBtn = document.getElementById('btn-refresh');
+        statusEl.textContent = 'Fetching live prices...';
+        statusEl.className = 'live-status loading';
+        if (loadingEl) loadingEl.style.display = 'inline-block';
+        refreshBtn.disabled = true;
+
+        try {
+            const resp = await fetch('/api/portfolio/live-prices');
+            const data = await resp.json();
+            if (!data.success) throw new Error(data.error || 'Failed');
+
+            // Update total value
+            const totalEl = document.getElementById('stat-total-value');
+            totalEl.textContent = '$' + data.totals.total_value.toLocaleString('en-US', {maximumFractionDigits: 0});
+
+            // Show P&L
+            const pnlContainer = document.getElementById('stat-pnl-container');
+            const pnlEl = document.getElementById('stat-total-pnl');
+            pnlContainer.style.display = '';
+            const pnl = data.totals.total_pnl;
+            const pnlPct = data.totals.total_pnl_pct;
+            const sign = pnl >= 0 ? '+' : '';
+            pnlEl.textContent = `${sign}$${Math.abs(pnl).toLocaleString('en-US', {maximumFractionDigits: 0})} (${sign}${pnlPct}%)`;
+            pnlEl.className = 'portfolio-stat-value ' + (pnl >= 0 ? 'pnl-positive' : 'pnl-negative');
+
+            // Update per-stock rows
+            data.stocks.forEach(s => {
+                const row = document.querySelector(`.holding-row[data-ticker="${s.ticker}"]`);
+                if (!row) return;
+
+                // Update value
+                const valueCell = row.querySelector('.holding-value-cell');
+                if (s.live_value_usd !== undefined) {
+                    valueCell.textContent = '$' + s.live_value_usd.toLocaleString('en-US', {maximumFractionDigits: 0});
+                }
+
+                // Update P&L
+                const pnlCell = row.querySelector('.holding-pnl-cell');
+                if (s.pnl_usd !== undefined) {
+                    const pSign = s.pnl_usd >= 0 ? '+' : '';
+                    pnlCell.innerHTML = `<span class="${s.pnl_usd >= 0 ? 'pnl-positive' : 'pnl-negative'}">${pSign}$${Math.abs(s.pnl_usd).toLocaleString('en-US', {maximumFractionDigits: 0})}<br><small>${pSign}${s.pnl_pct}%</small></span>`;
+                } else {
+                    pnlCell.textContent = '--';
+                }
+
+                // Update weight bar
+                const weightCell = row.querySelector('.holding-weight-cell');
+                if (weightCell) {
+                    const newWeight = data.totals.total_value > 0
+                        ? ((s.live_value_usd || 0) / data.totals.total_value * 100).toFixed(1)
+                        : '0.0';
+                    const fill = weightCell.querySelector('.weight-bar-fill');
+                    const span = weightCell.querySelector('span');
+                    if (fill) fill.style.width = (parseFloat(newWeight) / 30 * 100) + '%';
+                    if (span) span.textContent = newWeight + '%';
+                }
+            });
+
+            const now = new Date().toLocaleTimeString();
+            statusEl.textContent = `Live prices updated at ${now}`;
+            statusEl.className = 'live-status updated';
+        } catch (err) {
+            statusEl.textContent = 'Failed to load live prices — showing cached values';
+            statusEl.className = 'live-status error';
+            console.error('Live prices error:', err);
+        } finally {
+            if (loadingEl) loadingEl.style.display = 'none';
+            refreshBtn.disabled = false;
+        }
+    }
+
+    // Fetch live prices on page load
+    document.addEventListener('DOMContentLoaded', fetchLivePrices);
+
+    // ===== UTILITIES =====
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // Fixed canonical key order per section (deterministic table rows)
+    const SECTION_KEYS = {
+        valuation: ['pe_trailing','pe_forward','pb_ratio','ev_ebitda','peg_ratio','fcf_yield'],
+        profitability: ['roe','roa','gross_margin','operating_margin','net_margin'],
+        financial_health: ['debt_to_equity','current_ratio','quick_ratio','interest_coverage'],
+        growth: ['revenue_growth','earnings_growth'],
+        dividends: ['dividend_yield','payout_ratio'],
+    };
+
+    // ===== TAB SWITCHING =====
+    function switchPortfolioTab(tab, btn) {
+        document.querySelectorAll('.portfolio-panel').forEach(p => p.style.display = 'none');
+        document.querySelectorAll('.portfolio-tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('panel-' + tab).style.display = 'block';
+        btn.classList.add('active');
+
+        // Lazy-load ticker dropdown on first Fundamentals visit
+        if (tab === 'fundamentals' && !document.getElementById('fundTickerSelect')._loaded) {
+            loadTickerDropdowns();
+        }
+    }
+
+    // ===== TICKER DROPDOWNS =====
+    async function loadTickerDropdowns() {
+        const sel = document.getElementById('fundTickerSelect');
+        try {
+            const resp = await fetch('/api/portfolio/tickers');
+            const data = await resp.json();
+            sel._loaded = true;  // Only set after successful parse
+            if (data.holdings) {
+                data.holdings.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.ticker;
+                    opt.textContent = s.ticker + ' - ' + s.company;
+                    sel.appendChild(opt);
+                });
+            }
+            if (data.watchlist && data.watchlist.length) {
+                const grp = document.createElement('optgroup');
+                grp.label = 'Watchlist';
+                data.watchlist.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.ticker;
+                    opt.textContent = s.ticker + ' - ' + s.company;
+                    grp.appendChild(opt);
+                });
+                sel.appendChild(grp);
+            }
+        } catch(e) {
+            sel._loaded = false;  // Allow retry on failure
+            console.error('Failed to load tickers', e);
+        }
+    }
+
+    function onFundTickerSelect() {
+        const sel = document.getElementById('fundTickerSelect');
+        if (sel.value) {
+            document.getElementById('fundTickerInput').value = sel.value;
+        }
+    }
+
+    // ===== FUNDAMENTALS =====
+    let scoreChartInstance = null;
+
+    async function loadFundamentals(ticker) {
+        ticker = ticker || document.getElementById('fundTickerInput').value.trim().toUpperCase();
+        if (!ticker) { alert('Enter a ticker symbol'); return; }
+
+        document.getElementById('fundTickerInput').value = ticker;
+        document.getElementById('fund-loading').style.display = 'block';
+        document.getElementById('fund-error').style.display = 'none';
+        document.getElementById('fund-result').style.display = 'none';
+
+        try {
+            const resp = await fetch('/api/portfolio/fundamentals/' + encodeURIComponent(ticker));
+            const data = await resp.json();
+
+            document.getElementById('fund-loading').style.display = 'none';
+
+            if (!data.success) {
+                document.getElementById('fund-error').style.display = 'block';
+                document.getElementById('fund-error').textContent = data.error || 'Failed to fetch data';
+                return;
+            }
+
+            renderFundamentals(data);
+        } catch (e) {
+            document.getElementById('fund-loading').style.display = 'none';
+            document.getElementById('fund-error').style.display = 'block';
+            document.getElementById('fund-error').textContent = 'Error: ' + e.message;
+        }
+    }
+
+    function formatNum(v, type) {
+        if (v === null || v === undefined) return 'N/A';
+        if (type === 'price') return '$' + v.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        if (type === 'mcap') {
+            if (v >= 1e12) return '$' + (v/1e12).toFixed(2) + 'T';
+            if (v >= 1e9) return '$' + (v/1e9).toFixed(2) + 'B';
+            if (v >= 1e6) return '$' + (v/1e6).toFixed(1) + 'M';
+            return '$' + v.toLocaleString();
+        }
+        if (type === 'pct') return v.toFixed(1) + '%';
+        if (type === 'ratio') return v.toFixed(2);
+        return v.toFixed(2);
+    }
+
+    function metricFormat(key, val) {
+        if (val === null || val === undefined) return 'N/A';
+        const num = parseFloat(val);
+        if (isNaN(num)) return 'N/A';
+        const pctKeys = ['fcf_yield','roe','roa','gross_margin','operating_margin','net_margin','revenue_growth','earnings_growth','dividend_yield','payout_ratio'];
+        if (pctKeys.includes(key)) return num.toFixed(1) + '%';
+        return num.toFixed(2);
+    }
+
+    function renderFundamentals(data) {
+        document.getElementById('fund-ticker').textContent = data.ticker;
+        document.getElementById('fund-company').textContent = data.company_name || '';
+        document.getElementById('fund-sector').textContent = [data.sector, data.industry].filter(Boolean).join(' / ');
+
+        // Price bar
+        const p = data.price || {};
+        document.getElementById('fund-price').textContent = formatNum(p.current, 'price');
+        document.getElementById('fund-mcap').textContent = formatNum(p.market_cap, 'mcap');
+        document.getElementById('fund-52high').textContent = formatNum(p.week_52_high, 'price');
+        document.getElementById('fund-52low').textContent = formatNum(p.week_52_low, 'price');
+
+        // Value score donut (clamped to 0-100)
+        const score = Math.max(0, Math.min(100, parseFloat(data.value_score) || 0));
+        renderScoreDonut(score);
+
+        // KPI sections
+        const sections = {
+            valuation: data.valuation || {},
+            profitability: data.profitability || {},
+            financial_health: data.financial_health || {},
+            growth: data.growth || {},
+            dividends: data.dividends || {},
+        };
+        const ratings = data.ratings || {};
+        const labels = data.labels || {};
+
+        for (const [section, metrics] of Object.entries(sections)) {
+            const grid = document.getElementById('kpi-grid-' + section);
+            grid.innerHTML = '';
+            // Use fixed canonical key order for deterministic rendering
+            const keys = SECTION_KEYS[section] || Object.keys(metrics);
+            for (const key of keys) {
+                const val = metrics[key];
+                const color = ratings[key] || 'gray';
+                const label = labels[key] || key;
+                const card = document.createElement('div');
+                card.className = 'kpi-card kpi-' + color;
+                card.innerHTML = `
+                    <div class="kpi-value">${metricFormat(key, val)}</div>
+                    <div class="kpi-label">${escapeHtml(label)}</div>
+                `;
+                grid.appendChild(card);
+            }
+        }
+
+        document.getElementById('fund-result').style.display = 'block';
+    }
+
+    function renderScoreDonut(score) {
+        if (scoreChartInstance) scoreChartInstance.destroy();
+
+        score = Math.max(0, Math.min(100, score));
+        const color = score >= 70 ? '#4A7C59' : score >= 40 ? '#9C7A1E' : '#A0402A';
+        const ctx = document.getElementById('scoreChart').getContext('2d');
+
+        scoreChartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                datasets: [{
+                    data: [score, 100 - score],
+                    backgroundColor: [color, 'rgba(0,0,0,0.06)'],
+                    borderWidth: 0,
+                }]
+            },
+            options: {
+                cutout: '75%',
+                responsive: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { enabled: false },
+                },
+            },
+            plugins: [{
+                id: 'centerText',
+                afterDraw(chart) {
+                    const {ctx, width, height} = chart;
+                    ctx.save();
+                    ctx.font = 'bold 32px Inter, system-ui, sans-serif';
+                    ctx.fillStyle = color;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(Math.round(score), width/2, height/2);
+                    ctx.restore();
+                }
+            }]
+        });
+    }
+
+    // ===== COMPARE =====
+    let radarChartInstance = null;
+
+    async function loadComparison() {
+        // Deduplicate tickers
+        const tickers = [...new Set([1,2,3,4].map(i =>
+            document.getElementById('cmpTicker'+i).value.trim().toUpperCase()
+        ).filter(Boolean))];
+
+        if (tickers.length < 2) { alert('Enter at least 2 different tickers'); return; }
+
+        document.getElementById('cmp-loading').style.display = 'block';
+        document.getElementById('cmp-error').style.display = 'none';
+        document.getElementById('cmp-result').style.display = 'none';
+
+        try {
+            const resp = await fetch('/api/portfolio/compare?tickers=' + tickers.join(','));
+            const data = await resp.json();
+
+            document.getElementById('cmp-loading').style.display = 'none';
+
+            if (!data.success) {
+                document.getElementById('cmp-error').style.display = 'block';
+                document.getElementById('cmp-error').textContent = data.error || 'Failed';
+                return;
+            }
+
+            renderComparison(data);
+        } catch (e) {
+            document.getElementById('cmp-loading').style.display = 'none';
+            document.getElementById('cmp-error').style.display = 'block';
+            document.getElementById('cmp-error').textContent = 'Error: ' + e.message;
+        }
+    }
+
+    function renderComparison(data) {
+        const stocks = data.stocks;
+        const winners = data.winners || {};
+        const labels = data.labels || {};
+
+        // Show warnings for failed tickers
+        if (data.warnings && data.warnings.length) {
+            const warnDiv = document.getElementById('cmp-error');
+            warnDiv.style.display = 'block';
+            warnDiv.textContent = data.warnings.join('. ');
+            warnDiv.className = 'fund-error fund-warning';
+        }
+
+        // Score cards (XSS-safe)
+        const scoresDiv = document.getElementById('cmp-scores');
+        scoresDiv.innerHTML = '';
+        stocks.forEach(s => {
+            const score = Math.max(0, Math.min(100, parseFloat(s.value_score) || 0));
+            const color = score >= 70 ? 'green' : score >= 40 ? 'yellow' : 'red';
+            const card = document.createElement('div');
+            card.className = 'cmp-score-card cmp-score-' + color;
+            card.innerHTML = `
+                <div class="cmp-score-ticker">${escapeHtml(s.ticker)}</div>
+                <div class="cmp-score-value">${Math.round(score)}</div>
+                <div class="cmp-score-name">${escapeHtml(s.company_name || '')}</div>
+            `;
+            scoresDiv.appendChild(card);
+        });
+
+        // Radar chart
+        renderRadar(stocks);
+
+        // Comparison table
+        renderCompareTable(stocks, winners, labels);
+
+        document.getElementById('cmp-result').style.display = 'block';
+    }
+
+    function renderRadar(stocks) {
+        if (radarChartInstance) radarChartInstance.destroy();
+
+        // Compute category averages for each stock
+        const categories = ['Valuation', 'Profitability', 'Health', 'Growth', 'Dividends'];
+        const catKeys = {
+            Valuation: ['pe_trailing','pe_forward','pb_ratio','ev_ebitda','peg_ratio','fcf_yield'],
+            Profitability: ['roe','roa','gross_margin','operating_margin','net_margin'],
+            Health: ['debt_to_equity','current_ratio','quick_ratio','interest_coverage'],
+            Growth: ['revenue_growth','earnings_growth'],
+            Dividends: ['dividend_yield','payout_ratio'],
+        };
+
+        const colorPalette = [
+            {bg: 'rgba(74,126,138,0.15)', border: '#4A7E8A'},
+            {bg: 'rgba(74,124,89,0.15)', border: '#4A7C59'},
+            {bg: 'rgba(194,105,42,0.15)', border: '#C2692A'},
+            {bg: 'rgba(107,78,113,0.15)', border: '#6B4E71'},
+        ];
+
+        const datasets = stocks.map((stock, i) => {
+            const ratings = stock.ratings || {};
+            const scores = categories.map(cat => {
+                const keys = catKeys[cat];
+                let total = 0, count = 0;
+                keys.forEach(k => {
+                    const r = ratings[k];
+                    if (r === 'green') { total += 100; count++; }
+                    else if (r === 'yellow') { total += 50; count++; }
+                    else if (r === 'red') { total += 10; count++; }
+                });
+                return count > 0 ? total / count : null;  // null for all-N/A categories
+            });
+            const c = colorPalette[i % colorPalette.length];
+            return {
+                label: stock.ticker,
+                data: scores,
+                backgroundColor: c.bg,
+                borderColor: c.border,
+                borderWidth: 2,
+                pointRadius: 4,
+                pointBackgroundColor: c.border,
+                spanGaps: false,
+            };
+        });
+
+        const ctx = document.getElementById('radarChart').getContext('2d');
+        radarChartInstance = new Chart(ctx, {
+            type: 'radar',
+            data: { labels: categories, datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                scales: {
+                    r: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: { stepSize: 25, font: {size: 11} },
+                        pointLabels: { font: {size: 13, weight: '600'} },
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { font: {size: 13}, padding: 16 }
+                    }
+                }
+            }
+        });
+    }
+
+    function renderCompareTable(stocks, winners, labels) {
+        const table = document.getElementById('cmp-table');
+        // Build header (XSS-safe)
+        let html = '<thead><tr><th>Metric</th>';
+        stocks.forEach(s => { html += `<th>${escapeHtml(s.ticker)}</th>`; });
+        html += '</tr></thead><tbody>';
+
+        const sections = [
+            {name: 'Valuation', key: 'valuation'},
+            {name: 'Profitability', key: 'profitability'},
+            {name: 'Financial Health', key: 'financial_health'},
+            {name: 'Growth', key: 'growth'},
+            {name: 'Dividends', key: 'dividends'},
+        ];
+
+        sections.forEach(sec => {
+            html += `<tr class="cmp-section-row"><td colspan="${stocks.length + 1}">${sec.name}</td></tr>`;
+            // Use fixed canonical key order for deterministic rows
+            const keys = SECTION_KEYS[sec.key] || [];
+            keys.forEach(key => {
+                html += `<tr><td class="cmp-metric-name">${escapeHtml(labels[key] || key)}</td>`;
+                stocks.forEach(s => {
+                    const val = (s[sec.key] || {})[key];
+                    const isWinner = winners[key] === s.ticker;
+                    const rating = (s.ratings || {})[key] || 'gray';
+                    const cls = isWinner ? 'cmp-winner' : '';
+                    html += `<td class="${cls} cmp-rating-${rating}">${metricFormat(key, val)}</td>`;
+                });
+                html += '</tr>';
+            });
+        });
+
+        // Value Score row
+        html += `<tr class="cmp-section-row"><td colspan="${stocks.length + 1}">Overall</td></tr>`;
+        html += '<tr class="cmp-score-row"><td class="cmp-metric-name">Value Score</td>';
+        const maxScore = Math.max(...stocks.map(s => s.value_score || 0));
+        stocks.forEach(s => {
+            const v = s.value_score || 0;
+            const isWinner = v === maxScore;
+            const cls = isWinner ? 'cmp-winner' : '';
+            html += `<td class="${cls}"><strong>${Math.round(v)}</strong></td>`;
+        });
+        html += '</tr></tbody>';
+
+        table.innerHTML = html;
+    }
+
+    // ===== CLICK-TO-ANALYZE from Holdings table (event delegation) =====
+    document.querySelectorAll('.holdings-table-wrapper').forEach(wrapper => {
+        wrapper.addEventListener('click', (e) => {
+            const cell = e.target.closest('.holding-ticker-cell');
+            if (!cell) return;
+            const ticker = cell.textContent.trim();
+            switchPortfolioTab('fundamentals', document.querySelectorAll('.portfolio-tab')[1]);
+            document.getElementById('fundTickerInput').value = ticker;
+            loadFundamentals(ticker);
+        });
+    });
+
+    // ===== OVERVIEW FUNCTIONS (existing) =====
+    async function generateBriefing() {
+        const btn = document.getElementById('btn-generate');
+        const loading = document.getElementById('briefing-loading');
+        const content = document.getElementById('briefing-content');
+
+        btn.disabled = true;
+        btn.textContent = 'Generating...';
+        loading.style.display = 'block';
+        content.innerHTML = '';
+
+        try {
+            const response = await fetch('/api/portfolio/generate', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            const data = await response.json();
+
+            loading.style.display = 'none';
+
+            if (data.error) {
+                content.innerHTML = '<div class="briefing-error">Error: ' + data.error + '</div>';
+            } else {
+                content.innerHTML = data.html;
+            }
+            btn.textContent = 'Regenerate Briefing';
+        } catch (e) {
+            loading.style.display = 'none';
+            content.innerHTML = '<div class="briefing-error">Error: ' + e.message + '</div>';
+        }
+        btn.disabled = false;
+    }
+
+    async function deepDive(ticker, btn) {
+        const diveRow = document.getElementById('dive-row-' + ticker);
+        const diveEl = document.getElementById('dive-' + ticker);
+
+        if (diveRow.style.display === 'table-row') {
+            diveRow.style.display = 'none';
+            btn.textContent = 'Analyze';
+            return;
+        }
+
+        btn.textContent = 'Loading...';
+        btn.disabled = true;
+
+        try {
+            const response = await fetch('/api/portfolio/deep-dive/' + ticker, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            const data = await response.json();
+
+            if (data.error) {
+                diveEl.innerHTML = '<p class="error">' + data.error + '</p>';
+            } else {
+                diveEl.innerHTML = data.html;
+            }
+            diveRow.style.display = 'table-row';
+            btn.textContent = 'Close';
+        } catch (e) {
+            diveEl.innerHTML = '<p class="error">Error: ' + e.message + '</p>';
+            diveRow.style.display = 'table-row';
+            btn.textContent = 'Retry';
+        }
+        btn.disabled = false;
+    }
+
+    // === Watchlist Management ===
+    document.getElementById('addStockForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const ticker = document.getElementById('stockTicker').value.trim().toUpperCase();
+        const company = document.getElementById('stockCompany').value.trim();
+        if (!ticker || !company) return;
+
+        try {
+            const resp = await fetch('/api/portfolio/stock', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ticker,
+                    company,
+                    layer: document.getElementById('stockLayer').value.trim(),
+                    verdict: document.getElementById('stockVerdict').value
+                })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                const s = data.stock;
+                const verdictClass = s.verdict ? s.verdict.toLowerCase().replace(/ /g, '-') : 'hold';
+                const html = `
+                    <tr class="holding-row watchlist-row" data-ticker="${s.ticker}" data-id="${s.id}">
+                        <td class="holding-ticker-cell">${s.ticker}</td>
+                        <td class="holding-name-cell">${s.company}</td>
+                        <td class="holding-layer-cell">${s.layer}</td>
+                        <td><span class="verdict-badge verdict-${verdictClass}">${s.verdict || 'HOLD'}</span></td>
+                        <td class="watchlist-actions-cell">
+                            <button class="btn-deep-dive" onclick="deepDive('${s.ticker}', this)" title="Analyze">Analyze</button>
+                            <button class="btn-promote" onclick="showPromote(${s.id}, '${s.ticker}')" title="Move to portfolio">&#x2197;</button>
+                            <button class="btn-remove" onclick="removeStock(${s.id})" title="Remove">&times;</button>
+                        </td>
+                    </tr>
+                    <tr class="deep-dive-row" id="dive-row-${s.ticker}" style="display:none;">
+                        <td colspan="5"><div class="deep-dive-content" id="dive-${s.ticker}"></div></td>
+                    </tr>`;
+                document.getElementById('watchlistBody').insertAdjacentHTML('beforeend', html);
+                document.getElementById('stockTicker').value = '';
+                document.getElementById('stockCompany').value = '';
+                document.getElementById('stockLayer').value = '';
+            } else {
+                alert(data.error || 'Error adding stock');
+            }
+        } catch (err) { alert('Error adding stock'); }
+    });
+
+    let promoteStockId = null;
+
+    function showPromote(stockId, ticker) {
+        promoteStockId = stockId;
+        document.getElementById('promoteTicker').textContent = ticker;
+        document.getElementById('promoteOverlay').style.display = 'flex';
+    }
+
+    function cancelPromote() {
+        document.getElementById('promoteOverlay').style.display = 'none';
+        promoteStockId = null;
+    }
+
+    async function confirmPromote() {
+        if (!promoteStockId) return;
+        const value = document.getElementById('promoteValue').value;
+        if (!value || parseFloat(value) <= 0) {
+            alert('Please enter the position value');
+            return;
+        }
+
+        const btn = document.getElementById('promoteBtn');
+        btn.disabled = true;
+        btn.textContent = 'Moving...';
+
+        try {
+            const resp = await fetch(`/api/portfolio/stock/${promoteStockId}/promote`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ value: parseFloat(value) })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                cancelPromote();
+                window.location.reload();
+            } else {
+                alert(data.error || 'Error');
+                btn.disabled = false;
+                btn.textContent = 'Move to Portfolio';
+            }
+        } catch (err) {
+            alert('Error promoting stock');
+            btn.disabled = false;
+            btn.textContent = 'Move to Portfolio';
+        }
+    }
+
+    async function removeStock(stockId) {
+        if (!confirm('Remove this stock from your watchlist?')) return;
+        try {
+            await fetch(`/api/portfolio/stock/${stockId}`, { method: 'DELETE' });
+            const row = document.querySelector(`tr[data-id="${stockId}"]`);
+            if (row) {
+                const ticker = row.dataset.ticker;
+                const diveRow = document.getElementById('dive-row-' + ticker);
+                if (diveRow) diveRow.remove();
+                row.remove();
+            }
+        } catch (err) { alert('Error removing stock'); }
+    }
+
+    async function sellStock(stockId, ticker) {
+        if (!confirm(`Sell ${ticker}? This will remove it from your portfolio.`)) return;
+        try {
+            const resp = await fetch(`/api/portfolio/stock/${stockId}`, { method: 'DELETE' });
+            if (resp.ok) {
+                window.location.reload();
+            } else {
+                alert('Error selling stock');
+            }
+        } catch (err) { alert('Error selling stock'); }
+    }
+
+    // ===== DCA FUNCTIONS =====
+    async function addDCA() {
+        const stockId = document.getElementById('dcaStockSelect').value;
+        const amount = parseFloat(document.getElementById('dcaAmount').value);
+        if (!stockId) { alert('Please select a stock.'); return; }
+        if (!amount || amount <= 0) { alert('Please enter a monthly amount.'); return; }
+
+        try {
+            const resp = await fetch('/api/portfolio/dca', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ stock_id: parseInt(stockId), monthly_amount: amount })
+            });
+            const data = await resp.json();
+            if (data.success) window.location.reload();
+            else alert(data.error || 'Failed to add DCA');
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+
+    async function deleteDCA(id) {
+        if (!confirm('Remove this DCA schedule?')) return;
+        try {
+            const resp = await fetch(`/api/portfolio/dca/${id}`, { method: 'DELETE' });
+            const data = await resp.json();
+            if (data.success) {
+                document.getElementById('dca-' + id)?.remove();
+                window.location.reload();
+            }
+        } catch (err) { alert('Error: ' + err.message); }
+    }
+</script>
+{% endblock %}

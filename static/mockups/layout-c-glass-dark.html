@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Layout C: Glassmorphism Dark</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Space Grotesk', -apple-system, sans-serif;
+    background: #0a0a1a;
+    color: #e4e4ed;
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+}
+
+/* Background gradient orbs */
+body::before {
+    content: '';
+    position: fixed;
+    top: -20%;
+    left: -10%;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+body::after {
+    content: '';
+    position: fixed;
+    bottom: -10%;
+    right: -10%;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(168,85,247,0.1) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.glow-teal {
+    position: fixed;
+    top: 30%;
+    right: 20%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(20,184,166,0.08) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* ===== GLASS TOKENS ===== */
+:root {
+    --glass: rgba(255,255,255,0.04);
+    --glass-border: rgba(255,255,255,0.08);
+    --glass-hover: rgba(255,255,255,0.07);
+    --text: #e4e4ed;
+    --text-secondary: #9898b0;
+    --text-muted: #5a5a78;
+    --accent-indigo: #818cf8;
+    --accent-purple: #c084fc;
+    --accent-teal: #5eead4;
+    --accent-green: #4ade80;
+    --accent-orange: #fb923c;
+    --accent-red: #f87171;
+    --accent-blue: #60a5fa;
+    --radius: 20px;
+    --radius-sm: 12px;
+}
+
+/* ===== TOP BAR ===== */
+.topbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    background: rgba(10,10,26,0.7);
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.topbar-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 14px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.brand {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    background: linear-gradient(135deg, var(--accent-indigo), var(--accent-teal));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.nav-pills {
+    display: flex;
+    gap: 4px;
+    list-style: none;
+    background: var(--glass);
+    padding: 4px;
+    border-radius: 99px;
+    border: 1px solid var(--glass-border);
+}
+
+.nav-pills a {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 99px;
+    text-decoration: none;
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.nav-pills a:hover { color: var(--text); background: var(--glass-hover); }
+
+.nav-pills a.active {
+    background: rgba(129,140,248,0.15);
+    color: var(--accent-indigo);
+}
+
+.nav-pills .emoji { font-size: 14px; }
+
+.topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.topbar-btn {
+    padding: 7px 14px;
+    border-radius: 99px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+}
+
+.topbar-btn:hover { background: var(--glass-hover); color: var(--text); }
+
+.topbar-btn.primary {
+    background: linear-gradient(135deg, var(--accent-indigo), var(--accent-purple));
+    color: #fff;
+    border: none;
+}
+
+/* ===== PAGE ===== */
+.page {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 32px 80px;
+    position: relative;
+    z-index: 1;
+}
+
+/* ===== GLASS CARD ===== */
+.glass {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 24px;
+    transition: all 0.25s;
+}
+
+.glass:hover {
+    background: var(--glass-hover);
+    border-color: rgba(255,255,255,0.12);
+}
+
+.glass h3 {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+}
+
+/* ===== GREETING ===== */
+.greeting {
+    margin-bottom: 32px;
+}
+
+.greeting h1 {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 4px;
+}
+
+.greeting h1 span {
+    background: linear-gradient(135deg, var(--accent-indigo), var(--accent-teal));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.greeting .date { color: var(--text-muted); font-size: 13px; }
+
+/* ===== HABITS ===== */
+.habits-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.habit-card {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    padding: 20px 16px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+    text-decoration: none;
+    color: var(--text);
+}
+
+.habit-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 50%, rgba(255,255,255,0.02) 100%);
+    pointer-events: none;
+}
+
+.habit-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(255,255,255,0.15);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+
+.habit-card.done {
+    border-color: rgba(74,222,128,0.3);
+    background: rgba(74,222,128,0.05);
+}
+
+.habit-card.done::after {
+    content: '&#10003;';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    color: var(--accent-green);
+    font-size: 14px;
+    font-weight: 700;
+}
+
+.habit-emoji { font-size: 32px; margin-bottom: 10px; }
+.habit-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.habit-detail { font-size: 11px; color: var(--text-muted); }
+.habit-streak { font-size: 11px; color: var(--accent-orange); font-weight: 600; margin-top: 6px; }
+
+/* ===== BENTO ===== */
+.bento {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 16px;
+}
+
+.col-3 { grid-column: span 3; }
+.col-4 { grid-column: span 4; }
+.col-5 { grid-column: span 5; }
+.col-6 { grid-column: span 6; }
+.col-7 { grid-column: span 7; }
+.col-8 { grid-column: span 8; }
+.col-12 { grid-column: span 12; }
+
+/* ===== CHALLENGE ===== */
+.challenge-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.challenge-row .ch-emoji { font-size: 28px; }
+.challenge-row .ch-info { flex: 1; }
+.challenge-row .ch-title { font-size: 15px; font-weight: 600; }
+.challenge-row .ch-desc { font-size: 12px; color: var(--text-secondary); }
+
+.challenge-row .ch-xp {
+    padding: 6px 14px;
+    border-radius: 99px;
+    background: rgba(129,140,248,0.12);
+    color: var(--accent-indigo);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+/* ===== STATS ===== */
+.stat-item { text-align: center; }
+
+.stat-item .stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.03em;
+}
+
+.stat-item .stat-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.stat-item.indigo .stat-value { color: var(--accent-indigo); }
+.stat-item.green .stat-value { color: var(--accent-green); }
+.stat-item.teal .stat-value { color: var(--accent-teal); }
+.stat-item.orange .stat-value { color: var(--accent-orange); }
+
+/* ===== XP BAR ===== */
+.xp-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.xp-row .xp-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.xp-bar {
+    flex: 1;
+}
+
+.xp-track {
+    height: 6px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 99px;
+    overflow: hidden;
+}
+
+.xp-fill {
+    height: 100%;
+    border-radius: 99px;
+    background: linear-gradient(90deg, var(--accent-indigo), var(--accent-purple), var(--accent-teal));
+    width: 83%;
+    position: relative;
+}
+
+.xp-fill::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: -2px;
+    bottom: -2px;
+    width: 10px;
+    background: var(--accent-teal);
+    border-radius: 99px;
+    box-shadow: 0 0 12px var(--accent-teal);
+}
+
+/* ===== JOURNAL ===== */
+.journal-item {
+    padding: 14px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: background 0.15s;
+    border: 1px solid transparent;
+}
+
+.journal-item:hover {
+    background: var(--glass-hover);
+    border-color: var(--glass-border);
+}
+
+.journal-item .j-date { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.journal-item .j-text { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+.journal-item .j-tags { display: flex; gap: 6px; margin-top: 6px; }
+
+.journal-item .j-tag {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(129,140,248,0.1);
+    color: var(--accent-indigo);
+}
+
+/* ===== CHART ===== */
+.chart-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 100px;
+    padding-top: 8px;
+}
+
+.cbar {
+    flex: 1;
+    border-radius: 4px 4px 0 0;
+    position: relative;
+    transition: height 0.3s;
+}
+
+.cbar.indigo { background: linear-gradient(180deg, var(--accent-indigo), rgba(129,140,248,0.3)); }
+.cbar.teal { background: linear-gradient(180deg, var(--accent-teal), rgba(94,234,212,0.3)); }
+.cbar.purple { background: linear-gradient(180deg, var(--accent-purple), rgba(192,132,252,0.3)); }
+
+/* ===== ACHIEVEMENTS ===== */
+.ach-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.ach-badge {
+    text-align: center;
+    padding: 12px 8px;
+    border-radius: var(--radius-sm);
+    background: rgba(255,255,255,0.02);
+    border: 1px solid transparent;
+    transition: all 0.2s;
+}
+
+.ach-badge:hover {
+    border-color: var(--glass-border);
+    background: var(--glass-hover);
+}
+
+.ach-badge.locked { opacity: 0.2; }
+.ach-badge .ab-icon { font-size: 22px; margin-bottom: 4px; }
+.ach-badge .ab-name { font-size: 10px; font-weight: 600; color: var(--text-secondary); }
+
+/* ===== CONTACTS ===== */
+.contact-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+
+.contact-row:last-child { border-bottom: none; }
+.contact-row .c-name { font-size: 13px; font-weight: 500; }
+
+.contact-row .c-days {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 99px;
+}
+
+.contact-row .c-days.warn { background: rgba(251,146,60,0.12); color: var(--accent-orange); }
+.contact-row .c-days.danger { background: rgba(248,113,113,0.12); color: var(--accent-red); }
+
+/* ===== HEATMAP ===== */
+.heatmap {
+    display: grid;
+    grid-template-columns: repeat(26, 1fr);
+    gap: 2px;
+}
+
+.hm-cell {
+    aspect-ratio: 1;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.03);
+}
+
+.hm-cell.l1 { background: rgba(129,140,248,0.15); }
+.hm-cell.l2 { background: rgba(129,140,248,0.3); }
+.hm-cell.l3 { background: rgba(94,234,212,0.35); }
+.hm-cell.l4 { background: rgba(94,234,212,0.55); }
+.hm-cell.l5 { background: var(--accent-teal); box-shadow: 0 0 6px rgba(94,234,212,0.3); }
+
+/* ===== MOCKUP LABEL ===== */
+.mockup-label {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    background: linear-gradient(135deg, var(--accent-indigo), var(--accent-purple));
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    z-index: 999;
+    box-shadow: 0 4px 16px rgba(129,140,248,0.3);
+}
+</style>
+</head>
+<body>
+<div class="glow-teal"></div>
+
+<!-- TOP BAR -->
+<div class="topbar">
+    <div class="topbar-inner">
+        <div class="brand">Life Manager</div>
+        <ul class="nav-pills">
+            <li><a href="#" class="active"><span class="emoji">&#x1F3E0;</span> Home</a></li>
+            <li><a href="#"><span class="emoji">&#x1F4DD;</span> Journal</a></li>
+            <li><a href="#"><span class="emoji">&#x1F9D8;</span> Meditate</a></li>
+            <li><a href="#"><span class="emoji">&#x1F4DA;</span> Learn</a></li>
+            <li><a href="#"><span class="emoji">&#x1F957;</span> Nutrition</a></li>
+            <li><a href="#"><span class="emoji">&#x1F3C3;</span> Activity</a></li>
+            <li><a href="#"><span class="emoji">&#x2699;&#xFE0F;</span> More</a></li>
+        </ul>
+        <div class="topbar-right">
+            <button class="topbar-btn">&#x1F512;</button>
+            <button class="topbar-btn primary">Write Today</button>
+        </div>
+    </div>
+</div>
+
+<div class="page">
+    <!-- GREETING -->
+    <div class="greeting">
+        <h1>Good morning, <span>Noe</span></h1>
+        <p class="date">Friday, February 21, 2026</p>
+    </div>
+
+    <!-- HABITS -->
+    <div class="habits-grid">
+        <a class="habit-card done" href="#">
+            <div class="habit-emoji">&#x1F4DD;</div>
+            <div class="habit-name">Journal</div>
+            <div class="habit-detail">452 words</div>
+            <div class="habit-streak">&#x1F525; 5d</div>
+        </a>
+        <a class="habit-card done" href="#">
+            <div class="habit-emoji">&#x1F9D8;</div>
+            <div class="habit-name">Meditate</div>
+            <div class="habit-detail">15 min</div>
+            <div class="habit-streak">&#x1F525; 12d</div>
+        </a>
+        <a class="habit-card" href="#">
+            <div class="habit-emoji">&#x1F4DA;</div>
+            <div class="habit-name">Learn</div>
+            <div class="habit-detail">Not yet</div>
+        </a>
+        <a class="habit-card done" href="#">
+            <div class="habit-emoji">&#x1F957;</div>
+            <div class="habit-name">Nutrition</div>
+            <div class="habit-detail">2 meals</div>
+            <div class="habit-streak">&#x1F525; 8d</div>
+        </a>
+        <a class="habit-card" href="#">
+            <div class="habit-emoji">&#x1F3C3;</div>
+            <div class="habit-name">Activity</div>
+            <div class="habit-detail">Not yet</div>
+        </a>
+    </div>
+
+    <!-- BENTO GRID -->
+    <div class="bento">
+
+        <!-- Challenge + XP -->
+        <div class="glass col-7">
+            <h3>Today's Challenge</h3>
+            <div class="challenge-row">
+                <div class="ch-emoji">&#x1F3AF;</div>
+                <div class="ch-info">
+                    <div class="ch-title">Precision Writer</div>
+                    <div class="ch-desc">Write exactly 100 words (within 5 words)</div>
+                </div>
+                <div class="ch-xp">+25 XP</div>
+            </div>
+        </div>
+
+        <div class="glass col-5">
+            <h3>Level 5 &mdash; Historian</h3>
+            <div class="xp-bar">
+                <div class="xp-labels">
+                    <span>1,245 XP</span>
+                    <span>1,500 XP</span>
+                </div>
+                <div class="xp-track"><div class="xp-fill"></div></div>
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:16px;">
+                <div class="stat-item indigo"><div class="stat-value">5</div><div class="stat-label">Journal</div></div>
+                <div class="stat-item green"><div class="stat-value">12</div><div class="stat-label">Meditate</div></div>
+                <div class="stat-item teal"><div class="stat-value">3</div><div class="stat-label">Learn</div></div>
+                <div class="stat-item orange"><div class="stat-value">8</div><div class="stat-label">Nutrition</div></div>
+            </div>
+        </div>
+
+        <!-- Journal + Chart + Contacts -->
+        <div class="glass col-5">
+            <h3>Recent Journal</h3>
+            <div class="journal-item">
+                <div class="j-date">February 21, 2026</div>
+                <div class="j-text">Spent the morning working on the marathon training plan. The base phase is going well...</div>
+                <div class="j-tags"><span class="j-tag">Sarah</span><span class="j-tag">David</span></div>
+            </div>
+            <div class="journal-item">
+                <div class="j-date">February 20, 2026</div>
+                <div class="j-text">Great meditation session today. Tried the 4-7-8 breathing pattern for the first time...</div>
+            </div>
+            <div class="journal-item">
+                <div class="j-date">February 19, 2026</div>
+                <div class="j-text">Productive day at work. Had a long chat with the team about the Q2 roadmap...</div>
+                <div class="j-tags"><span class="j-tag">Alex</span><span class="j-tag">Tom</span></div>
+            </div>
+        </div>
+
+        <div class="glass col-4">
+            <h3>Weekly Activity</h3>
+            <div class="chart-bars">
+                <div class="cbar indigo" style="height:35%"></div>
+                <div class="cbar teal" style="height:60%"></div>
+                <div class="cbar indigo" style="height:25%"></div>
+                <div class="cbar purple" style="height:75%"></div>
+                <div class="cbar teal" style="height:50%"></div>
+                <div class="cbar indigo" style="height:40%"></div>
+                <div class="cbar teal" style="height:85%"></div>
+                <div class="cbar purple" style="height:65%"></div>
+            </div>
+        </div>
+
+        <div class="glass col-3">
+            <h3>Reach Out</h3>
+            <div class="contact-row">
+                <span class="c-name">David Park</span>
+                <span class="c-days danger">32d</span>
+            </div>
+            <div class="contact-row">
+                <span class="c-name">Alex Rivera</span>
+                <span class="c-days warn">21d</span>
+            </div>
+            <div class="contact-row">
+                <span class="c-name">Sarah Chen</span>
+                <span class="c-days warn">18d</span>
+            </div>
+            <div class="contact-row">
+                <span class="c-name">Tom Wilson</span>
+                <span class="c-days" style="color:var(--text-muted)">8d</span>
+            </div>
+        </div>
+
+        <!-- Heatmap + Achievements -->
+        <div class="glass col-8">
+            <h3>Habit Heatmap</h3>
+            <div class="heatmap" id="heatmap"></div>
+        </div>
+
+        <div class="glass col-4">
+            <h3>Achievements</h3>
+            <div class="ach-grid">
+                <div class="ach-badge"><div class="ab-icon">&#x1F525;</div><div class="ab-name">Week Warrior</div></div>
+                <div class="ach-badge"><div class="ab-icon">&#x1F4DC;</div><div class="ab-name">Wordsmith</div></div>
+                <div class="ach-badge"><div class="ab-icon">&#x1F9D8;</div><div class="ab-name">First Breath</div></div>
+                <div class="ach-badge"><div class="ab-icon">&#x1F3C3;</div><div class="ab-name">First Steps</div></div>
+                <div class="ach-badge"><div class="ab-icon">&#x1F4D3;</div><div class="ab-name">Regular</div></div>
+                <div class="ach-badge"><div class="ab-icon">&#x1F957;</div><div class="ab-name">First Bite</div></div>
+                <div class="ach-badge locked"><div class="ab-icon">&#x1F451;</div><div class="ab-name">Centurion</div></div>
+                <div class="ach-badge locked"><div class="ab-icon">&#x1F3C6;</div><div class="ab-name">Legend</div></div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="mockup-label">Layout C: Glassmorphism Dark</div>
+
+<script>
+const hm = document.getElementById('heatmap');
+for (let i = 0; i < 182; i++) {
+    const c = document.createElement('div');
+    c.className = 'hm-cell';
+    const r = Math.random();
+    if (r > 0.3) {
+        const l = ['l1','l2','l3','l4','l5'];
+        const w = r > 0.85 ? 4 : r > 0.7 ? 3 : r > 0.55 ? 2 : r > 0.4 ? 1 : 0;
+        c.classList.add(l[w]);
+    }
+    hm.appendChild(c);
+}
+</script>
+</body>
+</html>

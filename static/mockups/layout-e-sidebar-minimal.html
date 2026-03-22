@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Layout E: Sidebar + Minimal</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+    --bg: #fafaf9;
+    --surface: #ffffff;
+    --surface-alt: #f5f5f4;
+    --border: #e7e5e4;
+    --border-hover: #d6d3d1;
+    --text: #1c1917;
+    --text-secondary: #78716c;
+    --text-muted: #a8a29e;
+    --accent: #dc2626;
+    --accent-light: #fef2f2;
+    --green: #16a34a;
+    --green-light: #f0fdf4;
+    --orange: #ea580c;
+    --orange-light: #fff7ed;
+    --blue: #2563eb;
+    --blue-light: #eff6ff;
+    --purple: #7c3aed;
+    --purple-light: #f5f3ff;
+    --teal: #0d9488;
+    --teal-light: #f0fdfa;
+    --sidebar-bg: #1c1917;
+    --sidebar-text: #d6d3d1;
+    --sidebar-muted: #78716c;
+    --sidebar-active-bg: rgba(255,255,255,0.08);
+    --sidebar-active-text: #fafaf9;
+    --radius: 14px;
+    --radius-sm: 10px;
+}
+
+body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* ===== SIDEBAR ===== */
+.sidebar {
+    width: 240px;
+    background: var(--sidebar-bg);
+    color: var(--sidebar-text);
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    z-index: 50;
+}
+
+.sidebar-brand {
+    padding: 28px 24px 24px;
+}
+
+.sidebar-brand h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px;
+    font-weight: 400;
+    color: #fafaf9;
+    letter-spacing: -0.01em;
+}
+
+.sidebar-brand .brand-sub {
+    font-size: 11px;
+    color: var(--sidebar-muted);
+    margin-top: 2px;
+}
+
+.sidebar-divider {
+    height: 1px;
+    background: rgba(255,255,255,0.06);
+    margin: 0 16px;
+}
+
+.sidebar-section {
+    padding: 16px 12px 8px;
+}
+
+.sidebar-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--sidebar-muted);
+    padding: 0 12px;
+    margin-bottom: 8px;
+}
+
+.sidebar-nav {
+    list-style: none;
+}
+
+.sidebar-nav li a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 12px;
+    border-radius: var(--radius-sm);
+    color: var(--sidebar-text);
+    text-decoration: none;
+    font-size: 13.5px;
+    font-weight: 500;
+    transition: all 0.15s;
+}
+
+.sidebar-nav li a:hover {
+    background: var(--sidebar-active-bg);
+    color: var(--sidebar-active-text);
+}
+
+.sidebar-nav li a.active {
+    background: var(--sidebar-active-bg);
+    color: var(--sidebar-active-text);
+}
+
+.sidebar-nav li a .emoji { font-size: 17px; width: 24px; text-align: center; }
+
+.sidebar-nav li a .badge {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--orange);
+}
+
+.sidebar-footer {
+    margin-top: auto;
+    padding: 16px;
+}
+
+.sidebar-xp {
+    padding: 14px;
+    background: rgba(255,255,255,0.04);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255,255,255,0.06);
+}
+
+.sidebar-xp .xp-top {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.sidebar-xp .xp-level {
+    font-family: 'DM Serif Display', serif;
+    font-size: 13px;
+    color: #fafaf9;
+}
+
+.sidebar-xp .xp-numbers {
+    font-size: 11px;
+    color: var(--sidebar-muted);
+}
+
+.sidebar-xp .xp-track {
+    height: 4px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 99px;
+    overflow: hidden;
+}
+
+.sidebar-xp .xp-fill {
+    height: 100%;
+    width: 83%;
+    background: linear-gradient(90deg, var(--accent), var(--orange));
+    border-radius: 99px;
+}
+
+.sidebar-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.sidebar-btn {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: transparent;
+    color: var(--sidebar-text);
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+}
+
+.sidebar-btn:hover { background: rgba(255,255,255,0.06); }
+
+/* ===== MAIN ===== */
+.main {
+    margin-left: 240px;
+    flex: 1;
+    min-height: 100vh;
+}
+
+.page {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 40px 40px 80px;
+}
+
+/* ===== GREETING ===== */
+.greeting {
+    margin-bottom: 36px;
+}
+
+.greeting h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 36px;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+}
+
+.greeting .date {
+    color: var(--text-muted);
+    font-size: 14px;
+}
+
+/* ===== HABITS ===== */
+.habits {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-bottom: 36px;
+}
+
+.habit {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 14px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+    color: var(--text);
+}
+
+.habit:hover {
+    border-color: var(--border-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.04);
+}
+
+.habit.done {
+    border-color: var(--green);
+    background: var(--green-light);
+}
+
+.habit.done .habit-status { color: var(--green); }
+
+.habit .habit-emoji { font-size: 26px; margin-bottom: 8px; }
+.habit .habit-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.habit .habit-detail { font-size: 11px; color: var(--text-muted); }
+.habit .habit-streak { font-size: 11px; color: var(--orange); font-weight: 600; margin-top: 6px; }
+.habit .habit-status { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+
+/* ===== CHALLENGE ===== */
+.challenge {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 24px 28px;
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 36px;
+}
+
+.challenge .ch-emoji { font-size: 32px; }
+.challenge .ch-body { flex: 1; }
+
+.challenge .ch-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+.challenge .ch-title { font-size: 16px; font-weight: 600; margin: 2px 0; }
+.challenge .ch-desc { font-size: 13px; color: var(--text-secondary); }
+
+.challenge .ch-xp {
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px;
+    color: var(--accent);
+}
+
+.challenge .ch-xp span {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 10px;
+    display: block;
+    color: var(--text-muted);
+}
+
+/* ===== STATS ===== */
+.stats {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-bottom: 36px;
+}
+
+.stat {
+    text-align: center;
+    padding: 18px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.stat .stat-num {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    line-height: 1;
+}
+
+.stat .stat-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-top: 4px;
+}
+
+.stat:nth-child(1) .stat-num { color: var(--accent); }
+.stat:nth-child(2) .stat-num { color: var(--green); }
+.stat:nth-child(3) .stat-num { color: var(--blue); }
+.stat:nth-child(4) .stat-num { color: var(--orange); }
+.stat:nth-child(5) .stat-num { color: var(--teal); }
+
+/* ===== SECTION ===== */
+.section {
+    margin-bottom: 36px;
+}
+
+.section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+.section-head h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px;
+    font-weight: 400;
+}
+
+.section-head a {
+    color: var(--text-muted);
+    font-size: 12px;
+    text-decoration: none;
+}
+
+/* ===== TWO COL ===== */
+.two-col {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 24px;
+}
+
+/* ===== ENTRIES ===== */
+.entry {
+    padding: 18px 22px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.entry:hover { border-color: var(--border-hover); }
+
+.entry .entry-date { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.entry .entry-text { font-size: 13.5px; color: var(--text-secondary); line-height: 1.6; }
+
+.entry .entry-tags { display: flex; gap: 6px; margin-top: 8px; }
+.entry .entry-tag {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--surface-alt);
+    color: var(--text-muted);
+}
+
+/* ===== SIDE CARDS ===== */
+.side-card {
+    padding: 18px 22px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 14px;
+}
+
+.side-card h3 {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+}
+
+/* Achievements */
+.ach-list { display: flex; flex-direction: column; gap: 6px; }
+
+.ach-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 8px;
+}
+
+.ach-row:hover { background: var(--surface-alt); }
+.ach-row .ach-icon { font-size: 18px; }
+.ach-row .ach-name { font-size: 12px; font-weight: 500; flex: 1; }
+.ach-row .ach-desc { font-size: 10px; color: var(--text-muted); }
+.ach-row.locked { opacity: 0.3; }
+
+/* Contacts */
+.contact-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--surface-alt);
+}
+
+.contact-item:last-child { border-bottom: none; }
+.contact-item .name { font-size: 13px; font-weight: 500; }
+
+.contact-item .days {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.contact-item .days.warn { background: var(--orange-light); color: var(--orange); }
+.contact-item .days.danger { background: var(--accent-light); color: var(--accent); }
+
+/* ===== HEATMAP ===== */
+.heatmap-grid {
+    display: grid;
+    grid-template-columns: repeat(52, 1fr);
+    grid-template-rows: repeat(7, 1fr);
+    grid-auto-flow: column;
+    gap: 2px;
+}
+
+.hm {
+    aspect-ratio: 1;
+    border-radius: 2px;
+    background: var(--surface-alt);
+}
+
+.hm.a { background: #dcfce7; }
+.hm.b { background: #86efac; }
+.hm.c { background: #22c55e; }
+.hm.d { background: #15803d; }
+.hm.e { background: #14532d; }
+
+/* ===== CHART ===== */
+.chart {
+    height: 100px;
+    display: flex;
+    align-items: flex-end;
+    gap: 5px;
+}
+
+.chart .bar {
+    flex: 1;
+    border-radius: 4px 4px 0 0;
+}
+
+.chart .bar.green { background: var(--green); opacity: 0.7; }
+.chart .bar.blue { background: var(--blue); opacity: 0.7; }
+.chart .bar.teal { background: var(--teal); opacity: 0.7; }
+
+/* ===== MOCKUP LABEL ===== */
+.mockup-label {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    background: var(--accent);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    z-index: 999;
+}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <h1>Life Manager</h1>
+        <div class="brand-sub">Build better habits</div>
+    </div>
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-section">
+        <div class="sidebar-label">Habits</div>
+        <ul class="sidebar-nav">
+            <li><a href="#" class="active"><span class="emoji">&#x1F3E0;</span> Dashboard</a></li>
+            <li><a href="#"><span class="emoji">&#x1F4DD;</span> Journal <span class="badge">5d</span></a></li>
+            <li><a href="#"><span class="emoji">&#x1F9D8;</span> Meditate <span class="badge">12d</span></a></li>
+            <li><a href="#"><span class="emoji">&#x1F4DA;</span> Learn</a></li>
+            <li><a href="#"><span class="emoji">&#x1F957;</span> Nutrition <span class="badge">8d</span></a></li>
+            <li><a href="#"><span class="emoji">&#x1F3C3;</span> Activity</a></li>
+        </ul>
+    </div>
+
+    <div class="sidebar-section">
+        <div class="sidebar-label">More</div>
+        <ul class="sidebar-nav">
+            <li><a href="#"><span class="emoji">&#x2B50;</span> Highlights</a></li>
+            <li><a href="#"><span class="emoji">&#x1F4E8;</span> Newsletter</a></li>
+            <li><a href="#"><span class="emoji">&#x1F465;</span> Contacts</a></li>
+            <li><a href="#"><span class="emoji">&#x1F4C8;</span> Portfolio</a></li>
+            <li><a href="#"><span class="emoji">&#x1F3AE;</span> Wordle</a></li>
+        </ul>
+    </div>
+
+    <div class="sidebar-footer">
+        <div class="sidebar-xp">
+            <div class="xp-top">
+                <span class="xp-level">Level 5 &mdash; Historian</span>
+                <span class="xp-numbers">1,245 / 1,500</span>
+            </div>
+            <div class="xp-track"><div class="xp-fill"></div></div>
+        </div>
+        <div class="sidebar-actions">
+            <button class="sidebar-btn">&#x1F319; Theme</button>
+            <button class="sidebar-btn">&#x1F512; Lock</button>
+        </div>
+    </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+    <div class="page">
+
+        <div class="greeting">
+            <h1>Good morning, Noe</h1>
+            <p class="date">Friday, February 21, 2026</p>
+        </div>
+
+        <!-- HABITS -->
+        <div class="habits">
+            <a class="habit done" href="#">
+                <div class="habit-emoji">&#x1F4DD;</div>
+                <div class="habit-name">Journal</div>
+                <div class="habit-detail">452 words</div>
+                <div class="habit-streak">&#x1F525; 5d</div>
+            </a>
+            <a class="habit done" href="#">
+                <div class="habit-emoji">&#x1F9D8;</div>
+                <div class="habit-name">Meditate</div>
+                <div class="habit-detail">15 min</div>
+                <div class="habit-streak">&#x1F525; 12d</div>
+            </a>
+            <a class="habit" href="#">
+                <div class="habit-emoji">&#x1F4DA;</div>
+                <div class="habit-name">Learn</div>
+                <div class="habit-detail">Not yet</div>
+                <div class="habit-status">Go &rarr;</div>
+            </a>
+            <a class="habit done" href="#">
+                <div class="habit-emoji">&#x1F957;</div>
+                <div class="habit-name">Nutrition</div>
+                <div class="habit-detail">2 meals</div>
+                <div class="habit-streak">&#x1F525; 8d</div>
+            </a>
+            <a class="habit" href="#">
+                <div class="habit-emoji">&#x1F3C3;</div>
+                <div class="habit-name">Activity</div>
+                <div class="habit-detail">Not yet</div>
+                <div class="habit-status">Go &rarr;</div>
+            </a>
+        </div>
+
+        <!-- CHALLENGE -->
+        <div class="challenge">
+            <div class="ch-emoji">&#x1F3AF;</div>
+            <div class="ch-body">
+                <div class="ch-label">Today's Challenge</div>
+                <div class="ch-title">Precision Writer</div>
+                <div class="ch-desc">Write exactly 100 words (within 5 words)</div>
+            </div>
+            <div class="ch-xp">+25<span>bonus XP</span></div>
+        </div>
+
+        <!-- STATS -->
+        <div class="stats">
+            <div class="stat"><div class="stat-num">5</div><div class="stat-label">Journal</div></div>
+            <div class="stat"><div class="stat-num">12</div><div class="stat-label">Meditation</div></div>
+            <div class="stat"><div class="stat-num">3</div><div class="stat-label">Learning</div></div>
+            <div class="stat"><div class="stat-num">8</div><div class="stat-label">Nutrition</div></div>
+            <div class="stat"><div class="stat-num">4</div><div class="stat-label">Activity</div></div>
+        </div>
+
+        <!-- HEATMAP -->
+        <div class="section">
+            <div class="section-head">
+                <h2>This Year</h2>
+            </div>
+            <div class="heatmap-grid" id="heatmap"></div>
+        </div>
+
+        <!-- TWO COL -->
+        <div class="two-col">
+            <div>
+                <div class="section">
+                    <div class="section-head">
+                        <h2>Journal</h2>
+                        <a href="#">View all &rarr;</a>
+                    </div>
+                    <div class="entry">
+                        <div class="entry-date">February 21, 2026</div>
+                        <div class="entry-text">Spent the morning working on the marathon training plan. The base phase is going well, ran 8km this morning at an easy pace...</div>
+                        <div class="entry-tags"><span class="entry-tag">Sarah</span><span class="entry-tag">David</span></div>
+                    </div>
+                    <div class="entry">
+                        <div class="entry-date">February 20, 2026</div>
+                        <div class="entry-text">Great meditation session today. Tried the 4-7-8 breathing pattern for the first time and it felt incredibly calming...</div>
+                    </div>
+                    <div class="entry">
+                        <div class="entry-date">February 19, 2026</div>
+                        <div class="entry-text">Productive day at work. Had a long chat with the team about the Q2 roadmap...</div>
+                        <div class="entry-tags"><span class="entry-tag">Alex</span><span class="entry-tag">Tom</span><span class="entry-tag">Lisa</span></div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-head"><h2>Weekly Activity</h2></div>
+                    <div class="chart">
+                        <div class="bar green" style="height:35%"></div>
+                        <div class="bar blue" style="height:60%"></div>
+                        <div class="bar green" style="height:25%"></div>
+                        <div class="bar teal" style="height:75%"></div>
+                        <div class="bar green" style="height:45%"></div>
+                        <div class="bar blue" style="height:35%"></div>
+                        <div class="bar teal" style="height:80%"></div>
+                        <div class="bar green" style="height:55%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="side-card">
+                    <h3>Achievements</h3>
+                    <div class="ach-list">
+                        <div class="ach-row"><span class="ach-icon">&#x1F525;</span><span class="ach-name">Week Warrior</span><span class="ach-desc">7-day streak</span></div>
+                        <div class="ach-row"><span class="ach-icon">&#x1F4DC;</span><span class="ach-name">Wordsmith</span><span class="ach-desc">1,000 words</span></div>
+                        <div class="ach-row"><span class="ach-icon">&#x1F9D8;</span><span class="ach-name">First Breath</span><span class="ach-desc">First meditation</span></div>
+                        <div class="ach-row"><span class="ach-icon">&#x1F3C3;</span><span class="ach-name">First Steps</span><span class="ach-desc">First run</span></div>
+                        <div class="ach-row locked"><span class="ach-icon">&#x1F451;</span><span class="ach-name">Centurion</span><span class="ach-desc">100-day streak</span></div>
+                    </div>
+                </div>
+
+                <div class="side-card">
+                    <h3>Reach Out</h3>
+                    <div class="contact-item"><span class="name">David Park</span><span class="days danger">32d ago</span></div>
+                    <div class="contact-item"><span class="name">Alex Rivera</span><span class="days warn">21d ago</span></div>
+                    <div class="contact-item"><span class="name">Sarah Chen</span><span class="days warn">18d ago</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mockup-label">Layout E: Sidebar + Minimal</div>
+
+<script>
+const g = document.getElementById('heatmap');
+for (let i = 0; i < 364; i++) {
+    const c = document.createElement('div');
+    c.className = 'hm';
+    const r = Math.random();
+    if (r > 0.35) { c.classList.add(r > 0.88 ? 'e' : r > 0.72 ? 'd' : r > 0.55 ? 'c' : r > 0.42 ? 'b' : 'a'); }
+    g.appendChild(c);
+}
+</script>
+</body>
+</html>

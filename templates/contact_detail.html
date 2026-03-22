@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}{{ contact.full_name }} - Life Manager{% endblock %}
+
+{% block content %}
+<div class="contact-detail">
+    <div class="page-header">
+        <h1>{{ contact.full_name }}</h1>
+        <div class="actions">
+            <a href="{{ url_for('contact_edit', contact_id=contact.id) }}" class="btn-secondary">Edit</a>
+            <form method="POST" action="{{ url_for('contact_delete', contact_id=contact.id) }}" style="display: inline;" 
+                  onsubmit="return confirm('Are you sure you want to delete this contact?');">
+                <button type="submit" class="btn-danger">Delete</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="detail-grid">
+        <section class="detail-card">
+            <h2>Contact Information</h2>
+            <dl class="info-list">
+                {% if contact.relationship_category %}
+                    <dt>Category:</dt>
+                    <dd><span class="badge">{{ contact.relationship_category }}</span></dd>
+                {% endif %}
+                
+                {% if contact.preferred_language %}
+                    <dt>Preferred Language:</dt>
+                    <dd><span class="badge language-badge">{{ contact.preferred_language }}</span></dd>
+                {% endif %}
+                
+                {% if contact.email %}
+                    <dt>Email:</dt>
+                    <dd><a href="mailto:{{ contact.email }}">{{ contact.email }}</a></dd>
+                {% endif %}
+                
+                {% if contact.phone %}
+                    <dt>Phone:</dt>
+                    <dd><a href="tel:{{ contact.phone }}">{{ contact.phone }}</a></dd>
+                {% endif %}
+                
+                {% if contact.birthday %}
+                    <dt>Birthday:</dt>
+                    <dd>{{ contact.birthday.strftime('%B %d, %Y') }}</dd>
+                {% endif %}
+                
+                {% if contact.address %}
+                    <dt>Address:</dt>
+                    <dd>{{ contact.address }}</dd>
+                {% endif %}
+                
+                {% if contact.last_contacted_date %}
+                    <dt>Last Contact:</dt>
+                    <dd class="{% if contact.days_since_contact > 30 %}warning-text{% endif %}">
+                        {{ contact.last_contacted_date.strftime('%B %d, %Y') }} 
+                        ({{ contact.days_since_contact }} days ago)
+                    </dd>
+                {% endif %}
+                
+                {% if contact.contact_frequency %}
+                    <dt>Contact Frequency:</dt>
+                    <dd>Every {{ contact.contact_frequency }} days</dd>
+                {% endif %}
+            </dl>
+            
+            {% if contact.how_we_met %}
+                <h3>How We Met</h3>
+                <p>{{ contact.how_we_met }}</p>
+            {% endif %}
+            
+            {% if contact.notes %}
+                <h3>Notes</h3>
+                <p>{{ contact.notes }}</p>
+            {% endif %}
+        </section>
+
+        <section class="detail-card">
+            <h2>Interactions</h2>
+            
+            <form method="POST" action="{{ url_for('interaction_new', contact_id=contact.id) }}" class="interaction-form">
+                <h3>Add Interaction</h3>
+                <div class="form-inline">
+                    <input type="date" name="interaction_date" value="{{ today }}" required>
+                    <select name="interaction_type">
+                        <option value="Coffee">Coffee</option>
+                        <option value="Drinks">Drinks</option>
+                        <option value="Call">Call</option>
+                        <option value="Dinner">Dinner</option>
+                        <option value="Text">Text</option>
+                        <option value="Meeting">Meeting</option>
+                        <option value="Other">Other</option>
+                    </select>
+                    <input type="text" name="notes" placeholder="Notes...">
+                    <button type="submit" class="btn-primary">Add</button>
+                </div>
+            </form>
+
+            {% if interactions %}
+                <div class="interactions-list">
+                    {% for interaction in interactions %}
+                        <div class="interaction-item">
+                            <div class="interaction-header">
+                                <span class="interaction-type">{{ interaction.interaction_type }}</span>
+                                <span class="interaction-date">{{ interaction.interaction_date.strftime('%b %d, %Y') }}</span>
+                                <form method="POST" action="{{ url_for('interaction_delete', contact_id=contact.id, interaction_id=interaction.id) }}"
+                                      style="display: inline; margin-left: auto;"
+                                      onsubmit="return confirm('Delete this interaction?');">
+                                    <button type="submit" class="btn-delete-small" title="Delete interaction">&times;</button>
+                                </form>
+                            </div>
+                            {% if interaction.notes %}
+                                <p class="interaction-notes">{{ interaction.notes }}</p>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="empty-state">No interactions recorded yet.</p>
+            {% endif %}
+        </section>
+    </div>
+
+    {% if mention_contexts %}
+        <section class="detail-card journal-mentions-section">
+            <h2>Journal Mentions</h2>
+            <p class="section-description">{{ contact.first_name }} was mentioned in {{ mention_contexts|length }} journal {% if mention_contexts|length == 1 %}entry{% else %}entries{% endif %}:</p>
+            
+            <div class="journal-mentions-list">
+                {% for context in mention_contexts %}
+                    <div class="journal-mention">
+                        <a href="{{ url_for('journal_entry', date_str=context.entry.date.strftime('%Y-%m-%d')) }}">
+                            <div class="journal-mention-header">
+                                <div class="journal-mention-date">📅 {{ context.entry.date.strftime('%B %d, %Y') }}</div>
+                                {% if context.entry.mood %}
+                                    <span class="mood-indicator">{{ context.entry.mood }}</span>
+                                {% endif %}
+                            </div>
+                            <p class="journal-mention-sentence">
+                                "{{ context.sentence }}"
+                            </p>
+                        </a>
+                    </div>
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
+</div>
+
+<script>
+    // Set today's date as default for interaction form
+    document.querySelector('input[name="interaction_date"]').value = new Date().toISOString().split('T')[0];
+</script>
+{% endblock %}

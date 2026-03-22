@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <filter id="pencilTexture">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#pencilTexture)">
+    <!-- Lotus flower base -->
+    <!-- Center petal -->
+    <path d="M60 30 Q55 55 45 75 Q60 65 75 75 Q65 55 60 30"
+          stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M60 31 Q56 55 46 74 Q60 64 74 74 Q64 55 60 31"
+          stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+
+    <!-- Left petal -->
+    <path d="M45 45 Q30 55 25 75 Q40 68 50 75 Q42 60 45 45"
+          stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M46 46 Q31 56 26 74 Q41 67 51 74 Q43 60 46 46"
+          stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+
+    <!-- Right petal -->
+    <path d="M75 45 Q90 55 95 75 Q80 68 70 75 Q78 60 75 45"
+          stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M74 46 Q89 56 94 74 Q79 67 69 74 Q77 60 74 46"
+          stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+
+    <!-- Far left petal -->
+    <path d="M35 55 Q18 60 15 78 Q30 72 40 78 Q32 66 35 55"
+          stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M36 56 Q19 61 16 77 Q31 71 41 77 Q33 65 36 56"
+          stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.4"/>
+
+    <!-- Far right petal -->
+    <path d="M85 55 Q102 60 105 78 Q90 72 80 78 Q88 66 85 55"
+          stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M84 56 Q101 61 104 77 Q89 71 79 77 Q87 65 84 56"
+          stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.4"/>
+
+    <!-- Base curve -->
+    <path d="M25 80 Q60 90 95 80" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M26 81 Q60 91 94 81" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.5"/>
+
+    <!-- Stem -->
+    <path d="M60 85 Q58 95 60 105" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M61 86 Q59 96 61 104" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.5"/>
+
+    <!-- Glow dots -->
+    <circle cx="60" cy="22" r="2" stroke="#D4A574" stroke-width="1.5" fill="none" opacity="0.6"/>
+    <path d="M60 15 L60 18" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M50 20 L53 23" stroke="#D4A574" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <path d="M70 20 L67 23" stroke="#D4A574" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+
+    <!-- Inner detail -->
+    <path d="M55 50 Q60 45 65 50" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M52 58 Q60 52 68 58" stroke="#D4A574" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+  </g>
+
+  <!-- Extra sketch marks -->
+  <path d="M12 70 L14 72" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+  <path d="M106 70 L108 68" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+</svg>

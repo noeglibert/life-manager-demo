@@ -1,0 +1,871 @@
+{% extends "base.html" %}
+
+{% block title %}{{ session.topic_title }} - Learning Session{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ learn_icon(interest.icon, 'stat-icon-svg') }} {{ session.topic_title }}</h1>
+    <div class="actions">
+        <a href="{{ url_for('learn') }}" class="btn-secondary">&larr; Back to Roulette</a>
+    </div>
+</div>
+
+<!-- Session Info Banner -->
+<div class="session-info-banner">
+    <div class="info-item">
+        <span class="info-label">Topic</span>
+        <span class="info-value">{{ interest.name }}</span>
+    </div>
+    <div class="info-item">
+        <span class="info-label">Level</span>
+        <span class="level-badge {{ session.difficulty_level }}">{{ session.difficulty_level|title }}</span>
+    </div>
+    <div class="info-item">
+        <span class="info-label">Duration</span>
+        <span class="info-value">~{{ session.estimated_time }} min</span>
+    </div>
+    <div class="info-item">
+        <span class="info-label">XP Reward</span>
+        <span class="info-value xp-value">+{{ session.xp_earned }} XP</span>
+    </div>
+</div>
+
+{% if not session.completed %}
+<!-- Progress Indicator -->
+<div class="learning-progress-bar">
+    <div class="progress-step active" id="step-read">
+        <span class="step-number">1</span>
+        <span class="step-label">Read</span>
+    </div>
+    <div class="progress-connector"></div>
+    <div class="progress-step" id="step-quiz">
+        <span class="step-number">2</span>
+        <span class="step-label">Quiz</span>
+    </div>
+    <div class="progress-connector"></div>
+    <div class="progress-step" id="step-complete">
+        <span class="step-number">3</span>
+        <span class="step-label">Complete</span>
+    </div>
+</div>
+
+<!-- PHASE 1: Reading -->
+<div class="learning-phase" id="phase-reading">
+    <div class="learning-content-card">
+        <div class="reading-header">
+            <h2>{{ svg_icon('book', 'inline-icon') }} Today's Learning</h2>
+            <div class="reading-header-right">
+                <div class="highlight-counter" id="highlight-counter" title="Saved highlights">
+                    <span class="highlight-counter-icon">{{ svg_icon('pin', 'inline-icon') }}</span>
+                    <span class="highlight-counter-num" id="highlight-count">0</span>
+                </div>
+                <div class="reading-timer" id="reading-timer">
+                    <span class="timer-icon">{{ svg_icon('clock', 'inline-icon') }}</span>
+                    <span class="timer-text" id="timer-text">0:00</span>
+                </div>
+            </div>
+        </div>
+        <div class="content-body" id="content-body">
+            {{ session.content|markdown }}
+        </div>
+
+        <!-- Floating highlight button (hidden by default) -->
+        <div class="highlight-btn-float" id="highlight-btn" style="display: none;">
+            <button type="button" onclick="saveHighlight()">{{ svg_icon('pin', 'btn-icon-svg') }} Highlight</button>
+        </div>
+        <div class="reading-footer">
+            <p class="reading-prompt">Take your time to absorb the material. When you're ready, test your knowledge!</p>
+            <button type="button" class="btn-primary btn-large" onclick="finishReading()">
+                ✓ I've Finished Reading - Start Quiz
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- PHASE 2: Quiz -->
+<div class="learning-phase" id="phase-quiz" style="display: none;">
+    <div class="quiz-card">
+        <div class="quiz-header">
+            <h2>🧠 Knowledge Check</h2>
+            <p class="quiz-intro">Test your understanding with multiple-choice and open-ended questions. Score 75% or higher to level up in this subject!</p>
+        </div>
+
+        <div id="quiz-loading" class="quiz-loading">
+            <div class="loading-spinner"></div>
+            <p>Generating personalized questions based on your reading...</p>
+        </div>
+
+        <div id="quiz-questions" style="display: none;"></div>
+
+        <div class="quiz-actions" style="display: none;" id="quiz-submit-area">
+            <button type="button" class="btn-primary btn-large" onclick="submitQuiz()">Submit Answers</button>
+            <button type="button" class="btn-secondary" onclick="skipQuiz()">Skip Quiz</button>
+        </div>
+
+        <div id="quiz-submitting" style="display: none;" class="quiz-loading">
+            <div class="loading-spinner"></div>
+            <p>Evaluating your answers...</p>
+        </div>
+
+        <div id="quiz-results" style="display: none;"></div>
+    </div>
+</div>
+
+<!-- PHASE 3: Completion -->
+<div class="learning-phase" id="phase-complete" style="display: none;">
+    <div class="completion-card">
+        <div class="completion-header">
+            <h2>{{ svg_icon('trophy', 'inline-icon') }} Session Complete!</h2>
+            <p>Great job finishing today's learning session. Take a moment to reflect.</p>
+        </div>
+
+        <form action="{{ url_for('learn_complete', session_id=session.id) }}" method="POST" class="completion-form">
+            <div class="form-group">
+                <label for="notes">What were your key takeaways?</label>
+                <textarea name="notes" id="notes" rows="5" placeholder="Write down what you learned, questions you have, or ideas this sparked..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>How would you rate this content?</label>
+                <div class="rating-stars" id="rating-stars">
+                    <span class="star" data-value="1" onclick="setRating(1)">☆</span>
+                    <span class="star" data-value="2" onclick="setRating(2)">☆</span>
+                    <span class="star" data-value="3" onclick="setRating(3)">☆</span>
+                    <span class="star" data-value="4" onclick="setRating(4)">☆</span>
+                    <span class="star" data-value="5" onclick="setRating(5)">☆</span>
+                </div>
+            </div>
+
+            <div class="xp-summary" id="xp-summary">
+                <h3>XP Earned</h3>
+                <div class="xp-breakdown">
+                    <div class="xp-line">
+                        <span>Session Completion</span>
+                        <span>+{{ session.xp_earned }} XP</span>
+                    </div>
+                    <div class="xp-total">
+                        <span>Total</span>
+                        <span id="total-xp">+{{ session.xp_earned }} XP</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quiz result summary (populated by JS) -->
+            <div id="quiz-result-summary" style="display: none;"></div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn-primary btn-large">
+                    {{ svg_icon('check', 'btn-icon-svg') }} Complete Session & Claim XP
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% else %}
+<!-- Already Completed View -->
+<div class="completed-section">
+    <div class="completed-badge">
+        <span class="badge-icon">{{ svg_icon('check', 'stat-icon-svg') }}</span>
+        <div class="badge-info">
+            <h3>Session Completed!</h3>
+            <p>Completed on {{ session.completed_at.strftime('%B %d, %Y at %I:%M %p') if session.completed_at else 'Unknown' }}</p>
+            <p class="xp-earned">+{{ session.xp_earned }} XP earned</p>
+            {% if session.quiz_score is not none %}
+            <p class="quiz-score-display">Quiz Score: {{ session.quiz_score }}%</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Show content for review -->
+    <div class="learning-content-card review-mode">
+        <h2>📖 Content Review</h2>
+        <div class="content-body" id="content-body">
+            {{ session.content|markdown }}
+        </div>
+
+        <!-- Floating highlight button for review mode too -->
+        <div class="highlight-btn-float" id="highlight-btn" style="display: none;">
+            <button type="button" onclick="saveHighlight()">{{ svg_icon('pin', 'btn-icon-svg') }} Highlight</button>
+        </div>
+    </div>
+
+    {% if session.notes %}
+    <div class="session-notes-card">
+        <h3>Your Notes</h3>
+        <p>{{ session.notes }}</p>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let quizQuestions = [];
+let userAnswers = [];
+let currentRating = 0;
+let quizResultData = null;
+let readingStartTime = Date.now();
+let timerInterval;
+
+// Start reading timer
+function startTimer() {
+    timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - readingStartTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        document.getElementById('timer-text').textContent =
+            `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }, 1000);
+}
+
+// Initialize timer on page load
+startTimer();
+
+function finishReading() {
+    clearInterval(timerInterval);
+
+    // Transition to quiz phase
+    document.getElementById('phase-reading').style.display = 'none';
+    document.getElementById('phase-quiz').style.display = 'block';
+    document.getElementById('step-read').classList.remove('active');
+    document.getElementById('step-read').classList.add('completed');
+    document.getElementById('step-quiz').classList.add('active');
+
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Load quiz
+    loadQuiz();
+}
+
+async function loadQuiz() {
+    const loadingDiv = document.getElementById('quiz-loading');
+    const questionsDiv = document.getElementById('quiz-questions');
+
+    try {
+        const response = await fetch('/api/learn/quiz/{{ session.id }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        });
+        const data = await response.json();
+
+        if (data.error) {
+            loadingDiv.innerHTML = `<p class="error">Error: ${data.error}</p>`;
+            document.getElementById('quiz-submit-area').style.display = 'flex';
+            return;
+        }
+
+        quizQuestions = data.questions;
+        // Initialize answers: -1 for MCQ (not selected), '' for open (empty string)
+        userAnswers = quizQuestions.map(q => q.type === 'open' ? '' : -1);
+        renderQuiz();
+        loadingDiv.style.display = 'none';
+        questionsDiv.style.display = 'block';
+        document.getElementById('quiz-submit-area').style.display = 'flex';
+    } catch (e) {
+        loadingDiv.innerHTML = `<p class="error">Error loading quiz: ${e.message}</p>`;
+    }
+}
+
+function renderQuiz() {
+    const questionsDiv = document.getElementById('quiz-questions');
+    let html = '';
+
+    quizQuestions.forEach((q, qIndex) => {
+        const qType = q.type || 'mcq';
+        const typeLabel = qType === 'mcq' ? '<img class="btn-icon-svg" src="/static/images/icon-writing.svg" alt=""> Multiple Choice' : '<img class="btn-icon-svg" src="/static/images/icon-pencil.svg" alt=""> Open Question';
+        const maxPts = qType === 'mcq' ? '1 pt' : `${q.max_score || 3} pts`;
+
+        html += `<div class="quiz-question" id="question-${qIndex}">
+            <div class="question-header-row">
+                <p class="question-number">Question ${qIndex + 1} of ${quizQuestions.length}</p>
+                <span class="question-type-badge ${qType}">${typeLabel} (${maxPts})</span>
+            </div>
+            <p class="question-text">${q.question}</p>`;
+
+        if (qType === 'mcq') {
+            html += `<div class="question-options">`;
+            q.options.forEach((opt, oIndex) => {
+                html += `<label class="option-label">
+                    <input type="radio" name="q${qIndex}" value="${oIndex}" onchange="selectAnswer(${qIndex}, ${oIndex})">
+                    <span class="option-text">${opt}</span>
+                </label>`;
+            });
+            html += `</div>`;
+        } else {
+            // Open question with textarea
+            html += `<div class="open-answer-area">
+                <textarea class="open-answer-input" id="open-answer-${qIndex}" rows="5"
+                    placeholder="Write your answer here... Be thorough and explain your reasoning."
+                    oninput="updateOpenAnswer(${qIndex})"></textarea>
+                <p class="open-hint">Key areas to address: ${(q.key_points || []).length} key points expected</p>
+            </div>`;
+        }
+
+        html += `</div>`;
+    });
+
+    questionsDiv.innerHTML = html;
+}
+
+function selectAnswer(qIndex, oIndex) {
+    userAnswers[qIndex] = oIndex;
+    const question = document.getElementById(`question-${qIndex}`);
+    question.classList.add('answered');
+}
+
+function updateOpenAnswer(qIndex) {
+    const textarea = document.getElementById(`open-answer-${qIndex}`);
+    userAnswers[qIndex] = textarea.value;
+    const question = document.getElementById(`question-${qIndex}`);
+    if (textarea.value.trim().length > 0) {
+        question.classList.add('answered');
+    } else {
+        question.classList.remove('answered');
+    }
+}
+
+async function submitQuiz() {
+    // Check that all questions are answered
+    for (let i = 0; i < quizQuestions.length; i++) {
+        const q = quizQuestions[i];
+        const qType = q.type || 'mcq';
+        if (qType === 'mcq' && userAnswers[i] === -1) {
+            alert('Please answer all multiple-choice questions before submitting.');
+            document.getElementById(`question-${i}`).scrollIntoView({ behavior: 'smooth' });
+            return;
+        }
+        if (qType === 'open' && (!userAnswers[i] || userAnswers[i].trim().length === 0)) {
+            alert('Please write an answer for all open questions before submitting.');
+            document.getElementById(`question-${i}`).scrollIntoView({ behavior: 'smooth' });
+            return;
+        }
+    }
+
+    // Show evaluating state
+    document.getElementById('quiz-submit-area').style.display = 'none';
+    document.getElementById('quiz-submitting').style.display = 'block';
+
+    try {
+        const response = await fetch('/api/learn/quiz/{{ session.id }}/submit', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({answers: userAnswers})
+        });
+        const data = await response.json();
+
+        document.getElementById('quiz-submitting').style.display = 'none';
+        showQuizResults(data);
+    } catch (e) {
+        document.getElementById('quiz-submitting').style.display = 'none';
+        document.getElementById('quiz-submit-area').style.display = 'flex';
+        alert('Error submitting quiz: ' + e.message);
+    }
+}
+
+function skipQuiz() {
+    goToCompletion();
+}
+
+function showQuizResults(data) {
+    const resultsDiv = document.getElementById('quiz-results');
+    const questionsDiv = document.getElementById('quiz-questions');
+
+    quizResultData = data;
+
+    let scoreClass = data.passed ? 'excellent' : 'needs-work';
+    let emoji = data.passed ? '<img class="stat-icon-svg" src="/static/images/icon-trophy.svg" alt="">' : '<img class="stat-icon-svg" src="/static/images/icon-book.svg" alt="">';
+    let passText = data.passed ? 'Passed!' : 'Not quite - try again next time!';
+
+    let html = `<div class="quiz-score-card ${scoreClass}">
+        <div class="score-display">
+            <span class="score-emoji">${emoji}</span>
+            <span class="score-value">${data.score}%</span>
+        </div>
+        <p class="score-text">${data.earned_points} out of ${data.total_points} points</p>
+        <p class="pass-status ${data.passed ? 'passed' : 'failed'}">${passText}</p>`;
+
+    if (data.leveled_up) {
+        html += `<div class="level-up-banner">
+            <span class="level-up-icon">⬆️</span>
+            <p><strong>Level Up!</strong> You are now <strong>${data.new_level}</strong> in ${data.interest_name}!</p>
+            <p class="level-up-detail">Next time you study this subject, you'll get more advanced content.</p>
+        </div>`;
+    } else if (data.passed) {
+        html += `<p class="already-max-note">Great score! You've mastered this level.</p>`;
+    } else {
+        html += `<p class="retry-note">You need 75% to level up. Keep studying and try again next session!</p>`;
+    }
+
+    html += `</div>
+    <div class="quiz-review">
+        <h3>Review Your Answers</h3>`;
+
+    quizQuestions.forEach((q, i) => {
+        const result = data.results[i];
+        const qType = q.type || 'mcq';
+
+        if (qType === 'mcq') {
+            const icon = result.correct ? '<img class="inline-icon" src="/static/images/icon-check.svg" alt="">' : '<img class="inline-icon" src="/static/images/icon-target.svg" alt="">';
+            html += `<div class="review-question ${result.correct ? 'correct' : 'incorrect'}">
+                <p class="review-q"><strong>${icon} Q${i + 1} (MCQ):</strong> ${q.question}</p>
+                <p class="your-answer">Your answer: <strong>${q.options[result.user_answer]}</strong></p>
+                ${!result.correct ? `<p class="correct-answer">Correct answer: <strong>${q.options[result.correct_answer]}</strong></p>` : ''}
+                <p class="explanation">${result.explanation}</p>
+                <p class="points-display">${result.points_earned}/${result.max_points} point</p>
+            </div>`;
+        } else {
+            // Open question result
+            const scoreRatio = result.points_earned / result.max_points;
+            const icon = scoreRatio >= 0.7 ? '<img class="inline-icon" src="/static/images/icon-check.svg" alt="">' : scoreRatio >= 0.4 ? '<img class="inline-icon" src="/static/images/icon-star.svg" alt="">' : '<img class="inline-icon" src="/static/images/icon-target.svg" alt="">';
+            html += `<div class="review-question ${scoreRatio >= 0.7 ? 'correct' : scoreRatio >= 0.4 ? 'partial' : 'incorrect'}">
+                <p class="review-q"><strong>${icon} Q${i + 1} (Open):</strong> ${q.question}</p>
+                <div class="your-open-answer">
+                    <p class="open-answer-label">Your answer:</p>
+                    <blockquote>${result.user_answer}</blockquote>
+                </div>
+                <div class="claude-feedback">
+                    <p class="feedback-label"><img class="inline-icon" src="/static/images/icon-clipboard.svg" alt=""> Feedback:</p>
+                    <p class="feedback-text">${result.feedback}</p>
+                </div>
+                <p class="points-display">${result.points_earned}/${result.max_points} points</p>
+            </div>`;
+        }
+    });
+
+    html += `</div>
+    <div class="quiz-continue">
+        <button type="button" class="btn-primary btn-large" onclick="goToCompletion()">Continue to Complete Session</button>
+    </div>`;
+
+    resultsDiv.innerHTML = html;
+    resultsDiv.style.display = 'block';
+    questionsDiv.style.display = 'none';
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function goToCompletion() {
+    document.getElementById('phase-quiz').style.display = 'none';
+    document.getElementById('phase-complete').style.display = 'block';
+    document.getElementById('step-quiz').classList.remove('active');
+    document.getElementById('step-quiz').classList.add('completed');
+    document.getElementById('step-complete').classList.add('active');
+
+    // Show quiz result summary in completion phase
+    if (quizResultData) {
+        const summaryDiv = document.getElementById('quiz-result-summary');
+        let summaryHtml = `<div class="quiz-completion-summary">`;
+        if (quizResultData.passed) {
+            summaryHtml += `<p class="quiz-pass-note"><img class="inline-icon" src="/static/images/icon-check.svg" alt=""> Quiz passed with ${quizResultData.score}%</p>`;
+            if (quizResultData.leveled_up) {
+                summaryHtml += `<p class="level-up-note"><img class="inline-icon" src="/static/images/icon-star.svg" alt=""> Leveled up to <strong>${quizResultData.new_level}</strong> in ${quizResultData.interest_name}!</p>`;
+            }
+        } else {
+            summaryHtml += `<p class="quiz-fail-note"><img class="inline-icon" src="/static/images/icon-book.svg" alt=""> Quiz score: ${quizResultData.score}% (75% needed to level up)</p>`;
+        }
+        summaryHtml += `</div>`;
+        summaryDiv.innerHTML = summaryHtml;
+        summaryDiv.style.display = 'block';
+    }
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function setRating(value) {
+    currentRating = value;
+    const stars = document.querySelectorAll('.rating-stars .star');
+    stars.forEach((star, index) => {
+        star.textContent = index < value ? '★' : '☆';
+        star.classList.toggle('filled', index < value);
+    });
+
+    fetch('/api/learn/feedback/{{ session.id }}', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({rating: value, feedback: ''})
+    });
+}
+
+// ===== HIGHLIGHT SYSTEM =====
+const SESSION_ID = {{ session.id }};
+let savedHighlights = [];
+let currentSelection = null;
+
+// Load existing highlights and mark them in the content
+async function loadHighlights() {
+    try {
+        const response = await fetch(`/api/learn/highlights/${SESSION_ID}`);
+        const data = await response.json();
+        savedHighlights = data.highlights || [];
+        updateHighlightCount();
+        restoreHighlightsInContent();
+    } catch (e) {
+        console.log('Could not load highlights:', e);
+    }
+}
+
+function updateHighlightCount() {
+    const counter = document.getElementById('highlight-count');
+    if (counter) counter.textContent = savedHighlights.length;
+}
+
+function restoreHighlightsInContent() {
+    const contentBody = document.getElementById('content-body');
+    if (!contentBody || savedHighlights.length === 0) return;
+
+    // For each saved highlight, find and wrap the text with <mark>
+    savedHighlights.forEach(h => {
+        markTextInElement(contentBody, h.text, h.id);
+    });
+}
+
+function markTextInElement(root, searchText, highlightId) {
+    // Walk text nodes and find the search text
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+    const textNodes = [];
+    while (walker.nextNode()) textNodes.push(walker.currentNode);
+
+    // Build a concatenation to find cross-node matches
+    let fullText = '';
+    const nodeMap = []; // maps char index -> { node, offset }
+    for (const node of textNodes) {
+        for (let i = 0; i < node.textContent.length; i++) {
+            nodeMap.push({ node, offset: i });
+        }
+        fullText += node.textContent;
+    }
+
+    const idx = fullText.indexOf(searchText);
+    if (idx === -1) return;
+
+    // Bounds check before accessing nodeMap
+    const endIdx = idx + searchText.length - 1;
+    if (endIdx >= nodeMap.length) return;
+
+    // Find start and end nodes
+    const startInfo = nodeMap[idx];
+    const endInfo = nodeMap[endIdx];
+    if (!startInfo || !endInfo) return;
+
+    if (startInfo.node === endInfo.node) {
+        // Simple case: all in one text node
+        const node = startInfo.node;
+        const before = node.textContent.substring(0, startInfo.offset);
+        const matched = node.textContent.substring(startInfo.offset, endInfo.offset + 1);
+        const after = node.textContent.substring(endInfo.offset + 1);
+
+        const mark = document.createElement('mark');
+        mark.className = 'saved-highlight';
+        mark.dataset.highlightId = highlightId;
+        mark.textContent = matched;
+
+        const parent = node.parentNode;
+        if (before) parent.insertBefore(document.createTextNode(before), node);
+        parent.insertBefore(mark, node);
+        if (after) parent.insertBefore(document.createTextNode(after), node);
+        parent.removeChild(node);
+    } else {
+        // Multi-node span: wrap text across multiple nodes using Range
+        try {
+            const range = document.createRange();
+            range.setStart(startInfo.node, startInfo.offset);
+            range.setEnd(endInfo.node, endInfo.offset + 1);
+
+            // Extract and wrap in a mark element
+            const mark = document.createElement('mark');
+            mark.className = 'saved-highlight';
+            mark.dataset.highlightId = highlightId;
+            range.surroundContents(mark);
+        } catch (ex) {
+            // surroundContents can fail if selection crosses element boundaries
+            // Fallback: mark individual text nodes that are part of this highlight
+            const startNodeIdx = textNodes.indexOf(startInfo.node);
+            const endNodeIdx = textNodes.indexOf(endInfo.node);
+            if (startNodeIdx === -1 || endNodeIdx === -1) return;
+
+            for (let n = startNodeIdx; n <= endNodeIdx; n++) {
+                const tNode = textNodes[n];
+                const sliceStart = (n === startNodeIdx) ? startInfo.offset : 0;
+                const sliceEnd = (n === endNodeIdx) ? endInfo.offset + 1 : tNode.textContent.length;
+
+                const beforeText = tNode.textContent.substring(0, sliceStart);
+                const matchedText = tNode.textContent.substring(sliceStart, sliceEnd);
+                const afterText = tNode.textContent.substring(sliceEnd);
+
+                if (!matchedText) continue;
+
+                const mark = document.createElement('mark');
+                mark.className = 'saved-highlight';
+                mark.dataset.highlightId = highlightId;
+                mark.textContent = matchedText;
+
+                const parent = tNode.parentNode;
+                if (beforeText) parent.insertBefore(document.createTextNode(beforeText), tNode);
+                parent.insertBefore(mark, tNode);
+                if (afterText) parent.insertBefore(document.createTextNode(afterText), tNode);
+                parent.removeChild(tNode);
+            }
+        }
+    }
+}
+
+// Text selection handling
+function handleTextSelection(e) {
+    const contentBody = document.getElementById('content-body');
+    if (!contentBody) return;
+
+    const selection = window.getSelection();
+    const selectedText = selection.toString().trim();
+
+    const highlightBtn = document.getElementById('highlight-btn');
+    if (!highlightBtn) return;
+
+    // Check if selection is within the content body
+    if (selectedText.length > 5 && contentBody.contains(selection.anchorNode)) {
+        currentSelection = selectedText;
+
+        // Position the button near the end of the selection
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+
+        highlightBtn.style.top = (window.scrollY + rect.bottom + 8) + 'px';
+        highlightBtn.style.left = Math.min(rect.left + rect.width / 2, window.innerWidth - 60) + 'px';
+        highlightBtn.style.display = 'block';
+    } else {
+        // Small delay to allow button click/tap to register
+        setTimeout(() => {
+            if (!highlightBtn.contains(document.activeElement) && !highlightBtn.matches(':hover')) {
+                highlightBtn.style.display = 'none';
+                currentSelection = null;
+            }
+        }, 300);
+    }
+}
+document.addEventListener('mouseup', handleTextSelection);
+document.addEventListener('touchend', function(e) {
+    // Delay to let the selection finalize on touch devices
+    setTimeout(handleTextSelection, 100);
+});
+
+async function saveHighlight() {
+    if (!currentSelection) return;
+
+    const highlightBtn = document.getElementById('highlight-btn');
+
+    // Capture the selection range NOW before async call might lose it
+    const selection = window.getSelection();
+    let capturedRange = null;
+    if (selection.rangeCount > 0) {
+        capturedRange = selection.getRangeAt(0).cloneRange();
+    }
+
+    try {
+        const response = await fetch(`/api/learn/highlight/${SESSION_ID}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: currentSelection })
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error || `Server error ${response.status}`);
+        }
+
+        const data = await response.json();
+
+        if (data.id) {
+            savedHighlights.push(data);
+            updateHighlightCount();
+
+            // Wrap the selected text in a <mark> tag using the captured range
+            if (capturedRange) {
+                const mark = document.createElement('mark');
+                mark.className = 'saved-highlight';
+                mark.dataset.highlightId = data.id;
+                try {
+                    capturedRange.surroundContents(mark);
+                } catch (ex) {
+                    // If surroundContents fails (cross-element selection), manually mark
+                    markTextInElement(document.getElementById('content-body'), currentSelection, data.id);
+                }
+            } else {
+                // Selection was lost, fall back to text search
+                markTextInElement(document.getElementById('content-body'), currentSelection, data.id);
+            }
+
+            if (selection.rangeCount > 0) selection.removeAllRanges();
+
+            // Brief confirmation animation on the button
+            highlightBtn.querySelector('button').innerHTML = '<img class="btn-icon-svg" src="/static/images/icon-check.svg" alt=""> Saved!';
+            setTimeout(() => {
+                highlightBtn.querySelector('button').innerHTML = '<img class="btn-icon-svg" src="/static/images/icon-pin.svg" alt=""> Highlight';
+                highlightBtn.style.display = 'none';
+            }, 800);
+        }
+    } catch (e) {
+        console.error('Highlight save error:', e);
+        alert('Error saving highlight: ' + e.message);
+    }
+
+    currentSelection = null;
+}
+
+// Load highlights on page ready
+document.addEventListener('DOMContentLoaded', loadHighlights);
+</script>
+
+<style>
+/* Quiz type badges */
+.question-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+.question-type-badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-weight: 600;
+}
+.question-type-badge.mcq {
+    background: #e8f4fd;
+    color: #1a73e8;
+}
+.question-type-badge.open {
+    background: #fef3e2;
+    color: #e67e22;
+}
+
+/* Open answer textarea */
+.open-answer-area {
+    margin-top: 0.75rem;
+}
+.open-answer-input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    resize: vertical;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+}
+.open-answer-input:focus {
+    border-color: #1a73e8;
+    outline: none;
+}
+.open-hint {
+    font-size: 0.8rem;
+    color: #888;
+    margin-top: 0.4rem;
+    font-style: italic;
+}
+
+/* Pass/fail status */
+.pass-status {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-top: 0.5rem;
+}
+.pass-status.passed {
+    color: #27ae60;
+}
+.pass-status.failed {
+    color: #e74c3c;
+}
+
+/* Level up banner */
+.level-up-banner {
+    background: linear-gradient(135deg, #f0f9ff, #e8f5e9);
+    border: 2px solid #27ae60;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-top: 1rem;
+    text-align: center;
+}
+.level-up-icon {
+    font-size: 2rem;
+}
+.level-up-detail {
+    font-size: 0.85rem;
+    color: #666;
+    margin-top: 0.3rem;
+}
+.already-max-note, .retry-note {
+    font-size: 0.9rem;
+    color: #666;
+    margin-top: 0.5rem;
+}
+
+/* Open question review */
+.review-question.partial {
+    border-left: 4px solid #f39c12;
+}
+.your-open-answer {
+    margin: 0.5rem 0;
+}
+.open-answer-label, .feedback-label {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #555;
+    margin-bottom: 0.3rem;
+}
+.your-open-answer blockquote {
+    background: #f8f9fa;
+    border-left: 3px solid #ddd;
+    padding: 0.5rem 0.75rem;
+    margin: 0.3rem 0;
+    font-style: italic;
+    color: #444;
+}
+.claude-feedback {
+    margin: 0.5rem 0;
+    padding: 0.5rem 0.75rem;
+    background: #fff8e1;
+    border-radius: 8px;
+}
+.feedback-text {
+    color: #555;
+    line-height: 1.5;
+}
+.points-display {
+    font-weight: 700;
+    font-size: 0.85rem;
+    color: #1a73e8;
+    margin-top: 0.5rem;
+}
+
+/* Quiz completion summary */
+.quiz-completion-summary {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+    margin: 1rem 0;
+}
+.quiz-pass-note {
+    color: #27ae60;
+    font-weight: 600;
+}
+.quiz-fail-note {
+    color: #e67e22;
+    font-weight: 600;
+}
+.level-up-note {
+    color: #1a73e8;
+    font-weight: 600;
+    margin-top: 0.3rem;
+}
+
+/* Evaluating state */
+#quiz-submitting {
+    text-align: center;
+    padding: 2rem;
+}
+</style>
+{% endblock %}

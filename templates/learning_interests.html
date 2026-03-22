@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Learning Interests - Life Manager{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Manage Learning Interests</h1>
+    <div class="actions">
+        <a href="{{ url_for('learn') }}" class="btn-secondary">← Back to Roulette</a>
+    </div>
+</div>
+
+<!-- Add New Interest -->
+<div class="add-interest-card">
+    <h2>Add New Topic</h2>
+    <form action="{{ url_for('learn_interests_add') }}" method="POST" class="add-interest-form" id="add-interest-form">
+        <div class="form-row">
+            <div class="form-group">
+                <label for="icon">Icon</label>
+                <input type="text" name="icon" id="icon" placeholder="icon" maxlength="20" class="icon-input">
+            </div>
+            <div class="form-group flex-grow">
+                <label for="name">Topic Name</label>
+                <input type="text" name="name" id="name" placeholder="e.g., Machine Learning" required>
+            </div>
+            <div class="form-group">
+                <label>&nbsp;</label>
+                <button type="button" class="btn-secondary" onclick="enhanceTopic()">{{ svg_icon('sparkle', 'btn-icon-svg') }} AI Enhance</button>
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="description">Description</label>
+            <input type="text" name="description" id="description" placeholder="Brief description of the topic...">
+        </div>
+        <button type="submit" class="btn-primary">Add Topic</button>
+    </form>
+</div>
+
+<!-- Interests List -->
+<div class="interests-list-section">
+    <h2>Your Topics ({{ interests|length }})</h2>
+
+    <div class="interests-manage-grid">
+        {% for interest in interests %}
+        <div class="interest-manage-card {% if not interest.is_active %}inactive{% endif %}">
+            <div class="interest-header">
+                <span class="interest-icon">{{ learn_icon(interest.icon, 'stat-icon-svg') }}</span>
+                <div class="interest-details">
+                    <h3>{{ interest.name }}</h3>
+                    {% if interest.description %}
+                    <p class="interest-description">{{ interest.description }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="interest-stats">
+                <div class="stat">
+                    <span class="stat-value">{{ interest.times_selected }}</span>
+                    <span class="stat-label">Sessions</span>
+                </div>
+                <div class="stat">
+                    <span class="level-badge {{ interest.current_level }}">{{ interest.current_level|title }}</span>
+                    <span class="stat-label">Level</span>
+                </div>
+            </div>
+
+            <div class="interest-actions">
+                <form action="{{ url_for('learn_interests_toggle', interest_id=interest.id) }}" method="POST" style="display: inline;">
+                    {% if interest.is_active %}
+                    <button type="submit" class="btn-secondary btn-small">Disable</button>
+                    {% else %}
+                    <button type="submit" class="btn-primary btn-small">Enable</button>
+                    {% endif %}
+                </form>
+                <span class="status-indicator {% if interest.is_active %}active{% else %}inactive{% endif %}">
+                    {{ 'Active' if interest.is_active else 'Disabled' }}
+                </span>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No interests added yet. Add your first topic above!</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function enhanceTopic() {
+    const nameInput = document.getElementById('name');
+    const iconInput = document.getElementById('icon');
+    const descInput = document.getElementById('description');
+    const name = nameInput.value.trim();
+
+    if (!name) {
+        alert('Please enter a topic name first');
+        return;
+    }
+
+    const btn = event.target;
+    const originalText = btn.textContent;
+    btn.innerHTML = '{{ svg_icon("sparkle", "btn-icon-svg") }} Enhancing...';
+    btn.disabled = true;
+
+    try {
+        const response = await fetch('/api/learn/enhance-interest', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name: name})
+        });
+        const data = await response.json();
+
+        if (data.error) {
+            alert('Error: ' + data.error);
+        } else {
+            if (data.icon && !iconInput.value) {
+                iconInput.value = data.icon;
+            }
+            if (data.description) {
+                descInput.value = data.description;
+            }
+        }
+    } catch (e) {
+        alert('Error enhancing topic: ' + e.message);
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs><filter id="pencilTexture"><feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G"/></filter></defs>
+  <g filter="url(#pencilTexture)">
+    <circle cx="60" cy="60" r="44" stroke="#5D4037" stroke-width="2.5" fill="none"/>
+    <circle cx="60" cy="60" r="45" stroke="#8B5A2B" stroke-width="1.5" fill="none" opacity="0.4"/>
+    <path d="M60 16 L60 60" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M60 60 L98 40" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M60 60 L98 80" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M60 60 L60 104" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M60 60 L22 80" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M60 60 L22 40" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <circle cx="60" cy="60" r="6" stroke="#5D4037" stroke-width="2" fill="none"/>
+    <path d="M60 5 L55 16 L65 16 Z" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M30 22 Q44 16 58 18" stroke="#D4A574" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+  </g>
+</svg>

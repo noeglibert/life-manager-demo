@@ -1,0 +1,699 @@
+{% extends "base.html" %}
+
+{% block title %}Finance - Life Manager{% endblock %}
+
+{% block content %}
+<div class="finance-page">
+    <div class="page-header">
+        <h1>Personal Finance</h1>
+        <div class="finance-month-nav">
+            <button onclick="changeMonth(-1)">&larr;</button>
+            <span class="month-label">{{ month_label }}</span>
+            <button onclick="changeMonth(1)">&rarr;</button>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="finance-tabs">
+        <button class="finance-tab active" onclick="switchTab('dashboard', this)">Dashboard</button>
+        <button class="finance-tab" onclick="switchTab('transactions', this)">Transactions</button>
+        <button class="finance-tab" onclick="switchTab('budget', this)">Budget</button>
+        <button class="finance-tab" onclick="switchTab('import', this)">Import & Add</button>
+    </div>
+
+    <!-- ===== DASHBOARD TAB ===== -->
+    <div class="finance-panel active" id="panel-dashboard">
+        <!-- Summary Cards -->
+        <div class="finance-summary">
+            <div class="finance-stat-card">
+                <div class="stat-label">Income</div>
+                <div class="stat-value positive">{{ "%.2f"|format(total_income) }} &euro;</div>
+            </div>
+            <div class="finance-stat-card">
+                <div class="stat-label">Expenses</div>
+                <div class="stat-value negative">{{ "%.2f"|format(total_expenses) }} &euro;</div>
+            </div>
+            <div class="finance-stat-card">
+                <div class="stat-label">Net</div>
+                <div class="stat-value {% if net_savings >= 0 %}positive{% else %}negative{% endif %}">{{ "%.2f"|format(net_savings) }} &euro;</div>
+            </div>
+            <div class="finance-stat-card">
+                <div class="stat-label">Invested</div>
+                <div class="stat-value" style="color: var(--accent-blue);">{{ "%.2f"|format(total_invested) }} &euro;</div>
+            </div>
+            <div class="finance-stat-card">
+                <div class="stat-label">Leftover</div>
+                <div class="stat-value {% if leftover >= 0 %}positive{% else %}negative{% endif %}">{{ "%.2f"|format(leftover) }} &euro;</div>
+            </div>
+        </div>
+
+        <!-- Chart + Category Breakdown -->
+        <div class="finance-categories">
+            <div class="finance-chart-card">
+                <h3>Spending by Category</h3>
+                <div style="position: relative; height: 250px;"><canvas id="categoryChart"></canvas></div>
+            </div>
+            <div class="finance-breakdown-card">
+                <h3>Breakdown</h3>
+                {% for cat, amount in category_breakdown %}
+                <div class="finance-cat-row">
+                    <div class="finance-cat-name">
+                        <span class="finance-cat-dot" style="background: {{ category_info.get(cat, {}).get('color', '#9E9E9E') }};"></span>
+                        {{ cat }}
+                    </div>
+                    <div class="finance-cat-amount">{{ "%.2f"|format(amount) }} &euro;</div>
+                </div>
+                {% endfor %}
+                {% if not category_breakdown %}
+                <p style="color: var(--slate-light); font-size: 0.85rem; padding: 1rem 0;">No expenses this month yet.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Budget Progress -->
+        {% if budget_progress %}
+        <div style="margin-bottom: 1.5rem;">
+            <h3 class="finance-section-heading">Budget Progress</h3>
+            <div class="finance-budget-list">
+                {% for b in budget_progress %}
+                <div class="finance-budget-item">
+                    <div class="finance-budget-header">
+                        <span class="budget-cat">{{ b.category }}</span>
+                        <span class="budget-amounts"><strong>{{ "%.0f"|format(b.spent) }}</strong> / {{ "%.0f"|format(b.monthly_limit) }} &euro;</span>
+                    </div>
+                    <div class="finance-budget-bar">
+                        <div class="finance-budget-fill {% if b.percentage > 100 %}over{% elif b.percentage > 80 %}warning{% endif %}"
+                             style="width: {{ [b.percentage, 100] | min }}%"></div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Monthly Trend -->
+        <div class="finance-trend-card">
+            <h3>Monthly Trend</h3>
+            <div style="position: relative; height: 250px;"><canvas id="trendChart"></canvas></div>
+        </div>
+    </div>
+
+    <!-- ===== TRANSACTIONS TAB ===== -->
+    <div class="finance-panel" id="panel-transactions">
+        <div class="finance-filters">
+            <select id="filterCategory" onchange="filterTransactions()">
+                <option value="">All Categories</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}">{{ cat }}</option>
+                {% endfor %}
+            </select>
+            <select id="filterType" onchange="filterTransactions()">
+                <option value="">All Types</option>
+                <option value="expense">Expenses</option>
+                <option value="income">Income</option>
+                <option value="transfer">Transfers</option>
+                <option value="interest">Interest</option>
+                <option value="subscription">Subscriptions</option>
+            </select>
+            <input type="text" id="filterSearch" placeholder="Search..." oninput="filterTransactions()">
+        </div>
+
+        <div style="background: var(--surface); border: 1px solid var(--border-color); border-radius: var(--border-radius); overflow-x: auto;">
+            <table class="finance-tx-table" id="txTable">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Description</th>
+                        <th>Category</th>
+                        <th>Source</th>
+                        <th style="text-align: right;">Amount</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="txTableBody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ===== BUDGET TAB ===== -->
+    <div class="finance-panel" id="panel-budget">
+        <!-- Add Budget -->
+        <div class="finance-form">
+            <h3>Set Budget Target</h3>
+            <div class="finance-form-grid">
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="budgetCategory">
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Monthly Limit (&euro;)</label>
+                    <input type="number" id="budgetLimit" step="10" min="0" placeholder="e.g. 300">
+                </div>
+            </div>
+            <div class="finance-form-actions">
+                <button class="btn-primary" onclick="addBudget()">Set Budget</button>
+            </div>
+        </div>
+
+        <!-- Current Budgets -->
+        <h3 class="finance-section-heading">Active Budgets</h3>
+        <div class="finance-budget-list" id="budgetList">
+            {% for b in budget_progress %}
+            <div class="finance-budget-item" id="budget-{{ b.id }}">
+                <div class="finance-budget-header">
+                    <span class="budget-cat">{{ b.category }}</span>
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <span class="budget-amounts"><strong>{{ "%.0f"|format(b.spent) }}</strong> / {{ "%.0f"|format(b.monthly_limit) }} &euro;</span>
+                        <button class="btn-small" style="color: var(--accent-red); background: none; border: none; cursor: pointer; font-size: 0.8rem;" onclick="deleteBudget({{ b.id }})">&times;</button>
+                    </div>
+                </div>
+                <div class="finance-budget-bar">
+                    <div class="finance-budget-fill {% if b.percentage > 100 %}over{% elif b.percentage > 80 %}warning{% endif %}"
+                         style="width: {{ [b.percentage, 100] | min }}%"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Recurring Costs -->
+        <div style="margin-top: 2rem;">
+            <h3 class="finance-section-heading">Recurring Fixed Costs</h3>
+            <div class="finance-form" style="margin-bottom: 1rem;">
+                <div class="finance-form-grid">
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" id="recurringName" placeholder="e.g. Rent, Spotify...">
+                    </div>
+                    <div class="form-group">
+                        <label>Amount (&euro;/month)</label>
+                        <input type="number" id="recurringAmount" step="0.01" min="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select id="recurringCategory">
+                            {% for cat in categories %}
+                            <option value="{{ cat }}">{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Frequency</label>
+                        <select id="recurringFrequency">
+                            <option value="monthly">Monthly</option>
+                            <option value="yearly">Yearly</option>
+                            <option value="weekly">Weekly</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="finance-form-actions">
+                    <button class="btn-primary" onclick="addRecurring()">Add Recurring Cost</button>
+                </div>
+            </div>
+            <div class="finance-recurring-list" id="recurringList">
+                {% for r in recurring_costs %}
+                <div class="finance-recurring-item" id="recurring-{{ r.id }}">
+                    <div class="finance-recurring-info">
+                        <span class="name">{{ r.name }}</span>
+                        <span class="meta">{{ r.category }} &middot; {{ r.frequency }}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <span class="finance-recurring-amount">{{ "%.2f"|format(r.amount) }} &euro;</span>
+                        <button style="background: none; border: none; cursor: pointer; color: var(--slate-light); font-size: 0.85rem;" onclick="deleteRecurring({{ r.id }})">&times;</button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== IMPORT TAB ===== -->
+    <div class="finance-panel" id="panel-import">
+        <!-- Folder Import -->
+        <div class="finance-import-zone" onclick="importFromFolder()" style="margin-bottom: 1rem;">
+            <h3>Import from Folder</h3>
+            <p>Drop your Revolut CSVs into <code style="background: var(--surface-hover); padding: 0.15rem 0.4rem; border-radius: 4px; font-size: 0.8rem;">data/revolut-imports/</code> and click here</p>
+            <p style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--slate-light);">Duplicates are automatically skipped</p>
+        </div>
+        <div class="finance-import-result" id="folderResult"></div>
+
+        <!-- Or upload directly -->
+        <div class="finance-import-zone" onclick="document.getElementById('csvFile').click()">
+            <h3>Or Upload a CSV</h3>
+            <p>Click to browse for a .csv file</p>
+            <p style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--slate-light);">Revolut &rarr; Account &rarr; Statement &rarr; Excel/CSV</p>
+            <input type="file" id="csvFile" accept=".csv" style="display: none;" onchange="importCSV(this)">
+        </div>
+        <div class="finance-import-result" id="importResult"></div>
+
+        <!-- Manual Entry -->
+        <div class="finance-form">
+            <h3>Add Manual Transaction</h3>
+            <div class="finance-form-grid">
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" id="manualDate" value="{{ today.isoformat() }}">
+                </div>
+                <div class="form-group">
+                    <label>Type</label>
+                    <select id="manualType">
+                        <option value="expense">Expense</option>
+                        <option value="income">Income</option>
+                        <option value="transfer">Transfer</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" id="manualDesc" placeholder="e.g. Transfer from dad">
+                </div>
+                <div class="form-group">
+                    <label>Amount (&euro;)</label>
+                    <input type="number" id="manualAmount" step="0.01" min="0" placeholder="50.00">
+                </div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select id="manualCategory">
+                        {% for cat in categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Notes (optional)</label>
+                    <input type="text" id="manualNotes" placeholder="Any details...">
+                </div>
+            </div>
+            <div class="finance-form-actions">
+                <button class="btn-primary" onclick="addManualTransaction()">Add Transaction</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+const currentMonth = "{{ current_month }}";
+const transactions = {{ transactions | tojson }};
+const categoryBreakdown = {{ category_breakdown | tojson }};
+const categoryInfo = {{ category_info | tojson }};
+const monthlyHistory = {{ monthly_history | tojson }};
+const allCategories = {{ categories | tojson }};
+
+// ===== TAB SWITCHING =====
+function switchTab(tab, btn) {
+    document.querySelectorAll('.finance-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.finance-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + tab).classList.add('active');
+    if (btn) btn.classList.add('active');
+}
+
+// ===== MONTH NAVIGATION =====
+function changeMonth(delta) {
+    const [y, m] = currentMonth.split('-').map(Number);
+    let newMonth = m + delta;
+    let newYear = y;
+    if (newMonth > 12) { newMonth = 1; newYear++; }
+    if (newMonth < 1) { newMonth = 12; newYear--; }
+    const pad = String(newMonth).padStart(2, '0');
+    window.location.href = `/finance?month=${newYear}-${pad}`;
+}
+
+// ===== THEME-AWARE COLORS =====
+function getThemeColors() {
+    const cs = getComputedStyle(document.documentElement);
+    return {
+        surface: cs.getPropertyValue('--surface').trim() || '#fff',
+        tickColor: cs.getPropertyValue('--slate-light').trim() || '#78716c',
+        gridColor: cs.getPropertyValue('--border-color').trim() || '#e7e5e4',
+        textColor: cs.getPropertyValue('--slate-dark').trim() || '#1c1917',
+    };
+}
+
+// ===== CATEGORY CHART =====
+function renderCategoryChart() {
+    const canvas = document.getElementById('categoryChart');
+    if (!canvas || categoryBreakdown.length === 0) return;
+    const theme = getThemeColors();
+
+    const labels = categoryBreakdown.map(c => c[0]);
+    const data = categoryBreakdown.map(c => c[1]);
+    const colors = labels.map(l => (categoryInfo[l] && categoryInfo[l].color) || '#9E9E9E');
+
+    new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: colors,
+                borderWidth: 2,
+                borderColor: theme.surface,
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => `${ctx.label}: ${ctx.parsed.toFixed(2)} \u20ac`
+                    }
+                }
+            }
+        }
+    });
+}
+
+// ===== TREND CHART =====
+function renderTrendChart() {
+    const canvas = document.getElementById('trendChart');
+    if (!canvas || monthlyHistory.length === 0) return;
+    const theme = getThemeColors();
+
+    new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels: monthlyHistory.map(m => m.label),
+            datasets: [
+                {
+                    label: 'Income',
+                    data: monthlyHistory.map(m => m.income),
+                    backgroundColor: 'rgba(74, 124, 89, 0.7)',
+                    borderRadius: 4,
+                },
+                {
+                    label: 'Expenses',
+                    data: monthlyHistory.map(m => m.expenses),
+                    backgroundColor: 'rgba(160, 64, 42, 0.7)',
+                    borderRadius: 4,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    ticks: { color: theme.tickColor },
+                    grid: { color: theme.gridColor },
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: { color: theme.tickColor, callback: v => v + ' \u20ac' },
+                    grid: { color: theme.gridColor },
+                }
+            },
+            plugins: {
+                legend: { labels: { color: theme.textColor } },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(2)} \u20ac`
+                    }
+                }
+            }
+        }
+    });
+}
+
+// ===== TRANSACTIONS TABLE =====
+function renderTransactions(filtered) {
+    const tbody = document.getElementById('txTableBody');
+    if (!tbody) return;
+    const txs = filtered || transactions;
+
+    tbody.innerHTML = txs.map(tx => {
+        const isExpense = tx.amount < 0;
+        const displayAmount = tx.amount;
+        const feeStr = tx.fee > 0 ? ` <small style="color:var(--slate-light);">(+${tx.fee.toFixed(2)} fee)</small>` : '';
+        const catColor = (categoryInfo[tx.category] && categoryInfo[tx.category].color) || '#9E9E9E';
+        const sourceLabel = tx.source === 'revolut_import' ? 'Revolut' : tx.source === 'recurring' ? 'Auto' : 'Manual';
+
+        return `<tr data-id="${tx.id}" data-category="${tx.category || ''}" data-type="${tx.transaction_type || ''}" data-desc="${(tx.description || '').toLowerCase()}">
+            <td>${tx.date}</td>
+            <td>${tx.description}</td>
+            <td>
+                <div class="finance-cat-edit">
+                    <span class="finance-tx-cat-badge" style="border-left: 3px solid ${catColor};" onclick="toggleCatDropdown(${tx.id})">${tx.category || 'Uncategorized'}</span>
+                    <div class="finance-cat-dropdown" id="cat-dd-${tx.id}">
+                        ${allCategories.map(c => `<button onclick="updateCategory(${tx.id}, '${c}')">${c}</button>`).join('')}
+                    </div>
+                </div>
+            </td>
+            <td><span style="font-size:0.75rem; color: var(--slate-light);">${sourceLabel}</span></td>
+            <td class="tx-amount ${isExpense ? 'expense' : 'income'}">${displayAmount >= 0 ? '+' : ''}${displayAmount.toFixed(2)} \u20ac${feeStr}</td>
+            <td class="finance-tx-actions">
+                <button onclick="deleteTransaction(${tx.id})" title="Delete">&times;</button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function filterTransactions() {
+    const cat = document.getElementById('filterCategory').value;
+    const type = document.getElementById('filterType').value;
+    const search = document.getElementById('filterSearch').value.toLowerCase();
+
+    const filtered = transactions.filter(tx => {
+        if (cat && tx.category !== cat) return false;
+        if (type && tx.transaction_type !== type) return false;
+        if (search && !(tx.description || '').toLowerCase().includes(search)) return false;
+        return true;
+    });
+    renderTransactions(filtered);
+}
+
+// ===== CATEGORY EDITING =====
+function toggleCatDropdown(txId) {
+    // Close all others
+    document.querySelectorAll('.finance-cat-dropdown.open').forEach(d => d.classList.remove('open'));
+    const dd = document.getElementById('cat-dd-' + txId);
+    dd.classList.toggle('open');
+}
+
+async function updateCategory(txId, newCategory) {
+    document.querySelectorAll('.finance-cat-dropdown.open').forEach(d => d.classList.remove('open'));
+    try {
+        const resp = await fetch(`/api/finance/transaction/${txId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ category: newCategory })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            // Update local data and re-render
+            const tx = transactions.find(t => t.id === txId);
+            if (tx) tx.category = newCategory;
+            renderTransactions();
+        }
+    } catch (err) {
+        alert('Error updating category: ' + err.message);
+    }
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', e => {
+    if (!e.target.closest('.finance-cat-edit')) {
+        document.querySelectorAll('.finance-cat-dropdown.open').forEach(d => d.classList.remove('open'));
+    }
+});
+
+// ===== CRUD OPERATIONS =====
+async function deleteTransaction(txId) {
+    if (!confirm('Delete this transaction?')) return;
+    try {
+        const resp = await fetch(`/api/finance/transaction/${txId}`, { method: 'DELETE' });
+        const data = await resp.json();
+        if (data.success) {
+            window.location.reload();
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+async function addManualTransaction() {
+    const payload = {
+        date: document.getElementById('manualDate').value,
+        description: document.getElementById('manualDesc').value,
+        amount: parseFloat(document.getElementById('manualAmount').value) || 0,
+        transaction_type: document.getElementById('manualType').value,
+        category: document.getElementById('manualCategory').value,
+        notes: document.getElementById('manualNotes').value,
+    };
+    if (!payload.description || !payload.amount) {
+        alert('Please fill in description and amount.');
+        return;
+    }
+    try {
+        const resp = await fetch('/api/finance/transaction', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const data = await resp.json();
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert(data.error || 'Failed to add transaction');
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+async function importCSV(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const resultEl = document.getElementById('importResult');
+    resultEl.style.display = 'block';
+    resultEl.textContent = 'Importing...';
+    resultEl.style.background = 'var(--blue-light)';
+    resultEl.style.borderColor = 'var(--accent-blue)';
+    resultEl.style.color = 'var(--accent-blue)';
+
+    try {
+        const resp = await fetch('/api/finance/import-csv', {
+            method: 'POST',
+            body: formData
+        });
+        const data = await resp.json();
+        if (data.success) {
+            resultEl.style.background = 'var(--green-light)';
+            resultEl.style.borderColor = 'var(--accent-green)';
+            resultEl.style.color = 'var(--accent-green)';
+            resultEl.textContent = `Imported ${data.imported} transactions (${data.skipped} duplicates skipped, ${data.total} total in file)`;
+            setTimeout(() => window.location.reload(), 2000);
+        } else {
+            resultEl.style.background = 'var(--orange-light)';
+            resultEl.style.borderColor = 'var(--accent-red)';
+            resultEl.style.color = 'var(--accent-red)';
+            resultEl.textContent = data.error || 'Import failed';
+        }
+    } catch (err) {
+        resultEl.style.color = 'var(--accent-red)';
+        resultEl.textContent = 'Error: ' + err.message;
+    }
+    input.value = '';
+}
+
+async function importFromFolder() {
+    const resultEl = document.getElementById('folderResult');
+    resultEl.style.display = 'block';
+    resultEl.textContent = 'Scanning folder...';
+    resultEl.style.background = 'var(--blue-light)';
+    resultEl.style.borderColor = 'var(--accent-blue)';
+    resultEl.style.color = 'var(--accent-blue)';
+
+    try {
+        const resp = await fetch('/api/finance/import-folder', { method: 'POST' });
+        const data = await resp.json();
+        if (data.success) {
+            if (data.files && data.files.length > 0) {
+                const fileDetails = data.files.map(f => `${f.file}: ${f.imported} new, ${f.skipped} skipped`).join('\n');
+                resultEl.style.background = 'var(--green-light)';
+                resultEl.style.borderColor = 'var(--accent-green)';
+                resultEl.style.color = 'var(--accent-green)';
+                resultEl.textContent = `Imported ${data.total_imported} transactions from ${data.files.length} file(s) (${data.total_skipped} duplicates skipped)`;
+                if (data.total_imported > 0) setTimeout(() => window.location.reload(), 2000);
+            } else {
+                resultEl.textContent = data.message || 'No CSV files found in the folder.';
+            }
+        } else {
+            resultEl.style.color = 'var(--accent-red)';
+            resultEl.textContent = data.error || 'Import failed';
+        }
+    } catch (err) {
+        resultEl.style.color = 'var(--accent-red)';
+        resultEl.textContent = 'Error: ' + err.message;
+    }
+}
+
+async function addBudget() {
+    const category = document.getElementById('budgetCategory').value;
+    const limit = parseFloat(document.getElementById('budgetLimit').value);
+    if (!limit || limit <= 0) {
+        alert('Please enter a valid budget limit.');
+        return;
+    }
+    try {
+        const resp = await fetch('/api/finance/budget', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ category, monthly_limit: limit })
+        });
+        const data = await resp.json();
+        if (data.success) window.location.reload();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+async function deleteBudget(id) {
+    if (!confirm('Remove this budget?')) return;
+    try {
+        const resp = await fetch(`/api/finance/budget/${id}`, { method: 'DELETE' });
+        const data = await resp.json();
+        if (data.success) {
+            document.getElementById('budget-' + id)?.remove();
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+async function addRecurring() {
+    const payload = {
+        name: document.getElementById('recurringName').value,
+        amount: parseFloat(document.getElementById('recurringAmount').value) || 0,
+        category: document.getElementById('recurringCategory').value,
+        frequency: document.getElementById('recurringFrequency').value,
+    };
+    if (!payload.name || !payload.amount) {
+        alert('Please fill in name and amount.');
+        return;
+    }
+    try {
+        const resp = await fetch('/api/finance/recurring', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const data = await resp.json();
+        if (data.success) window.location.reload();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+async function deleteRecurring(id) {
+    if (!confirm('Remove this recurring cost?')) return;
+    try {
+        const resp = await fetch(`/api/finance/recurring/${id}`, { method: 'DELETE' });
+        const data = await resp.json();
+        if (data.success) {
+            document.getElementById('recurring-' + id)?.remove();
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+// ===== INIT =====
+document.addEventListener('DOMContentLoaded', () => {
+    renderCategoryChart();
+    renderTrendChart();
+    renderTransactions();
+});
+</script>
+{% endblock %}

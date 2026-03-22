@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Layout F: Sidebar + Glassmorphism</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: 'Space Grotesk', -apple-system, sans-serif;
+    background: #0a0a1a;
+    color: #e4e4ed;
+    display: flex;
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.6;
+    overflow-x: hidden;
+}
+
+/* Background orbs */
+.orb { position: fixed; pointer-events: none; z-index: 0; border-radius: 50%; }
+.orb-1 { top: -10%; left: 10%; width: 500px; height: 500px; background: radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 70%); }
+.orb-2 { bottom: 0; right: -5%; width: 450px; height: 450px; background: radial-gradient(circle, rgba(168,85,247,0.08) 0%, transparent 70%); }
+.orb-3 { top: 40%; left: 30%; width: 400px; height: 400px; background: radial-gradient(circle, rgba(20,184,166,0.06) 0%, transparent 70%); }
+
+:root {
+    --glass: rgba(255,255,255,0.03);
+    --glass-strong: rgba(255,255,255,0.06);
+    --glass-border: rgba(255,255,255,0.07);
+    --glass-border-hover: rgba(255,255,255,0.12);
+    --text: #e4e4ed;
+    --text-secondary: #9898b0;
+    --text-muted: #5a5a78;
+    --indigo: #818cf8;
+    --purple: #c084fc;
+    --teal: #5eead4;
+    --green: #4ade80;
+    --orange: #fb923c;
+    --red: #f87171;
+    --blue: #60a5fa;
+    --sidebar-bg: rgba(15,15,30,0.95);
+    --sidebar-border: rgba(255,255,255,0.05);
+    --radius: 16px;
+    --radius-sm: 10px;
+}
+
+/* ===== SIDEBAR ===== */
+.sidebar {
+    width: 240px;
+    background: var(--sidebar-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-right: 1px solid var(--sidebar-border);
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    z-index: 50;
+    overflow-y: auto;
+}
+
+.sidebar-brand {
+    padding: 28px 24px 24px;
+}
+
+.sidebar-brand h1 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    background: linear-gradient(135deg, var(--indigo), var(--teal));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.sidebar-brand .sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.sidebar-sep {
+    height: 1px;
+    background: var(--sidebar-border);
+    margin: 0 16px;
+}
+
+.sidebar-section {
+    padding: 16px 12px 8px;
+}
+
+.sidebar-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    padding: 0 12px;
+    margin-bottom: 8px;
+}
+
+.sidebar-nav { list-style: none; }
+
+.sidebar-nav li a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 12px;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 13.5px;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.sidebar-nav li a:hover {
+    background: rgba(255,255,255,0.05);
+    color: var(--text);
+}
+
+.sidebar-nav li a.active {
+    background: rgba(129,140,248,0.12);
+    color: var(--indigo);
+}
+
+.sidebar-nav .emoji { font-size: 17px; width: 24px; text-align: center; }
+
+.sidebar-nav .badge {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--orange);
+}
+
+.sidebar-footer {
+    margin-top: auto;
+    padding: 16px;
+}
+
+.sidebar-xp {
+    padding: 14px;
+    background: rgba(129,140,248,0.06);
+    border: 1px solid rgba(129,140,248,0.1);
+    border-radius: var(--radius-sm);
+}
+
+.sidebar-xp .xp-top {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.sidebar-xp .xp-level {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--indigo);
+}
+
+.sidebar-xp .xp-nums {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.sidebar-xp .xp-track {
+    height: 4px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 99px;
+    overflow: hidden;
+}
+
+.sidebar-xp .xp-fill {
+    height: 100%;
+    width: 83%;
+    background: linear-gradient(90deg, var(--indigo), var(--purple), var(--teal));
+    border-radius: 99px;
+    position: relative;
+}
+
+.sidebar-xp .xp-fill::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: -1px;
+    bottom: -1px;
+    width: 8px;
+    background: var(--teal);
+    border-radius: 99px;
+    box-shadow: 0 0 10px var(--teal);
+}
+
+.sidebar-btns {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.sidebar-btn {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass);
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+}
+
+.sidebar-btn:hover { background: var(--glass-strong); color: var(--text); }
+
+.sidebar-btn.primary {
+    background: linear-gradient(135deg, var(--indigo), var(--purple));
+    color: #fff;
+    border: none;
+}
+
+/* ===== MAIN ===== */
+.main {
+    margin-left: 240px;
+    flex: 1;
+    min-height: 100vh;
+    position: relative;
+    z-index: 1;
+}
+
+.page {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 40px 80px;
+}
+
+/* ===== GLASS CARD ===== */
+.glass {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    padding: 22px;
+    transition: all 0.25s;
+}
+
+.glass:hover {
+    background: var(--glass-strong);
+    border-color: var(--glass-border-hover);
+}
+
+.glass h3 {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+}
+
+/* ===== GREETING ===== */
+.greeting { margin-bottom: 32px; }
+
+.greeting h1 {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    margin-bottom: 4px;
+}
+
+.greeting h1 span {
+    background: linear-gradient(135deg, var(--indigo), var(--teal));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.greeting .date { color: var(--text-muted); font-size: 13px; }
+
+/* ===== HABITS ===== */
+.habits {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-bottom: 24px;
+}
+
+.habit {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    padding: 18px 14px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-decoration: none;
+    color: var(--text);
+    position: relative;
+}
+
+.habit:hover {
+    transform: translateY(-3px);
+    border-color: var(--glass-border-hover);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.25);
+}
+
+.habit.done {
+    border-color: rgba(74,222,128,0.25);
+    background: rgba(74,222,128,0.04);
+}
+
+.habit .h-emoji { font-size: 28px; margin-bottom: 8px; }
+.habit .h-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.habit .h-detail { font-size: 11px; color: var(--text-muted); }
+.habit .h-streak { font-size: 11px; color: var(--orange); font-weight: 600; margin-top: 6px; }
+.habit .h-go { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+
+/* ===== BENTO ===== */
+.bento {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 14px;
+}
+
+.c3 { grid-column: span 3; }
+.c4 { grid-column: span 4; }
+.c5 { grid-column: span 5; }
+.c6 { grid-column: span 6; }
+.c7 { grid-column: span 7; }
+.c8 { grid-column: span 8; }
+.c12 { grid-column: span 12; }
+
+/* ===== CHALLENGE ===== */
+.ch-row { display: flex; align-items: center; gap: 16px; }
+.ch-row .ch-emoji { font-size: 28px; }
+.ch-row .ch-body { flex: 1; }
+.ch-row .ch-title { font-size: 15px; font-weight: 600; }
+.ch-row .ch-desc { font-size: 12px; color: var(--text-secondary); }
+.ch-row .ch-xp {
+    padding: 6px 14px;
+    border-radius: 99px;
+    background: rgba(129,140,248,0.1);
+    color: var(--indigo);
+    font-size: 13px;
+    font-weight: 700;
+}
+
+/* ===== STATS ===== */
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+}
+
+.stat-item { text-align: center; }
+
+.stat-item .sv {
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.03em;
+}
+
+.stat-item .sl {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.stat-item:nth-child(1) .sv { color: var(--indigo); }
+.stat-item:nth-child(2) .sv { color: var(--green); }
+.stat-item:nth-child(3) .sv { color: var(--blue); }
+.stat-item:nth-child(4) .sv { color: var(--orange); }
+.stat-item:nth-child(5) .sv { color: var(--teal); }
+
+/* ===== JOURNAL ===== */
+.j-item {
+    padding: 12px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid transparent;
+}
+
+.j-item:hover { background: var(--glass-strong); border-color: var(--glass-border); }
+.j-item .j-date { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.j-item .j-text { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+.j-item .j-tags { display: flex; gap: 6px; margin-top: 6px; }
+.j-item .j-tag {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(129,140,248,0.08);
+    color: var(--indigo);
+}
+
+/* ===== CHART ===== */
+.chart-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 100px;
+}
+
+.cbar {
+    flex: 1;
+    border-radius: 4px 4px 0 0;
+}
+
+.cbar.indigo { background: linear-gradient(180deg, var(--indigo), rgba(129,140,248,0.25)); }
+.cbar.teal { background: linear-gradient(180deg, var(--teal), rgba(94,234,212,0.25)); }
+.cbar.purple { background: linear-gradient(180deg, var(--purple), rgba(192,132,252,0.25)); }
+
+/* ===== CONTACTS ===== */
+.c-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.c-row:last-child { border-bottom: none; }
+.c-row .c-name { font-size: 13px; }
+.c-row .c-pill {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 99px;
+}
+.c-row .c-pill.warn { background: rgba(251,146,60,0.1); color: var(--orange); }
+.c-row .c-pill.danger { background: rgba(248,113,113,0.1); color: var(--red); }
+
+/* ===== HEATMAP ===== */
+.heatmap {
+    display: grid;
+    grid-template-columns: repeat(52, 1fr);
+    grid-template-rows: repeat(7, 1fr);
+    grid-auto-flow: column;
+    gap: 2px;
+}
+
+.hm {
+    aspect-ratio: 1;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.02);
+}
+
+.hm.l1 { background: rgba(129,140,248,0.12); }
+.hm.l2 { background: rgba(129,140,248,0.25); }
+.hm.l3 { background: rgba(94,234,212,0.3); }
+.hm.l4 { background: rgba(94,234,212,0.5); }
+.hm.l5 { background: var(--teal); box-shadow: 0 0 6px rgba(94,234,212,0.25); }
+
+/* ===== ACHIEVEMENTS ===== */
+.ach-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+.ach {
+    text-align: center;
+    padding: 10px 6px;
+    border-radius: var(--radius-sm);
+    background: rgba(255,255,255,0.02);
+    border: 1px solid transparent;
+    transition: all 0.2s;
+}
+
+.ach:hover { border-color: var(--glass-border); background: var(--glass-strong); }
+.ach.locked { opacity: 0.2; }
+.ach .a-icon { font-size: 20px; margin-bottom: 4px; }
+.ach .a-name { font-size: 10px; font-weight: 600; color: var(--text-secondary); }
+
+/* ===== MOCKUP LABEL ===== */
+.mockup-label {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    background: linear-gradient(135deg, var(--indigo), var(--purple));
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    z-index: 999;
+}
+</style>
+</head>
+<body>
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <h1>Life Manager</h1>
+        <div class="sub">Build better habits</div>
+    </div>
+    <div class="sidebar-sep"></div>
+
+    <div class="sidebar-section">
+        <div class="sidebar-label">Habits</div>
+        <ul class="sidebar-nav">
+            <li><a href="#" class="active"><span class="emoji">&#x1F3E0;</span> Dashboard</a></li>
+            <li><a href="#"><span class="emoji">&#x1F4DD;</span> Journal <span class="badge">5d</span></a></li>
+            <li><a href="#"><span class="emoji">&#x1F9D8;</span> Meditate <span class="badge">12d</span></a></li>
+            <li><a href="#"><span class="emoji">&#x1F4DA;</span> Learn</a></li>
+            <li><a href="#"><span class="emoji">&#x1F957;</span> Nutrition <span class="badge">8d</span></a></li>
+            <li><a href="#"><span class="emoji">&#x1F3C3;</span> Activity</a></li>
+        </ul>
+    </div>
+
+    <div class="sidebar-section">
+        <div class="sidebar-label">More</div>
+        <ul class="sidebar-nav">
+            <li><a href="#"><span class="emoji">&#x2B50;</span> Highlights</a></li>
+            <li><a href="#"><span class="emoji">&#x1F4E8;</span> Newsletter</a></li>
+            <li><a href="#"><span class="emoji">&#x1F465;</span> Contacts</a></li>
+            <li><a href="#"><span class="emoji">&#x1F4C8;</span> Portfolio</a></li>
+            <li><a href="#"><span class="emoji">&#x1F3AE;</span> Wordle</a></li>
+        </ul>
+    </div>
+
+    <div class="sidebar-footer">
+        <div class="sidebar-xp">
+            <div class="xp-top">
+                <span class="xp-level">Lv.5 Historian</span>
+                <span class="xp-nums">1,245 / 1,500</span>
+            </div>
+            <div class="xp-track"><div class="xp-fill"></div></div>
+        </div>
+        <div class="sidebar-btns">
+            <button class="sidebar-btn">&#x1F512; Lock</button>
+            <button class="sidebar-btn primary">&#x270F;&#xFE0F; Write</button>
+        </div>
+    </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+    <div class="page">
+        <div class="greeting">
+            <h1>Good morning, <span>Noe</span></h1>
+            <p class="date">Friday, February 21, 2026</p>
+        </div>
+
+        <!-- HABITS -->
+        <div class="habits">
+            <a class="habit done" href="#"><div class="h-emoji">&#x1F4DD;</div><div class="h-name">Journal</div><div class="h-detail">452 words</div><div class="h-streak">&#x1F525; 5d</div></a>
+            <a class="habit done" href="#"><div class="h-emoji">&#x1F9D8;</div><div class="h-name">Meditate</div><div class="h-detail">15 min</div><div class="h-streak">&#x1F525; 12d</div></a>
+            <a class="habit" href="#"><div class="h-emoji">&#x1F4DA;</div><div class="h-name">Learn</div><div class="h-detail">Not yet</div><div class="h-go">Go &rarr;</div></a>
+            <a class="habit done" href="#"><div class="h-emoji">&#x1F957;</div><div class="h-name">Nutrition</div><div class="h-detail">2 meals</div><div class="h-streak">&#x1F525; 8d</div></a>
+            <a class="habit" href="#"><div class="h-emoji">&#x1F3C3;</div><div class="h-name">Activity</div><div class="h-detail">Not yet</div><div class="h-go">Go &rarr;</div></a>
+        </div>
+
+        <!-- BENTO -->
+        <div class="bento">
+            <div class="glass c7">
+                <h3>Today's Challenge</h3>
+                <div class="ch-row">
+                    <div class="ch-emoji">&#x1F3AF;</div>
+                    <div class="ch-body"><div class="ch-title">Precision Writer</div><div class="ch-desc">Write exactly 100 words (within 5 words)</div></div>
+                    <div class="ch-xp">+25 XP</div>
+                </div>
+            </div>
+
+            <div class="glass c5">
+                <h3>Streaks</h3>
+                <div class="stats-row">
+                    <div class="stat-item"><div class="sv">5</div><div class="sl">Journal</div></div>
+                    <div class="stat-item"><div class="sv">12</div><div class="sl">Meditate</div></div>
+                    <div class="stat-item"><div class="sv">3</div><div class="sl">Learn</div></div>
+                    <div class="stat-item"><div class="sv">8</div><div class="sl">Nutrition</div></div>
+                    <div class="stat-item"><div class="sv">4</div><div class="sl">Activity</div></div>
+                </div>
+            </div>
+
+            <div class="glass c5">
+                <h3>Recent Journal</h3>
+                <div class="j-item">
+                    <div class="j-date">February 21, 2026</div>
+                    <div class="j-text">Spent the morning working on the marathon training plan. The base phase is going well...</div>
+                    <div class="j-tags"><span class="j-tag">Sarah</span><span class="j-tag">David</span></div>
+                </div>
+                <div class="j-item">
+                    <div class="j-date">February 20, 2026</div>
+                    <div class="j-text">Great meditation session today. Tried the 4-7-8 breathing pattern...</div>
+                </div>
+                <div class="j-item">
+                    <div class="j-date">February 19, 2026</div>
+                    <div class="j-text">Productive day at work. Chat with team about Q2 roadmap...</div>
+                    <div class="j-tags"><span class="j-tag">Alex</span><span class="j-tag">Tom</span></div>
+                </div>
+            </div>
+
+            <div class="glass c4">
+                <h3>Weekly Activity</h3>
+                <div class="chart-bars">
+                    <div class="cbar indigo" style="height:35%"></div>
+                    <div class="cbar teal" style="height:60%"></div>
+                    <div class="cbar indigo" style="height:25%"></div>
+                    <div class="cbar purple" style="height:75%"></div>
+                    <div class="cbar teal" style="height:50%"></div>
+                    <div class="cbar indigo" style="height:40%"></div>
+                    <div class="cbar teal" style="height:85%"></div>
+                    <div class="cbar purple" style="height:65%"></div>
+                </div>
+            </div>
+
+            <div class="glass c3">
+                <h3>Reach Out</h3>
+                <div class="c-row"><span class="c-name">David Park</span><span class="c-pill danger">32d</span></div>
+                <div class="c-row"><span class="c-name">Alex Rivera</span><span class="c-pill warn">21d</span></div>
+                <div class="c-row"><span class="c-name">Sarah Chen</span><span class="c-pill warn">18d</span></div>
+                <div class="c-row"><span class="c-name">Tom Wilson</span><span class="c-pill" style="color:var(--text-muted)">8d</span></div>
+            </div>
+
+            <div class="glass c8">
+                <h3>Habit Heatmap</h3>
+                <div class="heatmap" id="heatmap"></div>
+            </div>
+
+            <div class="glass c4">
+                <h3>Achievements</h3>
+                <div class="ach-grid">
+                    <div class="ach"><div class="a-icon">&#x1F525;</div><div class="a-name">Week Warrior</div></div>
+                    <div class="ach"><div class="a-icon">&#x1F4DC;</div><div class="a-name">Wordsmith</div></div>
+                    <div class="ach"><div class="a-icon">&#x1F9D8;</div><div class="a-name">First Breath</div></div>
+                    <div class="ach"><div class="a-icon">&#x1F3C3;</div><div class="a-name">First Steps</div></div>
+                    <div class="ach"><div class="a-icon">&#x1F4D3;</div><div class="a-name">Regular</div></div>
+                    <div class="ach"><div class="a-icon">&#x1F957;</div><div class="a-name">First Bite</div></div>
+                    <div class="ach locked"><div class="a-icon">&#x1F451;</div><div class="a-name">Centurion</div></div>
+                    <div class="ach locked"><div class="a-icon">&#x1F3C6;</div><div class="a-name">Legend</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mockup-label">Layout F: Sidebar + Glassmorphism</div>
+
+<script>
+const hm = document.getElementById('heatmap');
+for (let i = 0; i < 364; i++) {
+    const c = document.createElement('div');
+    c.className = 'hm';
+    const r = Math.random();
+    if (r > 0.3) { c.classList.add(r > 0.85 ? 'l5' : r > 0.7 ? 'l4' : r > 0.55 ? 'l3' : r > 0.4 ? 'l2' : 'l1'); }
+    hm.appendChild(c);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <filter id="pencilTexture">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#pencilTexture)">
+    <!-- Pencil body -->
+    <path d="M30 90 L75 25 L90 35 L45 100 Z"
+          stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M31 89 L76 26 L89 34 L44 99 Z"
+          stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+
+    <!-- Pencil tip -->
+    <path d="M30 90 L22 108 L45 100"
+          stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M31 89 L23 107 L44 99"
+          stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+
+    <!-- Tip point -->
+    <path d="M26 100 L22 108 L34 104"
+          stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+    <!-- Pencil collar/eraser line -->
+    <path d="M75 25 L90 35"
+          stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M78 22 L93 32"
+          stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+    <!-- Eraser -->
+    <path d="M78 22 L85 12 L100 22 L93 32 Z"
+          stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M79 21 L86 13 L99 21 L92 31 Z"
+          stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
+
+    <!-- Pencil body line detail -->
+    <path d="M48 72 L82 28"
+          stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M42 80 L76 36"
+          stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.4"/>
+
+    <!-- Writing lines (paper hint) -->
+    <path d="M55 95 L70 95" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M60 102 L80 102" stroke="#D4A574" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <path d="M65 109 L85 109" stroke="#D4A574" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.3"/>
+
+    <!-- Sparkle/glow -->
+    <path d="M18 100 L20 105" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M15 105 L22 103" stroke="#D4A574" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+  </g>
+
+  <!-- Extra sketch marks -->
+  <path d="M95 10 L97 8" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+  <path d="M100 15 L102 17" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+</svg>

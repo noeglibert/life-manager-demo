@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Life Manager{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+
+    <!-- Today's Habits -->
+    <div class="habits-today">
+        <div class="habits-today-header">
+            <h1>Today</h1>
+        </div>
+        <div class="habits-grid">
+            <a href="{{ url_for('journal_today') }}" class="habit-card {% if habits_today.journal.done %}done{% endif %}">
+                <div class="habit-icon">{{ svg_icon('writing', 'habit-icon-svg') }}</div>
+                <div class="habit-info">
+                    <div class="habit-name">Journal</div>
+                    <div class="habit-detail">{{ habits_today.journal.detail }}</div>
+                </div>
+                <div class="habit-status">
+                    {% if habits_today.journal.done %}
+                        <span class="habit-check">✓</span>
+                    {% else %}
+                        <span class="habit-go">Go</span>
+                    {% endif %}
+                </div>
+                {% if habits_today.journal.streak > 0 %}
+                    <div class="habit-streak">{{ svg_icon('flame', 'inline-icon') }} {{ habits_today.journal.streak }}d</div>
+                {% endif %}
+            </a>
+            <a href="{{ url_for('meditate') }}" class="habit-card {% if habits_today.meditate.done %}done{% endif %}">
+                <div class="habit-icon">{{ svg_icon('beads', 'habit-icon-svg') }}</div>
+                <div class="habit-info">
+                    <div class="habit-name">Meditate</div>
+                    <div class="habit-detail">{{ habits_today.meditate.detail }}</div>
+                </div>
+                <div class="habit-status">
+                    {% if habits_today.meditate.done %}
+                        <span class="habit-check">✓</span>
+                    {% else %}
+                        <span class="habit-go">Go</span>
+                    {% endif %}
+                </div>
+                {% if habits_today.meditate.streak > 0 %}
+                    <div class="habit-streak">{{ svg_icon('flame', 'inline-icon') }} {{ habits_today.meditate.streak }}d</div>
+                {% endif %}
+            </a>
+            <a href="{{ url_for('learn') }}" class="habit-card {% if habits_today.learn.done %}done{% endif %}">
+                <div class="habit-icon">{{ svg_icon('book', 'habit-icon-svg') }}</div>
+                <div class="habit-info">
+                    <div class="habit-name">Learn</div>
+                    <div class="habit-detail">{{ habits_today.learn.detail }}</div>
+                </div>
+                <div class="habit-status">
+                    {% if habits_today.learn.done %}
+                        <span class="habit-check">✓</span>
+                    {% else %}
+                        <span class="habit-go">Go</span>
+                    {% endif %}
+                </div>
+                {% if habits_today.learn.streak > 0 %}
+                    <div class="habit-streak">{{ svg_icon('flame', 'inline-icon') }} {{ habits_today.learn.streak }}d</div>
+                {% endif %}
+            </a>
+            <a href="{{ url_for('nutrition') }}" class="habit-card {% if habits_today.nutrition.done %}done{% endif %}">
+                <div class="habit-icon">{{ svg_icon('seedling', 'habit-icon-svg') }}</div>
+                <div class="habit-info">
+                    <div class="habit-name">Nutrition</div>
+                    <div class="habit-detail">{{ habits_today.nutrition.detail }}</div>
+                </div>
+                <div class="habit-status">
+                    {% if habits_today.nutrition.done %}
+                        <span class="habit-check">✓</span>
+                    {% else %}
+                        <span class="habit-go">Go</span>
+                    {% endif %}
+                </div>
+                {% if habits_today.nutrition.streak > 0 %}
+                    <div class="habit-streak">{{ svg_icon('flame', 'inline-icon') }} {{ habits_today.nutrition.streak }}d</div>
+                {% endif %}
+            </a>
+            <a href="{{ url_for('activity') }}" class="habit-card {% if habits_today.activity.done %}done{% endif %}">
+                <div class="habit-icon">{{ svg_icon('muscle', 'habit-icon-svg') }}</div>
+                <div class="habit-info">
+                    <div class="habit-name">Activity</div>
+                    <div class="habit-detail">{{ habits_today.activity.detail }}</div>
+                </div>
+                <div class="habit-status">
+                    {% if habits_today.activity.done %}
+                        <span class="habit-check">✓</span>
+                    {% else %}
+                        <span class="habit-go">Go</span>
+                    {% endif %}
+                </div>
+                {% if habits_today.activity.streak > 0 %}
+                    <div class="habit-streak">{{ svg_icon('flame', 'inline-icon') }} {{ habits_today.activity.streak }}d</div>
+                {% endif %}
+            </a>
+        </div>
+    </div>
+
+    <!-- Daily Challenge Card -->
+    <div class="daily-challenge-card {% if game_stats.challenge_completed_today %}completed{% endif %}">
+        <div class="challenge-header">
+            <div class="challenge-icon">
+                {{ svg_icon(daily_challenge.icon, 'challenge-icon-svg') }}
+            </div>
+            <div class="challenge-info">
+                <div class="challenge-label">Today's Challenge</div>
+                <div class="challenge-title">{{ daily_challenge.title }}</div>
+            </div>
+            <div class="challenge-xp">+{{ daily_challenge.xp_bonus }} XP</div>
+        </div>
+        <div class="challenge-description">{{ daily_challenge.description }}</div>
+        {% if game_stats.challenge_completed_today %}
+            <div class="challenge-status completed">✓ Completed!</div>
+        {% else %}
+            <a href="{{ url_for('journal_today') }}" class="challenge-action">Accept Challenge →</a>
+        {% endif %}
+    </div>
+
+    <!-- Gamification Stats (condensed) -->
+    <div class="game-stats-banner">
+        <div class="streak-display">
+            <div class="streak-icon">{{ svg_icon('flame', 'stat-icon-svg') }}</div>
+            <div class="streak-info">
+                <div class="streak-number">{{ game_stats.current_streak }}</div>
+                <div class="streak-label">Day Streak</div>
+            </div>
+            {% if game_stats.freeze_available and not game_stats.freeze_used_this_week %}
+                <div class="freeze-badge" title="Streak freeze available">{{ svg_icon('snowflake', 'inline-icon') }}</div>
+            {% endif %}
+        </div>
+        <div class="level-display">
+            <div class="level-icon">{{ svg_icon('star', 'stat-icon-svg') }}</div>
+            <div class="level-info">
+                <div class="level-number">Level {{ game_stats.level }}</div>
+                <div class="level-name">{{ game_stats.level_name }}</div>
+            </div>
+        </div>
+        <div class="xp-display">
+            <div class="xp-label">{{ game_stats.xp }} / {{ game_stats.xp_for_next_level }} XP</div>
+            <div class="xp-bar">
+                <div class="xp-fill" style="width: {{ [game_stats.xp / game_stats.xp_for_next_level * 100, 100]|min|round }}%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Grid (streak-focused) -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <h3>{{ game_stats.current_streak }}</h3>
+            <p>Journal Streak</p>
+        </div>
+        <div class="stat-card">
+            <h3>{{ game_stats.learning_streak or 0 }}</h3>
+            <p>Learning Streak</p>
+        </div>
+        <div class="stat-card">
+            <h3>{{ game_stats.meditation_streak or 0 }}</h3>
+            <p>Meditation Streak</p>
+        </div>
+        <div class="stat-card">
+            <h3>{{ game_stats.nutrition_streak or 0 }}</h3>
+            <p>Nutrition Streak</p>
+        </div>
+        <div class="stat-card">
+            <h3>{{ unlocked_achievements|length }}/{{ all_achievements|length }}</h3>
+            <p>Achievements</p>
+        </div>
+    </div>
+
+    <!-- Recent Activity (Journal + Highlights) -->
+    <div class="dashboard-grid">
+        <section class="dashboard-section">
+            <div class="section-header">
+                <h2>Recent Journal Entries</h2>
+                <a href="{{ url_for('journal_today') }}" class="btn-primary">Write Today</a>
+            </div>
+
+            {% if recent_entries %}
+                <div class="journal-preview-list">
+                    {% for entry in recent_entries %}
+                        <div class="journal-preview">
+                            <a href="{{ url_for('journal_entry', date_str=entry.date.strftime('%Y-%m-%d')) }}">
+                                <div class="journal-date">{{ entry.date.strftime('%B %d, %Y') }}</div>
+                                <p class="journal-snippet">
+                                    {{ entry.content[:150] }}{% if entry.content|length > 150 %}...{% endif %}
+                                </p>
+                                {% if entry.mentioned_contacts %}
+                                    <div class="journal-mentions">
+                                        Mentioned:
+                                        {% for contact in entry.mentioned_contacts[:3] %}
+                                            {{ contact.first_name }}{% if not loop.last %}, {% endif %}
+                                        {% endfor %}
+                                        {% if entry.mentioned_contacts|length > 3 %}
+                                            and {{ entry.mentioned_contacts|length - 3 }} more
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                            </a>
+                        </div>
+                    {% endfor %}
+                </div>
+                <a href="{{ url_for('journal_list') }}" class="view-all">View All Entries →</a>
+            {% else %}
+                <p class="empty-state">No journal entries yet. <a href="{{ url_for('journal_today') }}">Start writing</a></p>
+            {% endif %}
+        </section>
+
+        <section class="dashboard-section">
+            <div class="section-header">
+                <h2>Recent Highlights</h2>
+                {% if recent_highlights %}
+                    <a href="{{ url_for('highlights_list') }}" class="btn-secondary">View All →</a>
+                {% endif %}
+            </div>
+
+            {% if recent_highlights %}
+                <div class="highlights-preview-list-compact">
+                    {% for h in recent_highlights %}
+                    <div class="highlight-preview-card">
+                        <div class="highlight-preview-quote">"{{ h.text[:150] }}{% if h.text|length > 150 %}...{% endif %}"</div>
+                        <div class="highlight-preview-meta">
+                            <span class="highlight-preview-source">{{ h.session.interest.icon }} {{ h.session.interest.name }}</span>
+                            <span class="highlight-preview-date">{{ h.created_at.strftime('%b %d') }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="empty-state">No highlights yet. Save snippets from your learning sessions.</p>
+            {% endif %}
+        </section>
+    </div>
+
+    <!-- Contacts (compact, demoted) -->
+    {% if contacts_needing_attention > 0 %}
+    <div class="contacts-attention-section">
+        <div class="section-header">
+            <h2>Contacts Needing Attention</h2>
+            <a href="{{ url_for('contacts_list') }}" class="btn-secondary">All Contacts ({{ total_contacts }}) →</a>
+        </div>
+        <div class="contacts-attention-list">
+            {% for contact in contacts_needing_attention_list %}
+                <a href="{{ url_for('contact_detail', contact_id=contact.id) }}" class="contact-attention-item">
+                    <span class="contact-attention-name">{{ contact.full_name }}</span>
+                    <span class="contact-attention-days">{{ contact.days_since_contact }}d ago</span>
+                </a>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Achievements Section -->
+    <div class="achievements-section">
+        <div class="section-header">
+            <h2>Achievements</h2>
+            <span class="achievements-count">{{ unlocked_achievements|length }} of {{ all_achievements|length }} unlocked</span>
+        </div>
+        <div class="achievements-grid" id="achievements-grid">
+            {% set seen_categories = [] %}
+            {% for achievement in all_achievements %}
+                {% set is_first_in_category = achievement.category not in seen_categories %}
+                {% if is_first_in_category %}
+                    {% if seen_categories.append(achievement.category) %}{% endif %}
+                {% endif %}
+                <div class="achievement-badge {% if achievement.id in unlocked_ids %}unlocked{% else %}locked{% endif %}{% if not is_first_in_category %} achievement-hidden{% endif %}" data-category="{{ achievement.category }}">
+                    <div class="badge-icon">
+                        {{ svg_icon(achievement.icon, 'badge-icon-svg') }}
+                    </div>
+                    <div class="badge-info">
+                        <div class="badge-name">{{ achievement.name }}</div>
+                        <div class="badge-description">{{ achievement.description }}</div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        <div class="achievements-expand-area">
+            <button type="button" class="btn-expand-achievements" id="btn-expand-achievements" onclick="toggleAchievements()">
+                Show All Achievements <span class="expand-arrow">▼</span>
+            </button>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

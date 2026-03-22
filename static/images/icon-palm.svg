@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs><filter id="pencilTexture"><feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/><feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G"/></filter></defs>
+  <g filter="url(#pencilTexture)">
+    <path d="M58 110 Q60 70 62 55" stroke="#5D4037" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M60 55 Q40 30 15 25" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M60 55 Q80 30 105 25" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M60 55 Q45 20 35 10" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M60 55 Q75 20 85 10" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M60 55 Q58 25 60 8" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M60 55 Q30 40 10 45" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M60 55 Q90 40 110 45" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M20 28 Q28 22 38 24" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+  </g>
+</svg>

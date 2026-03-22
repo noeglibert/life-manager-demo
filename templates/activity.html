@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}Activity - Life Manager{% endblock %}
+
+{% block content %}
+<div class="activity-page">
+    <div class="page-header">
+        <h1>Activity Tracker</h1>
+        {% if days_until is not none %}
+        <span class="countdown-badge">{{ svg_icon('flag', 'inline-icon') }} {{ days_until }} days until marathon</span>
+        {% endif %}
+    </div>
+
+    <!-- Stats Banner -->
+    <div class="activity-stats-banner">
+        <div class="stat-item">
+            <span class="stat-icon">{{ svg_icon('flame', 'stat-icon-svg') }}</span>
+            <div class="stat-info">
+                <span class="stat-number">{{ game_stats.activity_streak or 0 }}</span>
+                <span class="stat-label">Day Streak</span>
+            </div>
+        </div>
+        <div class="stat-item">
+            <span class="stat-icon">{{ svg_icon('muscle', 'stat-icon-svg') }}</span>
+            <div class="stat-info">
+                <span class="stat-number">{{ game_stats.activity_sessions_total or 0 }}</span>
+                <span class="stat-label">Total Sessions</span>
+            </div>
+        </div>
+        <div class="stat-item">
+            <span class="stat-icon">{{ svg_icon('star', 'stat-icon-svg') }}</span>
+            <div class="stat-info">
+                <span class="stat-number">{{ game_stats.activity_xp_total or 0 }}</span>
+                <span class="stat-label">Activity XP</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Weekly Summary Cards -->
+    <div class="activity-summary-grid">
+        <div class="activity-summary-card">
+            <div class="summary-icon">{{ svg_icon('muscle', 'summary-icon-svg') }}</div>
+            <div class="summary-value">{{ week_runs|length }}</div>
+            <div class="summary-label">Runs this week</div>
+            <div class="summary-detail">{{ total_km_week }} km total</div>
+        </div>
+        <div class="activity-summary-card">
+            <div class="summary-icon">{{ svg_icon('dumbbell', 'summary-icon-svg') }}</div>
+            <div class="summary-value">{{ week_gym|length }}</div>
+            <div class="summary-label">Gym sessions</div>
+            <div class="summary-detail">{% if muscle_groups_week %}{{ muscle_groups_week|join(', ') }}{% else %}—{% endif %}</div>
+        </div>
+        <div class="activity-summary-card">
+            <div class="summary-icon">{{ svg_icon('chart', 'summary-icon-svg') }}</div>
+            <div class="summary-value">{% if compliance is not none %}{{ compliance }}%{% else %}—{% endif %}</div>
+            <div class="summary-label">Weekly compliance</div>
+            <div class="summary-detail">{% if active_plan %}{{ current_phase or 'Active' }} phase{% else %}No active plan{% endif %}</div>
+        </div>
+    </div>
+
+    <!-- Garmin Connect Live Stats -->
+    {% if garmin_available %}
+    <div class="garmin-widget" id="garmin-widget">
+        <div class="garmin-header">
+            <h3>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -3px; margin-right: 4px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Garmin Forerunner
+            </h3>
+            <button class="btn-garmin-sync" id="btn-garmin-sync" onclick="syncGarmin()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                <span id="sync-label">Sync</span>
+            </button>
+        </div>
+        {% if garmin_today %}
+        <div class="garmin-stats-grid">
+            <div class="garmin-stat">
+                <span class="garmin-stat-value">{{ '{:,}'.format(garmin_today.steps or 0) }}</span>
+                <span class="garmin-stat-label">Steps</span>
+            </div>
+            <div class="garmin-stat">
+                <span class="garmin-stat-value">{{ garmin_today.resting_hr or '—' }}</span>
+                <span class="garmin-stat-label">Resting HR</span>
+            </div>
+            <div class="garmin-stat">
+                <span class="garmin-stat-value">{{ garmin_today.active_minutes or 0 }}</span>
+                <span class="garmin-stat-label">Active Min</span>
+            </div>
+            <div class="garmin-stat">
+                <span class="garmin-stat-value">{{ '{:,}'.format((garmin_today.calories or 0)|int) }}</span>
+                <span class="garmin-stat-label">Calories</span>
+            </div>
+            <div class="garmin-stat">
+                <span class="garmin-stat-value">{{ garmin_today.body_battery_high or '—' }}<span class="garmin-stat-unit">/{{ garmin_today.body_battery_low or '—' }}</span></span>
+                <span class="garmin-stat-label">Body Battery H/L</span>
+            </div>
+            <div class="garmin-stat">
+                <span class="garmin-stat-value">{{ garmin_today.avg_stress or '—' }}</span>
+                <span class="garmin-stat-label">Avg Stress</span>
+            </div>
+            {% if garmin_today.sleep_seconds %}
+            <div class="garmin-stat">
+                <span class="garmin-stat-value">{{ (garmin_today.sleep_seconds // 3600) }}h {{ ((garmin_today.sleep_seconds % 3600) // 60) }}m</span>
+                <span class="garmin-stat-label">Sleep</span>
+            </div>
+            <div class="garmin-stat">
+                <span class="garmin-stat-value">{{ garmin_today.sleep_score or '—' }}</span>
+                <span class="garmin-stat-label">Sleep Score</span>
+            </div>
+            {% endif %}
+        </div>
+        <div class="garmin-synced-at">Last synced: {{ garmin_today.synced_at.strftime('%b %d, %H:%M') if garmin_today.synced_at else 'Unknown' }}</div>
+        {% else %}
+        <div class="garmin-empty">
+            <p>No data yet — click <strong>Sync</strong> to pull today's stats from your Garmin watch.</p>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Quick Actions -->
+    <div class="activity-actions">
+        <a href="{{ url_for('activity_log') }}" class="btn-primary">+ Log Workout</a>
+        <a href="{{ url_for('activity_expert') }}" class="btn-secondary">{{ svg_icon('robot', 'btn-icon-svg') }} Ask Coach</a>
+        <a href="{{ url_for('activity_plan') }}" class="btn-secondary">{{ svg_icon('clipboard', 'btn-icon-svg') }} Training Plan</a>
+        <a href="{{ url_for('activity_history') }}" class="btn-secondary">{{ svg_icon('scroll', 'btn-icon-svg') }} History</a>
+        {% if garmin_available %}
+        <a href="{{ url_for('garmin_dashboard') }}" class="btn-secondary">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: -2px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Garmin
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Active Plan Status -->
+    {% if active_plan %}
+    <div class="activity-plan-status">
+        <div class="plan-status-header">
+            <h3>{{ svg_icon('clipboard', 'inline-icon') }} {{ active_plan.target_event }} Plan</h3>
+            {% if current_phase %}
+            <span class="phase-badge phase-{{ current_phase|lower }}">{{ current_phase }} Phase{% if plan_week_number %} — Week {{ plan_week_number }}{% endif %}</span>
+            {% endif %}
+        </div>
+        <p class="plan-status-detail">
+            Target: {{ active_plan.target_date.strftime('%B %d, %Y') if active_plan.target_date else 'TBD' }}
+            {% if active_plan.goals %} · {{ active_plan.goals }}{% endif %}
+        </p>
+        <a href="{{ url_for('activity_plan') }}" class="plan-link">View Full Plan →</a>
+    </div>
+    {% endif %}
+
+    <!-- Recent Workouts -->
+    <div class="activity-recent">
+        <h3>Recent Workouts</h3>
+        {% if recent_workouts %}
+        <div class="workout-list">
+            {% for w in recent_workouts %}
+            <div class="workout-row workout-row-detailed {% if w.workout_type == 'gym' and w.exercises %}workout-row-gym{% endif %}" {% if w.workout_type == 'gym' and w.exercises %}onclick="this.classList.toggle('expanded')"{% endif %}>
+                <div class="workout-row-main">
+                    <span class="workout-date">{{ w.date.strftime('%b %d') }}</span>
+                    <span class="workout-type-icon">{% if w.workout_type == 'run' %}{{ svg_icon('muscle', 'inline-icon') }}{% elif w.workout_type == 'gym' %}{{ svg_icon('dumbbell', 'inline-icon') }}{% else %}{{ svg_icon('cycling', 'inline-icon') }}{% endif %}</span>
+                    <span class="workout-title">{{ w.title or w.workout_type|capitalize }}</span>
+                    <span class="workout-stats">
+                        {% if w.workout_type == 'run' %}
+                            {{ w.distance_km or 0 }}km · {{ (w.duration_minutes or 0)|duration_fmt }}
+                            {% if w.pace_per_km %} · {{ w.pace_per_km }}/km{% endif %}
+                        {% elif w.workout_type == 'gym' %}
+                            {{ (w.duration_minutes or 0)|duration_fmt }}
+                        {% else %}
+                            {{ (w.duration_minutes or 0)|duration_fmt }}
+                        {% endif %}
+                    </span>
+                    <span class="workout-xp">+{{ w.xp_earned }} XP</span>
+                </div>
+                {% if w.workout_type == 'gym' and w.exercises %}
+                {% set exercises = w.exercises|parse_exercises %}
+                {% if exercises %}
+                <div class="workout-exercises-detail">
+                    {% for ex in exercises %}
+                    <div class="exercise-detail-block">
+                        <div class="exercise-detail-name">{{ ex.name }}</div>
+                        {% if ex.sets is iterable and ex.sets is not string %}
+                        <table class="exercise-detail-table">
+                            <thead><tr><th>Set</th><th>Weight</th><th>Reps</th></tr></thead>
+                            <tbody>
+                            {% for s in ex.sets %}
+                            <tr{% if s.failed %} class="set-failed-row"{% endif %}>
+                                <td>{{ s.set or loop.index }}</td>
+                                <td>{{ s.weight_kg }}kg</td>
+                                <td>{{ s.reps }}{% if s.failed %} ✕{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <div style="font-size:0.8rem;color:var(--text-secondary)">{{ ex.sets or '?' }}×{{ ex.reps or '?' }} @ {{ ex.weight_kg or '?' }}kg</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty-state">No workouts yet. <a href="{{ url_for('activity_log') }}">Log your first workout!</a></p>
+        {% endif %}
+    </div>
+
+    <!-- Weekly Volume Chart -->
+    <div class="activity-weekly-chart">
+        <h3>Weekly Volume (Last 8 Weeks)</h3>
+        <div class="volume-chart" id="volume-chart"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const weeklyVolume = {{ weekly_volume|safe }};
+
+function renderVolumeChart() {
+    const container = document.getElementById('volume-chart');
+    const labels = Object.keys(weeklyVolume);
+    const maxKm = Math.max(...labels.map(l => weeklyVolume[l].runs_km), 1);
+    const maxGym = Math.max(...labels.map(l => weeklyVolume[l].gym), 1);
+    const maxVal = Math.max(maxKm, maxGym * 5, 1); // Normalize gym to ~5km equivalent
+
+    container.innerHTML = labels.map((label, i) => {
+        const d = weeklyVolume[label];
+        const kmPct = (d.runs_km / maxVal) * 100;
+        const gymPct = (d.gym * 5 / maxVal) * 100;
+        const isThisWeek = i === labels.length - 1;
+        return `<div class="volume-bar-col">
+            <div class="volume-bar-values">
+                ${d.runs_km > 0 ? `<span class="volume-km">${d.runs_km}km</span>` : ''}
+                ${d.gym > 0 ? `<span class="volume-gym">${d.gym}x gym</span>` : ''}
+            </div>
+            <div class="volume-bar-stack">
+                <div class="volume-bar volume-bar-run" style="height: ${Math.max(kmPct, d.runs_km > 0 ? 4 : 0)}%"></div>
+                <div class="volume-bar volume-bar-gym" style="height: ${Math.max(gymPct, d.gym > 0 ? 4 : 0)}%"></div>
+            </div>
+            <div class="volume-bar-label${isThisWeek ? ' current' : ''}">${label}</div>
+        </div>`;
+    }).join('');
+}
+
+renderVolumeChart();
+
+// Garmin Sync
+async function syncGarmin() {
+    const btn = document.getElementById('btn-garmin-sync');
+    const label = document.getElementById('sync-label');
+    btn.disabled = true;
+    label.textContent = 'Syncing...';
+    btn.classList.add('syncing');
+
+    try {
+        const resp = await fetch('/api/garmin/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ days_back: 14 }),
+        });
+        const data = await resp.json();
+
+        if (data.error) {
+            alert('Sync failed: ' + data.error);
+            label.textContent = 'Sync';
+            btn.disabled = false;
+            btn.classList.remove('syncing');
+            return;
+        }
+
+        let msg = 'Garmin sync complete!';
+        if (data.imported_count > 0) {
+            msg += ` ${data.imported_count} new workout(s) imported.`;
+        }
+
+        label.textContent = 'Done!';
+        setTimeout(() => location.reload(), 1000);
+    } catch (e) {
+        alert('Sync error: ' + e.message);
+        label.textContent = 'Sync';
+        btn.disabled = false;
+        btn.classList.remove('syncing');
+    }
+}
+</script>
+{% endblock %}

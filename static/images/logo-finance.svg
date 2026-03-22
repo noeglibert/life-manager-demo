@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <filter id="pencilTexture">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#pencilTexture)">
+    <!-- Euro coin outer circle -->
+    <circle cx="60" cy="58" r="38" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <circle cx="60" cy="58" r="37" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <circle cx="60" cy="58" r="39" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.3"/>
+
+    <!-- Inner circle detail -->
+    <circle cx="60" cy="58" r="32" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <circle cx="60" cy="58" r="31" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.3"/>
+
+    <!-- Euro symbol - main stroke -->
+    <path d="M72 40 Q60 30 50 40 Q40 50 40 58 Q40 66 50 76 Q60 86 72 76"
+          stroke="#5D4037" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M71 41 Q59 31 51 41 Q41 51 41 58 Q41 66 51 75 Q61 85 71 75"
+          stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+
+    <!-- Euro horizontal bars -->
+    <path d="M38 52 L62 52" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M39 53 L61 53" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M38 63 L62 63" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M39 64 L61 64" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.5"/>
+
+    <!-- Small trend arrow (bottom right) -->
+    <path d="M75 85 L90 72 L85 72 L90 72 L90 77"
+          stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M76 86 L91 73"
+          stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.5"/>
+
+    <!-- Shine highlights -->
+    <path d="M35 42 Q40 38 45 42" stroke="#D4A574" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M78 50 Q82 47 84 52" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.4"/>
+  </g>
+
+  <!-- Extra sketch marks -->
+  <path d="M22 45 L24 47" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+  <path d="M95 68 L93 70" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+</svg>

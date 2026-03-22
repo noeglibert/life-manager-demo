@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <filter id="pencilTexture">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#pencilTexture)">
+    <!-- Envelope body -->
+    <rect x="20" y="35" width="80" height="55" rx="4"
+          stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="21" y="36" width="78" height="53" rx="3"
+          stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
+
+    <!-- Envelope flap (V shape) -->
+    <path d="M20 35 L60 65 L100 35"
+          stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M21 36 L60 64 L99 36"
+          stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
+
+    <!-- Bottom V lines -->
+    <path d="M20 90 L45 68"
+          stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M100 90 L75 68"
+          stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+
+    <!-- Paper peeking out -->
+    <path d="M35 35 L35 22 L85 22 L85 35"
+          stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M36 34 L36 23 L84 23 L84 34"
+          stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.4"/>
+
+    <!-- Text lines on paper -->
+    <line x1="42" y1="27" x2="68" y2="27" stroke="#D4A574" stroke-width="1.5" opacity="0.6"/>
+    <line x1="42" y1="31" x2="78" y2="31" stroke="#D4A574" stroke-width="1.5" opacity="0.5"/>
+
+    <!-- Small star / sparkle -->
+    <path d="M75 27 L76 24 L77 27 L80 28 L77 29 L76 32 L75 29 L72 28 Z"
+          stroke="#5D4037" stroke-width="1.5" fill="none" opacity="0.7"/>
+  </g>
+
+  <!-- Corner sketch marks -->
+  <path d="M15 95 L17 93" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+  <path d="M103 95 L105 97" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+</svg>

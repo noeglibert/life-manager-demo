@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+{% block title %}API Usage & Costs{% endblock %}
+
+{% block content %}
+<div class="api-usage-page">
+    <h1>API Usage & Costs</h1>
+
+    <!-- Summary Cards -->
+    <div class="usage-stats-row">
+        <div class="usage-stat-card">
+            <div class="usage-stat-value">${{ "%.4f"|format(total_cost) }}</div>
+            <div class="usage-stat-label">Total (All Time)</div>
+        </div>
+        <div class="usage-stat-card">
+            <div class="usage-stat-value">${{ "%.4f"|format(month_cost) }}</div>
+            <div class="usage-stat-label">This Month</div>
+        </div>
+        <div class="usage-stat-card">
+            <div class="usage-stat-value">${{ "%.4f"|format(today_cost) }}</div>
+            <div class="usage-stat-label">Today</div>
+        </div>
+        <div class="usage-stat-card">
+            <div class="usage-stat-value">{{ total_calls }}</div>
+            <div class="usage-stat-label">Total API Calls</div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="usage-charts-row">
+        <div class="usage-chart-card">
+            <h3>Daily Cost (Last 30 Days)</h3>
+            <canvas id="dailyCostChart"></canvas>
+        </div>
+    </div>
+    <div class="usage-charts-row">
+        <div class="usage-chart-card usage-chart-half">
+            <h3>Cost by Feature</h3>
+            <canvas id="featureChart"></canvas>
+        </div>
+        <div class="usage-chart-card usage-chart-half">
+            <h3>Cost by Model</h3>
+            <canvas id="modelChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Recent Calls Table -->
+    <div class="usage-table-card">
+        <h3>Recent API Calls</h3>
+        <div class="usage-table-wrapper">
+            <table class="usage-table">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Feature</th>
+                        <th>Endpoint</th>
+                        <th>Model</th>
+                        <th>Input Tok.</th>
+                        <th>Output Tok.</th>
+                        <th>Cost</th>
+                        <th>Duration</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for call in recent_calls %}
+                    <tr>
+                        <td class="usage-cell-time">{{ call.timestamp }}</td>
+                        <td><span class="usage-badge usage-badge-{{ call.feature }}">{{ call.feature }}</span></td>
+                        <td class="usage-cell-endpoint">{{ call.endpoint }}</td>
+                        <td><span class="usage-model-badge {% if 'haiku' in call.model %}model-haiku{% else %}model-sonnet{% endif %}">{{ call.model.split('-')[1] if '-' in call.model else call.model }}</span></td>
+                        <td class="usage-cell-num">{{ "{:,}".format(call.input_tokens) }}</td>
+                        <td class="usage-cell-num">{{ "{:,}".format(call.output_tokens) }}</td>
+                        <td class="usage-cell-cost">${{ "%.6f"|format(call.cost_usd) }}</td>
+                        <td class="usage-cell-num">{{ call.duration_ms }}ms</td>
+                    </tr>
+                    {% endfor %}
+                    {% if not recent_calls %}
+                    <tr><td colspan="8" class="usage-empty">No API calls logged yet. Use any AI-powered feature to start tracking costs.</td></tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+    const featureData = {{ feature_data|safe }};
+    const modelData = {{ model_data|safe }};
+    const dailyData = {{ daily_data|safe }};
+
+    // Warm earth tone chart palette
+    const colors = ['#8B6914', '#4A7C59', '#A0402A', '#6B4E71', '#3D7068', '#C2692A', '#4A6E8A', '#5D4037'];
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#a8a29e' : '#78716c';
+    const gridColor = isDark ? 'rgba(168,162,158,0.1)' : 'rgba(0,0,0,0.06)';
+
+    Chart.defaults.color = textColor;
+    Chart.defaults.borderColor = gridColor;
+
+    // Daily cost line chart
+    if (dailyData.length > 0) {
+        new Chart(document.getElementById('dailyCostChart'), {
+            type: 'line',
+            data: {
+                labels: dailyData.map(d => d.date.slice(5)),
+                datasets: [{
+                    label: 'Cost ($)',
+                    data: dailyData.map(d => d.cost),
+                    borderColor: '#8B6914',
+                    backgroundColor: 'rgba(139,105,20,0.12)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 3,
+                }, {
+                    label: 'Calls',
+                    data: dailyData.map(d => d.calls),
+                    borderColor: '#4A7C59',
+                    backgroundColor: 'rgba(74,124,89,0.12)',
+                    fill: false,
+                    tension: 0.3,
+                    pointRadius: 3,
+                    yAxisID: 'y1',
+                }]
+            },
+            options: {
+                responsive: true,
+                interaction: { mode: 'index', intersect: false },
+                scales: {
+                    y: { beginAtZero: true, title: { display: true, text: 'Cost ($)' } },
+                    y1: { beginAtZero: true, position: 'right', title: { display: true, text: 'Calls' }, grid: { drawOnChartArea: false } }
+                }
+            }
+        });
+    }
+
+    // Feature bar chart
+    if (featureData.length > 0) {
+        new Chart(document.getElementById('featureChart'), {
+            type: 'bar',
+            data: {
+                labels: featureData.map(d => d.feature),
+                datasets: [{
+                    label: 'Cost ($)',
+                    data: featureData.map(d => d.cost),
+                    backgroundColor: featureData.map((_, i) => colors[i % colors.length]),
+                    borderRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+    }
+
+    // Model pie chart
+    if (modelData.length > 0) {
+        new Chart(document.getElementById('modelChart'), {
+            type: 'doughnut',
+            data: {
+                labels: modelData.map(d => `${d.model} (${d.calls} calls)`),
+                datasets: [{
+                    data: modelData.map(d => d.cost),
+                    backgroundColor: ['#8B6914', '#4A7C59', '#C2692A', '#6B4E71'],
+                    borderWidth: 0,
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { position: 'bottom' },
+                }
+            }
+        });
+    }
+</script>
+{% endblock %}

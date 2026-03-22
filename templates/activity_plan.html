@@ -1,0 +1,640 @@
+{% extends "base.html" %}
+
+{% block title %}Training Calendar - Life Manager{% endblock %}
+
+{% block content %}
+<div class="activity-page">
+    <div class="page-header">
+        <h1>Training Calendar</h1>
+        {% if days_until is not none %}
+        <span class="countdown-badge">{{ svg_icon('flag', 'inline-icon') }} {{ days_until }} days to race</span>
+        {% endif %}
+    </div>
+
+    {% if active_plan %}
+    <!-- Plan Header -->
+    <div class="plan-header-card">
+        <div class="plan-header-info">
+            <h2>{{ active_plan.target_event }}</h2>
+            <p>Target: {{ active_plan.target_date.strftime('%B %d, %Y') if active_plan.target_date else 'TBD' }}
+                {% if plan_week_number %} — Week {{ plan_week_number }}{% endif %}
+            </p>
+            {% if active_plan.goals %}<p class="plan-goals">{{ active_plan.goals }}</p>{% endif %}
+        </div>
+        {% if current_phase %}
+        <span class="phase-badge phase-{{ current_phase|lower }}">{{ current_phase }} Phase</span>
+        {% endif %}
+    </div>
+
+    <!-- Phase Timeline -->
+    {% if active_plan.phase_summary %}
+    <div class="phase-timeline">
+        <div class="phase-timeline-bar" id="phase-timeline"></div>
+    </div>
+    {% endif %}
+
+    {% if has_schedule and calendar_data %}
+    <!-- Calendar View -->
+    <div class="tc-calendar-container">
+        <!-- Month Navigation -->
+        <div class="tc-month-nav">
+            <a href="{{ url_for('activity_plan', year=calendar_data.prev_year, month=calendar_data.prev_month) }}" class="btn-secondary tc-nav-btn">&larr;</a>
+            <h3 class="tc-month-name">{{ calendar_data.month_name }}</h3>
+            <a href="{{ url_for('activity_plan', year=calendar_data.next_year, month=calendar_data.next_month) }}" class="btn-secondary tc-nav-btn">&rarr;</a>
+        </div>
+
+        <!-- Calendar Grid -->
+        <div class="tc-grid">
+            <div class="tc-header-row">
+                <div class="tc-header-cell">Mon</div>
+                <div class="tc-header-cell">Tue</div>
+                <div class="tc-header-cell">Wed</div>
+                <div class="tc-header-cell">Thu</div>
+                <div class="tc-header-cell">Fri</div>
+                <div class="tc-header-cell">Sat</div>
+                <div class="tc-header-cell">Sun</div>
+            </div>
+            {% for week in calendar_data.cal_grid %}
+            <div class="tc-week-row">
+                {% for day_date in week %}
+                {% if day_date %}
+                    {% set day = calendar_data.days_by_date.get(day_date) %}
+                    <div class="tc-cell{% if day_date == calendar_data.today %} tc-cell--today{% endif %}{% if day and day.status == 'skipped' %} tc-cell--skipped{% endif %}{% if day and day.status == 'completed' %} tc-cell--completed{% endif %}"
+                         data-date="{{ day_date }}"
+                         {% if day %}data-day-id="{{ day.id }}"{% endif %}
+                         onclick="Cal.selectDay('{{ day_date }}')">
+                        <span class="tc-date-num">{{ day_date[-2:] | int }}</span>
+                        {% if day %}
+                            <div class="tc-pill tc-pill--{{ day.session_type }}{% if day.effort_level == 'hard' %} tc-pill--hard{% endif %}{% if day.is_key_session %} tc-pill--key{% endif %}{% if day.session_type == 'race' %} tc-pill--race{% endif %}">
+                                {{ day.title | truncate(22, True) }}
+                            </div>
+                            {% if day.planned_km %}
+                            <span class="tc-km-badge">{{ day.planned_km | round(1) }}km</span>
+                            {% endif %}
+                            {% if day.status == 'completed' %}
+                            <span class="tc-status-icon tc-status-done">&#10003;</span>
+                            {% elif day.status == 'skipped' %}
+                            <span class="tc-status-icon tc-status-skip">&#10007;</span>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <div class="tc-cell tc-cell--empty"></div>
+                {% endif %}
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Detail Panel -->
+    <div id="tc-detail-panel" class="tc-detail-panel" style="display:none;">
+        <div class="tc-detail-header">
+            <h3 id="tc-detail-title"></h3>
+            <div class="tc-detail-badges">
+                <span id="tc-detail-date" class="tc-detail-date"></span>
+                <span id="tc-detail-phase" class="phase-badge"></span>
+                <span id="tc-detail-effort" class="tc-effort-badge"></span>
+                <span id="tc-detail-status-badge" class="tc-status-badge" style="display:none;"></span>
+            </div>
+        </div>
+        <div class="tc-detail-body">
+            <div class="tc-detail-desc-wrap">
+                <label>Session details <small>(copy for your watch)</small></label>
+                <textarea id="tc-detail-desc" class="tc-detail-desc" readonly></textarea>
+                <button type="button" class="btn-secondary tc-copy-btn" onclick="Cal.copyDescription()">Copy</button>
+            </div>
+        </div>
+        <div class="tc-detail-actions" id="tc-detail-actions">
+            <button type="button" class="btn-primary" id="btn-complete" onclick="Cal.showCompleteForm()">Mark Complete</button>
+            <button type="button" class="btn-secondary" id="btn-skip" onclick="Cal.skipDay()">Skip</button>
+            <button type="button" class="btn-secondary" id="btn-swap" onclick="Cal.toggleSwap()">Select for Swap</button>
+            <button type="button" class="btn-secondary" id="btn-ripple" onclick="Cal.rippleAdjust()" style="display:none;">Adjust Nearby (AI)</button>
+        </div>
+
+        <!-- Swap indicator -->
+        <div id="tc-swap-bar" class="tc-swap-bar" style="display:none;">
+            <span>Swapping: <strong id="tc-swap-first-label"></strong></span>
+            <span>→ Now click another day to swap with</span>
+            <button type="button" class="btn-secondary" onclick="Cal.cancelSwap()">Cancel</button>
+        </div>
+
+        <!-- Complete form (hidden by default) -->
+        <div id="tc-complete-form" class="tc-complete-form" style="display:none;">
+            <h4>How did it go?</h4>
+            <div class="tc-feedback-row">
+                <label>Followed the plan?</label>
+                <select id="tc-followed">
+                    <option value="true">Yes</option>
+                    <option value="false">Modified it</option>
+                </select>
+            </div>
+            <div class="tc-feedback-row">
+                <label>How did it feel?</label>
+                <div class="tc-feedback-options">
+                    <button type="button" class="tc-fb-btn" data-val="easy" onclick="Cal.setFeedback('easy', this)">Easy</button>
+                    <button type="button" class="tc-fb-btn tc-fb-btn--active" data-val="as_expected" onclick="Cal.setFeedback('as_expected', this)">As Expected</button>
+                    <button type="button" class="tc-fb-btn" data-val="tough" onclick="Cal.setFeedback('tough', this)">Tough</button>
+                    <button type="button" class="tc-fb-btn" data-val="couldnt_finish" onclick="Cal.setFeedback('couldnt_finish', this)">Couldn't Finish</button>
+                </div>
+            </div>
+            <div class="tc-feedback-row" id="tc-km-row">
+                <label>Actual distance (km)</label>
+                <input type="number" id="tc-actual-km" step="0.1" min="0">
+            </div>
+            <div class="tc-feedback-row">
+                <label>Duration (minutes)</label>
+                <input type="number" id="tc-actual-duration" step="1" min="0">
+            </div>
+            <div class="tc-feedback-row">
+                <label>Notes (optional)</label>
+                <input type="text" id="tc-complete-notes" placeholder="Any notes about the session...">
+            </div>
+            <div class="tc-feedback-actions">
+                <button type="button" class="btn-primary" onclick="Cal.submitComplete()">Save & Complete</button>
+                <button type="button" class="btn-secondary" onclick="Cal.hideCompleteForm()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Export training data -->
+    <div class="plan-actions" style="margin-top: 1rem;">
+        <a href="{{ url_for('export_training_pdf') }}" class="btn-secondary" download="training_summary.pdf">{{ svg_icon('clipboard', 'btn-icon-svg') }} Export Training Data (PDF)</a>
+    </div>
+
+    {% elif not has_schedule %}
+    <!-- State B: Plan exists but no day-by-day schedule yet — import CSV -->
+    <div class="no-plan-state">
+        <div class="no-plan-icon">{{ svg_icon('clipboard', 'inline-icon') }}</div>
+        <h2>Import Your Training Schedule</h2>
+        <p>Create your plan externally, export as CSV, and import it here.</p>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <!-- State A: No Plan — Generate One -->
+    <div class="no-plan-state">
+        <div class="no-plan-icon">{{ svg_icon('clipboard', 'inline-icon') }}</div>
+        <h2>No Active Training Plan</h2>
+        <p>Generate a personalized, periodized training plan based on your goals and current fitness.</p>
+
+        <form id="generate-plan-form" class="generate-plan-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="target-event">Event</label>
+                    <input type="text" id="target-event" value="Marathon" required>
+                </div>
+                <div class="form-group">
+                    <label for="target-date">Target Date</label>
+                    <input type="date" id="target-date" value="2026-10-10" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="plan-goals">Goals</label>
+                <input type="text" id="plan-goals" value="Complete the marathon + weight loss" placeholder="e.g. Sub 4h, weight loss">
+            </div>
+            <div class="form-group">
+                <label for="plan-notes">Additional notes (optional)</label>
+                <textarea id="plan-notes" rows="3" placeholder="Any injuries, constraints, preferred running days..."></textarea>
+            </div>
+            <button type="submit" class="btn-primary" id="btn-generate-plan">{{ svg_icon('robot', 'btn-icon-svg') }} Generate Training Plan</button>
+        </form>
+    </div>
+    {% endif %}
+
+    <!-- Generate New Plan (shown when plan exists) -->
+    {% if active_plan %}
+    <div class="plan-actions">
+        <details>
+            <summary class="btn-secondary">Generate New Plan (replaces current)</summary>
+            <form id="generate-plan-form" class="generate-plan-form" style="margin-top: 1rem;">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="target-event">Event</label>
+                        <input type="text" id="target-event" value="{{ active_plan.target_event or 'Marathon' }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="target-date">Target Date</label>
+                        <input type="date" id="target-date" value="{{ active_plan.target_date.strftime('%Y-%m-%d') if active_plan.target_date else '2026-10-10' }}" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="plan-goals">Goals</label>
+                    <input type="text" id="plan-goals" value="{{ active_plan.goals or '' }}" placeholder="e.g. Sub 4h, weight loss">
+                </div>
+                <div class="form-group">
+                    <label for="plan-notes">Additional notes</label>
+                    <textarea id="plan-notes" rows="3" placeholder="Any changes to your training..."></textarea>
+                </div>
+                <button type="submit" class="btn-primary" id="btn-generate-plan">{{ svg_icon('robot', 'btn-icon-svg') }} Generate New Plan</button>
+            </form>
+        </details>
+    </div>
+    {% endif %}
+
+    <div class="plan-nav">
+        <a href="{{ url_for('activity') }}" class="btn-secondary">&larr; Back to Activity</a>
+        <a href="{{ url_for('activity_expert') }}" class="btn-secondary">{{ svg_icon('robot', 'btn-icon-svg') }} Ask Coach</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Phase timeline rendering
+{% if active_plan and phase_data %}
+try {
+    const phases = {{ phase_data|tojson }};
+    const timeline = document.getElementById('phase-timeline');
+    if (timeline && phases.length > 0) {
+        const totalWeeks = phases[phases.length - 1].end_week || phases.reduce((s, p) => s + (p.end_week - p.start_week + 1), 0);
+        const colors = { 'Base': '#38A169', 'Build': '#3182CE', 'Peak': '#D69E2E', 'Taper': '#E53E3E' };
+        const weeksElapsed = Math.floor((new Date() - new Date('{{ active_plan.created_at.strftime("%Y-%m-%d") }}')) / (7 * 24 * 60 * 60 * 1000)) + 1;
+
+        timeline.innerHTML = phases.map(p => {
+            const width = ((p.end_week - p.start_week + 1) / totalWeeks * 100).toFixed(1);
+            const isCurrent = weeksElapsed >= p.start_week && weeksElapsed <= p.end_week;
+            return `<div class="phase-segment${isCurrent ? ' phase-current' : ''}" style="width:${width}%; background:${colors[p.phase] || '#718096'}">
+                <span>${p.phase}</span>
+                <small>Wk ${p.start_week}-${p.end_week}</small>
+            </div>`;
+        }).join('');
+    }
+} catch(e) { console.log('Phase timeline error:', e); }
+{% endif %}
+
+// Calendar Controller
+const Cal = {
+    data: {{ calendar_data.days_by_date | tojson if calendar_data else '{}' }},
+    selectedDate: null,
+    selectedDayId: null,
+    swapFirst: null,
+    feedback: 'as_expected',
+
+    selectDay(dateStr) {
+        const day = this.data[dateStr];
+
+        // If in swap mode and clicking an empty date (rest day with no record), handle it
+        if (!day && this.swapFirst) {
+            this.executeSwapWithDate(dateStr);
+            return;
+        }
+        if (!day) return;
+
+        // Update selected cell styling
+        document.querySelectorAll('.tc-cell--selected').forEach(el => el.classList.remove('tc-cell--selected'));
+        const cell = document.querySelector(`.tc-cell[data-date="${dateStr}"]`);
+        if (cell) cell.classList.add('tc-cell--selected');
+
+        this.selectedDate = dateStr;
+        this.selectedDayId = day.id;
+
+        // If in swap mode, execute swap
+        if (this.swapFirst && this.swapFirst.id !== day.id) {
+            this.executeSwap(day);
+            return;
+        }
+
+        // Populate detail panel
+        const panel = document.getElementById('tc-detail-panel');
+        document.getElementById('tc-detail-title').textContent = day.title || 'Rest Day';
+        document.getElementById('tc-detail-date').textContent = new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+        const phaseBadge = document.getElementById('tc-detail-phase');
+        phaseBadge.textContent = (day.phase || 'base') + ' phase';
+        phaseBadge.className = 'phase-badge phase-' + (day.phase || 'base');
+
+        const effortBadge = document.getElementById('tc-detail-effort');
+        effortBadge.textContent = day.effort_level || '';
+        effortBadge.className = 'tc-effort-badge tc-effort--' + (day.effort_level || 'easy');
+
+        // Status badge
+        const statusBadge = document.getElementById('tc-detail-status-badge');
+        if (day.status === 'completed') {
+            statusBadge.textContent = 'Completed';
+            statusBadge.className = 'tc-status-badge tc-status-badge--completed';
+            statusBadge.style.display = '';
+        } else if (day.status === 'skipped') {
+            statusBadge.textContent = 'Skipped';
+            statusBadge.className = 'tc-status-badge tc-status-badge--skipped';
+            statusBadge.style.display = '';
+        } else {
+            statusBadge.style.display = 'none';
+        }
+
+        document.getElementById('tc-detail-desc').value = day.description || '';
+
+        // Show/hide action buttons based on status
+        const actions = document.getElementById('tc-detail-actions');
+        const btnComplete = document.getElementById('btn-complete');
+        const btnSkip = document.getElementById('btn-skip');
+        const btnRipple = document.getElementById('btn-ripple');
+
+        if (day.status === 'completed' || day.session_type === 'rest') {
+            btnComplete.style.display = 'none';
+            btnSkip.style.display = 'none';
+        } else if (day.status === 'skipped') {
+            btnComplete.style.display = 'none';
+            btnSkip.style.display = 'none';
+            btnRipple.style.display = day.is_key_session ? '' : 'none';
+        } else {
+            btnComplete.style.display = '';
+            btnSkip.style.display = '';
+            btnRipple.style.display = 'none';
+        }
+
+        // Pre-fill complete form
+        document.getElementById('tc-actual-km').value = day.planned_km || '';
+        document.getElementById('tc-km-row').style.display = (day.session_type === 'run' || day.session_type === 'race') ? '' : 'none';
+
+        // Hide complete form
+        document.getElementById('tc-complete-form').style.display = 'none';
+
+        panel.style.display = '';
+        panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    },
+
+    copyDescription() {
+        const desc = document.getElementById('tc-detail-desc').value;
+        navigator.clipboard.writeText(desc).then(() => {
+            const btn = document.querySelector('.tc-copy-btn');
+            btn.textContent = 'Copied!';
+            setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+        });
+    },
+
+    showCompleteForm() {
+        document.getElementById('tc-complete-form').style.display = '';
+        document.getElementById('tc-detail-actions').style.display = 'none';
+    },
+
+    hideCompleteForm() {
+        document.getElementById('tc-complete-form').style.display = 'none';
+        document.getElementById('tc-detail-actions').style.display = '';
+    },
+
+    setFeedback(val, btn) {
+        this.feedback = val;
+        document.querySelectorAll('.tc-fb-btn').forEach(b => b.classList.remove('tc-fb-btn--active'));
+        btn.classList.add('tc-fb-btn--active');
+    },
+
+    async submitComplete() {
+        const dayId = this.selectedDayId;
+        const btn = document.querySelector('#tc-complete-form .btn-primary');
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+
+        try {
+            const res = await fetch(`/api/activity/days/${dayId}/complete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    feedback: this.feedback,
+                    actual_km: parseFloat(document.getElementById('tc-actual-km').value) || null,
+                    actual_duration_minutes: parseFloat(document.getElementById('tc-actual-duration').value) || null,
+                    notes: document.getElementById('tc-complete-notes').value,
+                    followed_plan: document.getElementById('tc-followed').value === 'true',
+                })
+            });
+            const result = await res.json();
+            if (result.success) {
+                // Update local data
+                this.data[this.selectedDate].status = 'completed';
+                // Update cell
+                const cell = document.querySelector(`.tc-cell[data-date="${this.selectedDate}"]`);
+                if (cell) {
+                    cell.classList.add('tc-cell--completed');
+                    if (!cell.querySelector('.tc-status-done')) {
+                        const icon = document.createElement('span');
+                        icon.className = 'tc-status-icon tc-status-done';
+                        icon.innerHTML = '&#10003;';
+                        cell.appendChild(icon);
+                    }
+                }
+                this.selectDay(this.selectedDate);
+                if (result.xp_earned) {
+                    alert(`Session completed! +${result.xp_earned} XP` +
+                        (result.leveled_up ? ' — Level Up!' : '') +
+                        (result.achievements.length ? ` — ${result.achievements.join(', ')}` : ''));
+                }
+            } else {
+                alert('Error: ' + (result.error || 'Unknown'));
+            }
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+        btn.disabled = false;
+        btn.textContent = 'Save & Complete';
+    },
+
+    async skipDay() {
+        if (!confirm('Skip this session?')) return;
+        const dayId = this.selectedDayId;
+        try {
+            const res = await fetch(`/api/activity/days/${dayId}/skip`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const result = await res.json();
+            if (result.success) {
+                this.data[this.selectedDate].status = 'skipped';
+                const cell = document.querySelector(`.tc-cell[data-date="${this.selectedDate}"]`);
+                if (cell) {
+                    cell.classList.add('tc-cell--skipped');
+                    if (!cell.querySelector('.tc-status-skip')) {
+                        const icon = document.createElement('span');
+                        icon.className = 'tc-status-icon tc-status-skip';
+                        icon.innerHTML = '&#10007;';
+                        cell.appendChild(icon);
+                    }
+                }
+                this.selectDay(this.selectedDate);
+                if (result.is_key_session) {
+                    if (confirm('This was a key session. Would you like the AI coach to adjust nearby days?')) {
+                        this.rippleAdjust();
+                    }
+                }
+            }
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+    },
+
+    toggleSwap() {
+        const day = this.data[this.selectedDate];
+        this.swapFirst = day;
+        document.getElementById('tc-swap-bar').style.display = '';
+        document.getElementById('tc-swap-first-label').textContent = `${day.title} (${this.selectedDate})`;
+        // Highlight swap source
+        const cell = document.querySelector(`.tc-cell[data-date="${this.selectedDate}"]`);
+        if (cell) cell.classList.add('tc-cell--swap-selected');
+    },
+
+    cancelSwap() {
+        this.swapFirst = null;
+        document.getElementById('tc-swap-bar').style.display = 'none';
+        document.querySelectorAll('.tc-cell--swap-selected').forEach(el => el.classList.remove('tc-cell--swap-selected'));
+    },
+
+    async executeSwap(dayB) {
+        const dayA = this.swapFirst;
+        if (!confirm(`Swap "${dayA.title}" (${dayA.date}) with "${dayB.title}" (${dayB.date})?`)) {
+            this.cancelSwap();
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/activity/days/swap', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ day_a: dayA.id, day_b: dayB.id })
+            });
+            const result = await res.json();
+            if (result.success) {
+                // Update local data
+                this.data[result.day_a.date] = result.day_a;
+                this.data[result.day_b.date] = result.day_b;
+                // Reload to reflect changes
+                window.location.reload();
+            } else {
+                alert('Error: ' + (result.error || 'Unknown'));
+            }
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+        this.cancelSwap();
+    },
+
+    async executeSwapWithDate(dateStr) {
+        const dayA = this.swapFirst;
+        const dateLabel = new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        if (!confirm(`Swap "${dayA.title}" (${dayA.date}) with Rest Day (${dateLabel})?`)) {
+            this.cancelSwap();
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/activity/days/swap', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ day_a: dayA.id, date_b: dateStr })
+            });
+            const result = await res.json();
+            if (result.success) {
+                this.data[result.day_a.date] = result.day_a;
+                this.data[result.day_b.date] = result.day_b;
+                window.location.reload();
+            } else {
+                alert('Error: ' + (result.error || 'Unknown'));
+            }
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+        this.cancelSwap();
+    },
+
+    async rippleAdjust() {
+        const dayId = this.selectedDayId;
+        const btn = document.getElementById('btn-ripple');
+        btn.disabled = true;
+        btn.textContent = 'Adjusting...';
+
+        try {
+            const res = await fetch(`/api/activity/days/${dayId}/ripple`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const result = await res.json();
+            if (result.success) {
+                alert(`Adjusted ${result.adjusted_count} nearby session(s).`);
+                // Update local data and reload for simplicity
+                if (result.adjusted_count > 0) {
+                    window.location.reload();
+                }
+            } else {
+                alert('Error: ' + (result.error || 'Unknown'));
+            }
+        } catch (err) {
+            alert('Error: ' + err.message);
+        }
+        btn.disabled = false;
+        btn.textContent = 'Adjust Nearby (AI)';
+    },
+
+    async generateSchedule() {
+        const btn = document.getElementById('btn-gen-schedule') || document.getElementById('btn-regen-schedule');
+        if (!btn) return;
+        btn.disabled = true;
+        btn.textContent = 'Generating schedule...';
+        const progress = document.getElementById('schedule-progress');
+        if (progress) progress.style.display = '';
+
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 min timeout
+            const res = await fetch('/api/activity/generate-schedule', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({}),
+                signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+            const result = await res.json();
+            if (result.success) {
+                window.location.href = '{{ url_for("activity_plan") }}';
+            } else {
+                alert('Error: ' + (result.error || 'Unknown'));
+                btn.disabled = false;
+                btn.textContent = 'Generate Day-by-Day Schedule';
+                if (progress) progress.style.display = 'none';
+            }
+        } catch (err) {
+            const msg = err.name === 'AbortError'
+                ? 'Request timed out. The schedule generation takes a while — please try again.'
+                : 'Error: ' + err.message;
+            alert(msg);
+            btn.disabled = false;
+            btn.textContent = 'Generate Day-by-Day Schedule';
+            if (progress) progress.style.display = 'none';
+        }
+    }
+};
+
+// Plan generation form
+const form = document.getElementById('generate-plan-form');
+if (form) {
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = form.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        btn.textContent = 'Generating plan...';
+
+        try {
+            const response = await fetch('/api/activity/generate-plan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    target_event: document.getElementById('target-event').value,
+                    target_date: document.getElementById('target-date').value,
+                    goals: document.getElementById('plan-goals').value,
+                    notes: document.getElementById('plan-notes').value
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                window.location.reload();
+            } else {
+                alert('Error: ' + (result.error || 'Unknown error'));
+                btn.disabled = false;
+                btn.innerHTML = '{{ svg_icon("robot", "btn-icon-svg") }} Generate Training Plan';
+            }
+        } catch (err) {
+            alert('Error: ' + err.message);
+            btn.disabled = false;
+            btn.innerHTML = '{{ svg_icon("robot", "btn-icon-svg") }} Generate Training Plan';
+        }
+    });
+}
+</script>
+{% endblock %}

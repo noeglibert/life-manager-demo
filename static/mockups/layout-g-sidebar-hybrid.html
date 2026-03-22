@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Layout G: Sidebar + Warm Glass Hybrid</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+    --bg: #f5f3ef;
+    --surface: rgba(255,255,255,0.7);
+    --surface-hover: rgba(255,255,255,0.85);
+    --surface-solid: #ffffff;
+    --border: rgba(0,0,0,0.06);
+    --border-hover: rgba(0,0,0,0.1);
+    --text: #1c1917;
+    --text-secondary: #57534e;
+    --text-muted: #a8a29e;
+    --accent: #b91c1c;
+    --accent-light: rgba(185,28,28,0.06);
+    --green: #15803d;
+    --green-light: rgba(21,128,61,0.06);
+    --orange: #c2410c;
+    --orange-light: rgba(194,65,12,0.06);
+    --blue: #1d4ed8;
+    --blue-light: rgba(29,78,216,0.06);
+    --purple: #6d28d9;
+    --purple-light: rgba(109,40,217,0.06);
+    --teal: #0f766e;
+    --teal-light: rgba(15,118,110,0.06);
+    --sidebar-bg: #292524;
+    --sidebar-text: #d6d3d1;
+    --sidebar-muted: #78716c;
+    --radius: 16px;
+    --radius-sm: 10px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.03), 0 4px 12px rgba(0,0,0,0.03);
+    --shadow-hover: 0 4px 20px rgba(0,0,0,0.06);
+}
+
+body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.6;
+    overflow-x: hidden;
+}
+
+/* Warm background gradient */
+body::before {
+    content: '';
+    position: fixed;
+    top: -20%;
+    right: -10%;
+    width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(185,28,28,0.04) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+body::after {
+    content: '';
+    position: fixed;
+    bottom: -10%;
+    left: 20%;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(109,40,217,0.03) 0%, transparent 70%);
+    pointer-events: none;
+}
+
+/* ===== SIDEBAR ===== */
+.sidebar {
+    width: 240px;
+    background: var(--sidebar-bg);
+    color: var(--sidebar-text);
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    display: flex;
+    flex-direction: column;
+    z-index: 50;
+    overflow-y: auto;
+}
+
+.sidebar-brand {
+    padding: 28px 24px 24px;
+}
+
+.sidebar-brand h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px;
+    font-weight: 400;
+    color: #fafaf9;
+}
+
+.sidebar-brand .sub {
+    font-size: 11px;
+    color: var(--sidebar-muted);
+    margin-top: 2px;
+}
+
+.sidebar-sep {
+    height: 1px;
+    background: rgba(255,255,255,0.06);
+    margin: 0 16px;
+}
+
+.sidebar-section { padding: 16px 12px 8px; }
+
+.sidebar-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--sidebar-muted);
+    padding: 0 12px;
+    margin-bottom: 8px;
+}
+
+.sidebar-nav { list-style: none; }
+
+.sidebar-nav li a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 12px;
+    border-radius: var(--radius-sm);
+    color: var(--sidebar-text);
+    text-decoration: none;
+    font-size: 13.5px;
+    font-weight: 500;
+    transition: all 0.15s;
+}
+
+.sidebar-nav li a:hover { background: rgba(255,255,255,0.06); color: #fafaf9; }
+.sidebar-nav li a.active { background: rgba(255,255,255,0.08); color: #fafaf9; }
+.sidebar-nav .emoji { font-size: 17px; width: 24px; text-align: center; }
+.sidebar-nav .badge { margin-left: auto; font-size: 10px; font-weight: 600; color: #fb923c; }
+
+.sidebar-footer { margin-top: auto; padding: 16px; }
+
+.sidebar-xp {
+    padding: 14px;
+    background: rgba(255,255,255,0.04);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(255,255,255,0.06);
+}
+
+.sidebar-xp .xp-top { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.sidebar-xp .xp-level { font-family: 'DM Serif Display', serif; font-size: 13px; color: #fafaf9; }
+.sidebar-xp .xp-nums { font-size: 11px; color: var(--sidebar-muted); }
+
+.sidebar-xp .xp-track { height: 4px; background: rgba(255,255,255,0.08); border-radius: 99px; overflow: hidden; }
+.sidebar-xp .xp-fill { height: 100%; width: 83%; background: linear-gradient(90deg, var(--accent), var(--orange)); border-radius: 99px; }
+
+.sidebar-btns { display: flex; gap: 8px; margin-top: 12px; }
+
+.sidebar-btn {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: transparent;
+    color: var(--sidebar-text);
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+}
+
+.sidebar-btn:hover { background: rgba(255,255,255,0.06); }
+
+/* ===== MAIN ===== */
+.main {
+    margin-left: 240px;
+    flex: 1;
+    min-height: 100vh;
+    position: relative;
+    z-index: 1;
+}
+
+.page {
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 40px 40px 80px;
+}
+
+/* ===== GLASS CARD (warm) ===== */
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    padding: 22px;
+    box-shadow: var(--shadow);
+    transition: all 0.25s;
+}
+
+.card:hover {
+    background: var(--surface-hover);
+    box-shadow: var(--shadow-hover);
+    border-color: var(--border-hover);
+}
+
+.card h3 {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+}
+
+/* ===== GREETING ===== */
+.greeting { margin-bottom: 32px; }
+
+.greeting h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 36px;
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    margin-bottom: 4px;
+}
+
+.greeting .date { color: var(--text-muted); font-size: 14px; }
+
+/* ===== HABITS ===== */
+.habits {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-bottom: 24px;
+}
+
+.habit {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius);
+    backdrop-filter: blur(12px);
+    padding: 18px 14px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    text-decoration: none;
+    color: var(--text);
+    box-shadow: var(--shadow);
+}
+
+.habit:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-hover);
+    border-color: var(--border-hover);
+}
+
+.habit.done {
+    border-color: rgba(21,128,61,0.25);
+    background: rgba(240,253,244,0.7);
+}
+
+.habit .h-emoji { font-size: 28px; margin-bottom: 8px; }
+.habit .h-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+.habit .h-detail { font-size: 11px; color: var(--text-muted); }
+.habit .h-streak { font-size: 11px; color: var(--orange); font-weight: 600; margin-top: 6px; }
+.habit .h-go { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+
+/* ===== BENTO ===== */
+.bento {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 14px;
+}
+
+.c3 { grid-column: span 3; }
+.c4 { grid-column: span 4; }
+.c5 { grid-column: span 5; }
+.c6 { grid-column: span 6; }
+.c7 { grid-column: span 7; }
+.c8 { grid-column: span 8; }
+.c12 { grid-column: span 12; }
+
+/* ===== CHALLENGE ===== */
+.ch-row { display: flex; align-items: center; gap: 16px; }
+.ch-row .ch-emoji { font-size: 30px; }
+.ch-row .ch-body { flex: 1; }
+
+.ch-row .ch-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+.ch-row .ch-title { font-size: 16px; font-weight: 600; margin: 2px 0; }
+.ch-row .ch-desc { font-size: 12px; color: var(--text-secondary); }
+
+.ch-row .ch-xp {
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px;
+    color: var(--accent);
+}
+
+.ch-row .ch-xp span {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 10px;
+    display: block;
+    color: var(--text-muted);
+}
+
+/* ===== STATS ===== */
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+}
+
+.stat { text-align: center; }
+
+.stat .sv {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    line-height: 1;
+}
+
+.stat .sl {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-top: 4px;
+}
+
+.stat:nth-child(1) .sv { color: var(--accent); }
+.stat:nth-child(2) .sv { color: var(--green); }
+.stat:nth-child(3) .sv { color: var(--blue); }
+.stat:nth-child(4) .sv { color: var(--orange); }
+.stat:nth-child(5) .sv { color: var(--teal); }
+
+/* ===== JOURNAL ===== */
+.j-item {
+    padding: 14px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid transparent;
+}
+
+.j-item:hover { background: rgba(255,255,255,0.5); border-color: var(--border); }
+.j-item .j-date { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.j-item .j-text { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+.j-item .j-tags { display: flex; gap: 6px; margin-top: 6px; }
+.j-item .j-tag {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--blue-light);
+    color: var(--blue);
+}
+
+/* ===== CHART ===== */
+.chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 5px;
+    height: 100px;
+}
+
+.chart .bar { flex: 1; border-radius: 4px 4px 0 0; opacity: 0.75; }
+.chart .bar.green { background: var(--green); }
+.chart .bar.blue { background: var(--blue); }
+.chart .bar.teal { background: var(--teal); }
+
+/* ===== CONTACTS ===== */
+.c-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+.c-row:last-child { border-bottom: none; }
+.c-row .c-name { font-size: 13px; font-weight: 500; }
+.c-row .c-pill {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+.c-row .c-pill.warn { background: var(--orange-light); color: var(--orange); }
+.c-row .c-pill.danger { background: var(--accent-light); color: var(--accent); }
+
+/* ===== HEATMAP ===== */
+.heatmap {
+    display: grid;
+    grid-template-columns: repeat(52, 1fr);
+    grid-template-rows: repeat(7, 1fr);
+    grid-auto-flow: column;
+    gap: 2px;
+}
+
+.hm {
+    aspect-ratio: 1;
+    border-radius: 2px;
+    background: rgba(0,0,0,0.04);
+}
+
+.hm.a { background: #dcfce7; }
+.hm.b { background: #86efac; }
+.hm.c { background: #22c55e; }
+.hm.d { background: #15803d; }
+.hm.e { background: #14532d; }
+
+/* ===== ACHIEVEMENTS ===== */
+.ach-list { display: flex; flex-direction: column; gap: 6px; }
+
+.ach-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    transition: background 0.15s;
+}
+.ach-row:hover { background: rgba(255,255,255,0.5); }
+.ach-row .a-icon { font-size: 18px; }
+.ach-row .a-name { font-size: 12px; font-weight: 500; flex: 1; }
+.ach-row .a-desc { font-size: 10px; color: var(--text-muted); }
+.ach-row.locked { opacity: 0.3; }
+
+/* ===== MOCKUP LABEL ===== */
+.mockup-label {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    background: var(--accent);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    z-index: 999;
+}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+    <div class="sidebar-brand">
+        <h1>Life Manager</h1>
+        <div class="sub">Build better habits</div>
+    </div>
+    <div class="sidebar-sep"></div>
+
+    <div class="sidebar-section">
+        <div class="sidebar-label">Habits</div>
+        <ul class="sidebar-nav">
+            <li><a href="#" class="active"><span class="emoji">&#x1F3E0;</span> Dashboard</a></li>
+            <li><a href="#"><span class="emoji">&#x1F4DD;</span> Journal <span class="badge">5d</span></a></li>
+            <li><a href="#"><span class="emoji">&#x1F9D8;</span> Meditate <span class="badge">12d</span></a></li>
+            <li><a href="#"><span class="emoji">&#x1F4DA;</span> Learn</a></li>
+            <li><a href="#"><span class="emoji">&#x1F957;</span> Nutrition <span class="badge">8d</span></a></li>
+            <li><a href="#"><span class="emoji">&#x1F3C3;</span> Activity</a></li>
+        </ul>
+    </div>
+
+    <div class="sidebar-section">
+        <div class="sidebar-label">More</div>
+        <ul class="sidebar-nav">
+            <li><a href="#"><span class="emoji">&#x2B50;</span> Highlights</a></li>
+            <li><a href="#"><span class="emoji">&#x1F4E8;</span> Newsletter</a></li>
+            <li><a href="#"><span class="emoji">&#x1F465;</span> Contacts</a></li>
+            <li><a href="#"><span class="emoji">&#x1F4C8;</span> Portfolio</a></li>
+            <li><a href="#"><span class="emoji">&#x1F3AE;</span> Wordle</a></li>
+        </ul>
+    </div>
+
+    <div class="sidebar-footer">
+        <div class="sidebar-xp">
+            <div class="xp-top">
+                <span class="xp-level">Level 5 &mdash; Historian</span>
+                <span class="xp-nums">1,245 / 1,500</span>
+            </div>
+            <div class="xp-track"><div class="xp-fill"></div></div>
+        </div>
+        <div class="sidebar-btns">
+            <button class="sidebar-btn">&#x1F319; Theme</button>
+            <button class="sidebar-btn">&#x1F512; Lock</button>
+        </div>
+    </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+    <div class="page">
+        <div class="greeting">
+            <h1>Good morning, Noe</h1>
+            <p class="date">Friday, February 21, 2026</p>
+        </div>
+
+        <!-- HABITS -->
+        <div class="habits">
+            <a class="habit done" href="#"><div class="h-emoji">&#x1F4DD;</div><div class="h-name">Journal</div><div class="h-detail">452 words</div><div class="h-streak">&#x1F525; 5d</div></a>
+            <a class="habit done" href="#"><div class="h-emoji">&#x1F9D8;</div><div class="h-name">Meditate</div><div class="h-detail">15 min</div><div class="h-streak">&#x1F525; 12d</div></a>
+            <a class="habit" href="#"><div class="h-emoji">&#x1F4DA;</div><div class="h-name">Learn</div><div class="h-detail">Not yet</div><div class="h-go">Go &rarr;</div></a>
+            <a class="habit done" href="#"><div class="h-emoji">&#x1F957;</div><div class="h-name">Nutrition</div><div class="h-detail">2 meals</div><div class="h-streak">&#x1F525; 8d</div></a>
+            <a class="habit" href="#"><div class="h-emoji">&#x1F3C3;</div><div class="h-name">Activity</div><div class="h-detail">Not yet</div><div class="h-go">Go &rarr;</div></a>
+        </div>
+
+        <!-- BENTO -->
+        <div class="bento">
+            <div class="card c7">
+                <h3>Today's Challenge</h3>
+                <div class="ch-row">
+                    <div class="ch-emoji">&#x1F3AF;</div>
+                    <div class="ch-body">
+                        <div class="ch-label">Daily Challenge</div>
+                        <div class="ch-title">Precision Writer</div>
+                        <div class="ch-desc">Write exactly 100 words (within 5 words)</div>
+                    </div>
+                    <div class="ch-xp">+25<span>bonus XP</span></div>
+                </div>
+            </div>
+
+            <div class="card c5">
+                <h3>Streaks</h3>
+                <div class="stats-row">
+                    <div class="stat"><div class="sv">5</div><div class="sl">Journal</div></div>
+                    <div class="stat"><div class="sv">12</div><div class="sl">Meditate</div></div>
+                    <div class="stat"><div class="sv">3</div><div class="sl">Learn</div></div>
+                    <div class="stat"><div class="sv">8</div><div class="sl">Nutrition</div></div>
+                    <div class="stat"><div class="sv">4</div><div class="sl">Activity</div></div>
+                </div>
+            </div>
+
+            <div class="card c5">
+                <h3>Recent Journal</h3>
+                <div class="j-item">
+                    <div class="j-date">February 21, 2026</div>
+                    <div class="j-text">Spent the morning working on the marathon training plan. The base phase is going well...</div>
+                    <div class="j-tags"><span class="j-tag">Sarah</span><span class="j-tag">David</span></div>
+                </div>
+                <div class="j-item">
+                    <div class="j-date">February 20, 2026</div>
+                    <div class="j-text">Great meditation session today. Tried the 4-7-8 breathing pattern...</div>
+                </div>
+                <div class="j-item">
+                    <div class="j-date">February 19, 2026</div>
+                    <div class="j-text">Productive day at work. Chat with team about Q2 roadmap...</div>
+                    <div class="j-tags"><span class="j-tag">Alex</span><span class="j-tag">Tom</span></div>
+                </div>
+            </div>
+
+            <div class="card c4">
+                <h3>Weekly Activity</h3>
+                <div class="chart">
+                    <div class="bar green" style="height:35%"></div>
+                    <div class="bar blue" style="height:60%"></div>
+                    <div class="bar green" style="height:25%"></div>
+                    <div class="bar teal" style="height:75%"></div>
+                    <div class="bar green" style="height:45%"></div>
+                    <div class="bar blue" style="height:35%"></div>
+                    <div class="bar teal" style="height:80%"></div>
+                    <div class="bar green" style="height:55%"></div>
+                </div>
+            </div>
+
+            <div class="card c3">
+                <h3>Reach Out</h3>
+                <div class="c-row"><span class="c-name">David Park</span><span class="c-pill danger">32d</span></div>
+                <div class="c-row"><span class="c-name">Alex Rivera</span><span class="c-pill warn">21d</span></div>
+                <div class="c-row"><span class="c-name">Sarah Chen</span><span class="c-pill warn">18d</span></div>
+                <div class="c-row"><span class="c-name">Tom Wilson</span><span class="c-pill" style="color:var(--text-muted)">8d</span></div>
+            </div>
+
+            <div class="card c8">
+                <h3>Habit Heatmap</h3>
+                <div class="heatmap" id="heatmap"></div>
+            </div>
+
+            <div class="card c4">
+                <h3>Achievements</h3>
+                <div class="ach-list">
+                    <div class="ach-row"><span class="a-icon">&#x1F525;</span><span class="a-name">Week Warrior</span><span class="a-desc">7-day streak</span></div>
+                    <div class="ach-row"><span class="a-icon">&#x1F4DC;</span><span class="a-name">Wordsmith</span><span class="a-desc">1,000 words</span></div>
+                    <div class="ach-row"><span class="a-icon">&#x1F9D8;</span><span class="a-name">First Breath</span><span class="a-desc">First meditation</span></div>
+                    <div class="ach-row"><span class="a-icon">&#x1F3C3;</span><span class="a-name">First Steps</span><span class="a-desc">First run</span></div>
+                    <div class="ach-row"><span class="a-icon">&#x1F957;</span><span class="a-name">First Bite</span><span class="a-desc">First meal</span></div>
+                    <div class="ach-row locked"><span class="a-icon">&#x1F451;</span><span class="a-name">Centurion</span><span class="a-desc">100-day streak</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="mockup-label">Layout G: Sidebar + Warm Glass Hybrid</div>
+
+<script>
+const hm = document.getElementById('heatmap');
+for (let i = 0; i < 364; i++) {
+    const c = document.createElement('div');
+    c.className = 'hm';
+    const r = Math.random();
+    if (r > 0.35) { c.classList.add(r > 0.88 ? 'e' : r > 0.72 ? 'd' : r > 0.55 ? 'c' : r > 0.42 ? 'b' : 'a'); }
+    hm.appendChild(c);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,407 @@
+{% extends "base.html" %}
+
+{% block title %}Journal - {{ date.strftime('%B %d, %Y') }} - Life Manager{% endblock %}
+
+{% block content %}
+<div class="journal-editor">
+    <div class="page-header">
+        <h1>{{ date.strftime('%A, %B %d, %Y') }}</h1>
+        <div class="journal-nav">
+            {% set prev_date = date - import('datetime').timedelta(days=1) if false else none %}
+            <a href="{{ url_for('journal_entry', date_str=(date - timedelta(days=1)).strftime('%Y-%m-%d')) }}" class="btn-secondary" title="Previous day">&larr; Prev</a>
+            <a href="{{ url_for('journal_list') }}" class="btn-secondary">All Entries</a>
+            {% if date < today %}
+            <a href="{{ url_for('journal_entry', date_str=(date + timedelta(days=1)).strftime('%Y-%m-%d')) }}" class="btn-secondary" title="Next day">Next &rarr;</a>
+            {% else %}
+            <span class="btn-secondary btn-disabled">Next &rarr;</span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if is_today and daily_challenge %}
+    <div class="journal-challenge-box {% if game_stats.challenge_completed_today %}completed{% endif %}">
+        <div class="challenge-box-header">
+            <span class="challenge-box-icon">
+                {{ svg_icon(daily_challenge.icon, 'inline-icon') }}
+            </span>
+            <span class="challenge-box-title">Today's Challenge: {{ daily_challenge.title }}</span>
+            <span class="challenge-box-xp">+{{ daily_challenge.xp_bonus }} XP</span>
+        </div>
+        <div class="challenge-box-description">{{ daily_challenge.description }}</div>
+        {% if game_stats.challenge_completed_today %}
+            <div class="challenge-box-status">✓ Challenge Completed!</div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="{{ url_for('journal_save') }}" class="journal-form">
+        <input type="hidden" name="date" value="{{ date.strftime('%Y-%m-%d') }}">
+
+        <div class="form-group">
+            <label for="mood">How are you feeling?</label>
+            <select id="mood" name="mood">
+                <option value="">Select mood...</option>
+                <option value="Great" {% if entry and entry.mood in ['Great', '😊 Great'] %}selected{% endif %}>Great</option>
+                <option value="Good" {% if entry and entry.mood in ['Good', '🙂 Good'] %}selected{% endif %}>Good</option>
+                <option value="Okay" {% if entry and entry.mood in ['Okay', '😐 Okay'] %}selected{% endif %}>Okay</option>
+                <option value="Down" {% if entry and entry.mood in ['Down', '😔 Down'] %}selected{% endif %}>Down</option>
+                <option value="Sad" {% if entry and entry.mood in ['Sad', '😢 Sad'] %}selected{% endif %}>Sad</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="content">What happened today?</label>
+            <div class="editor-help">
+                <p>{{ svg_icon('lightbulb', 'inline-icon') }} Type <strong>@Name</strong> to link people (e.g., @John or @John Smith)</p>
+            </div>
+            <textarea id="content" name="content" rows="20" placeholder="Start writing about your day...">{{ entry.content if entry else '' }}</textarea>
+            <div class="word-counter" id="wordCounter">
+                <span id="wordCount">0</span> words
+                <span class="word-min-hint" id="wordMinHint">(aim for at least 500)</span>
+            </div>
+        </div>
+
+        {% if is_today and daily_challenge and not game_stats.challenge_completed_today %}
+        <div class="challenge-claim-section">
+            <label class="challenge-claim-label">
+                <input type="checkbox" name="claim_challenge" value="true" id="claim-challenge">
+                <span class="checkmark"></span>
+                <span class="claim-text">I completed today's challenge: <strong>{{ daily_challenge.title }}</strong></span>
+            </label>
+            <p class="claim-hint">Check this box if your entry follows the challenge criteria to earn +{{ daily_challenge.xp_bonus }} bonus XP</p>
+        </div>
+        {% endif %}
+
+        <div class="form-actions">
+            <button type="submit" class="btn-primary btn-large">Save Entry</button>
+            <a href="{{ url_for('journal_list') }}" class="btn-secondary">Cancel</a>
+        </div>
+    </form>
+
+    <!-- Claude AI Section -->
+    <section class="claude-section">
+        <div class="claude-header">
+            <h2>Reflect with Claude</h2>
+            <p class="claude-description">Get AI-powered insights, improve your writing, or chat about your day</p>
+        </div>
+
+        {% if entry and entry.claude_reflection %}
+        <!-- Saved Reflection -->
+        <div class="saved-reflection">
+            <div class="saved-reflection-header">
+                <span class="saved-reflection-icon">{{ svg_icon('brain', 'inline-icon') }}</span>
+                <span class="saved-reflection-title">Claude's Reflection</span>
+            </div>
+            <div class="saved-reflection-content">
+                {{ entry.claude_reflection|e }}
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="claude-actions">
+            <button type="button" class="btn-claude" onclick="claudeReflect()">
+                <span class="btn-icon">{{ svg_icon('brain', 'btn-icon-svg') }}</span> {% if entry and entry.claude_reflection %}New Reflection{% else %}Reflect{% endif %}
+            </button>
+            <button type="button" class="btn-claude" onclick="claudeImprove()">
+                <span class="btn-icon">{{ svg_icon('sparkle', 'btn-icon-svg') }}</span> Improve Writing
+            </button>
+            {% if is_today and daily_challenge and not game_stats.challenge_completed_today %}
+            <button type="button" class="btn-claude" onclick="claudeVerifyChallenge()">
+                <span class="btn-icon">{{ svg_icon('target', 'btn-icon-svg') }}</span> Verify Challenge
+            </button>
+            {% endif %}
+            <button type="button" class="btn-claude" onclick="toggleChat()">
+                <span class="btn-icon">{{ svg_icon('writing', 'btn-icon-svg') }}</span> Chat
+            </button>
+        </div>
+
+        <div id="claude-response" class="claude-response" style="display: none;">
+            <div class="response-header">
+                <span class="response-title">Claude</span>
+                <button type="button" class="close-btn" onclick="closeResponse()">&times;</button>
+            </div>
+            <div id="claude-content" class="response-content"></div>
+        </div>
+
+        <div id="claude-chat" class="claude-chat" style="display: none;">
+            <div class="chat-header">
+                <span class="chat-title">Chat with Claude</span>
+                <button type="button" class="close-btn" onclick="closeChat()">&times;</button>
+            </div>
+            <div id="chat-messages" class="chat-messages"></div>
+            <div class="chat-input-area">
+                <input type="text" id="chat-input" placeholder="Ask Claude about your entry..." onkeydown="if(event.key==='Enter')sendChat()">
+                <button type="button" class="btn-primary" onclick="sendChat()">Send</button>
+            </div>
+        </div>
+    </section>
+
+    {% if entry and entry.mentioned_contacts %}
+        <section class="mentioned-contacts-section">
+            <h2>People Mentioned</h2>
+            <div class="mentioned-contacts-grid">
+                {% for contact in entry.mentioned_contacts %}
+                    <a href="{{ url_for('contact_detail', contact_id=contact.id) }}" class="mentioned-contact-card">
+                        <h3>{{ contact.full_name }}</h3>
+                        <p>{{ contact.relationship_category or 'Uncategorized' }}</p>
+                    </a>
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
+
+    <section class="quick-contacts-panel">
+        <h3>Quick Reference</h3>
+        <p class="help-text">Your contacts for easy @mentioning:</p>
+        <div class="contacts-list-simple">
+            {% for contact in contacts %}
+                <div class="contact-quick-item">
+                    <code>@{{ contact.first_name }}{% if contact.last_name %} {{ contact.last_name }}{% endif %}</code>
+                    <span>- {{ contact.full_name }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const entryDate = "{{ date.strftime('%Y-%m-%d') }}";
+    const entryDateDisplay = "{{ date.strftime('%B %d, %Y') }}";
+    const entryMood = "{{ entry.mood if entry else '' }}";
+    let chatHistory = [];
+
+    // Word counter
+    const WORD_MINIMUM = 500;
+    const contentEl = document.getElementById('content');
+    const wordCountEl = document.getElementById('wordCount');
+    const wordMinHint = document.getElementById('wordMinHint');
+    const wordCounter = document.getElementById('wordCounter');
+
+    function updateWordCount() {
+        const text = contentEl.value.trim();
+        const count = text ? text.split(/\s+/).length : 0;
+        wordCountEl.textContent = count;
+        if (count >= WORD_MINIMUM) {
+            wordCounter.classList.add('word-count-ok');
+            wordCounter.classList.remove('word-count-low');
+            wordMinHint.textContent = '';
+        } else if (count > 0) {
+            wordCounter.classList.add('word-count-low');
+            wordCounter.classList.remove('word-count-ok');
+            wordMinHint.textContent = `(${WORD_MINIMUM - count} more to reach minimum)`;
+        } else {
+            wordCounter.classList.remove('word-count-ok', 'word-count-low');
+            wordMinHint.textContent = `(aim for at least ${WORD_MINIMUM})`;
+        }
+    }
+    contentEl.addEventListener('input', updateWordCount);
+    updateWordCount();
+
+    // Warn on save if under minimum
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const count = contentEl.value.trim() ? contentEl.value.trim().split(/\s+/).length : 0;
+        if (count > 0 && count < WORD_MINIMUM) {
+            if (!confirm(`Your entry is only ${count} words. Aim for at least ${WORD_MINIMUM} to get the most out of journaling. Save anyway?`)) {
+                e.preventDefault();
+                return false;
+            }
+        }
+        formSubmitting = true;
+    });
+
+    // Unsaved changes warning
+    let initialContent = contentEl ? contentEl.value : '';
+    let formSubmitting = false;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.querySelector('.journal-form');
+        if (form) {
+            form.addEventListener('submit', function() { formSubmitting = true; });
+        }
+    });
+
+    window.addEventListener('beforeunload', function(e) {
+        if (formSubmitting) return;
+        const currentContent = document.getElementById('content') ? document.getElementById('content').value : '';
+        if (currentContent !== initialContent) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+
+    {% if is_today and daily_challenge %}
+    const challengeTitle = "{{ daily_challenge.title }}";
+    const challengeDescription = "{{ daily_challenge.description }}";
+    const challengeXP = {{ daily_challenge.xp_bonus }};
+    {% endif %}
+
+    function getContent() {
+        return document.getElementById('content').value;
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function showResponse(html) {
+        document.getElementById('claude-content').innerHTML = html;
+        document.getElementById('claude-response').style.display = 'block';
+        document.getElementById('claude-chat').style.display = 'none';
+    }
+
+    function closeResponse() {
+        document.getElementById('claude-response').style.display = 'none';
+    }
+
+    function closeChat() {
+        document.getElementById('claude-chat').style.display = 'none';
+    }
+
+    function toggleChat() {
+        const chat = document.getElementById('claude-chat');
+        const response = document.getElementById('claude-response');
+        response.style.display = 'none';
+        chat.style.display = chat.style.display === 'none' ? 'block' : 'none';
+        if (chat.style.display === 'block') {
+            document.getElementById('chat-input').focus();
+        }
+    }
+
+    async function claudeReflect() {
+        const content = getContent();
+        if (!content.trim()) {
+            alert('Write something first!');
+            return;
+        }
+        showResponse('<div class="loading">Claude is reflecting...</div>');
+
+        try {
+            const response = await fetch('/api/claude/reflect', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({content, mood: entryMood, date: entryDate})
+            });
+            const data = await response.json();
+            if (data.error) {
+                showResponse(`<div class="error">Error: ${data.error}</div>`);
+            } else {
+                showResponse(`<div class="reflection">${escapeHtml(data.reflection)}</div>`);
+            }
+        } catch (e) {
+            showResponse(`<div class="error">Error: ${e.message}</div>`);
+        }
+    }
+
+    async function claudeImprove() {
+        const content = getContent();
+        if (!content.trim()) {
+            alert('Write something first!');
+            return;
+        }
+        showResponse('<div class="loading">Claude is reviewing your writing...</div>');
+
+        try {
+            const response = await fetch('/api/claude/improve', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({content})
+            });
+            const data = await response.json();
+            if (data.error) {
+                showResponse(`<div class="error">Error: ${data.error}</div>`);
+            } else {
+                showResponse(`<div class="suggestions">${escapeHtml(data.suggestions)}</div>`);
+            }
+        } catch (e) {
+            showResponse(`<div class="error">Error: ${e.message}</div>`);
+        }
+    }
+
+    {% if is_today and daily_challenge %}
+    async function claudeVerifyChallenge() {
+        const content = getContent();
+        if (!content.trim()) {
+            alert('Write something first!');
+            return;
+        }
+        showResponse('<div class="loading">Claude is checking your challenge...</div>');
+
+        try {
+            const response = await fetch('/api/claude/verify-challenge', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    content,
+                    challenge_title: challengeTitle,
+                    challenge_description: challengeDescription
+                })
+            });
+            const data = await response.json();
+            if (data.error) {
+                showResponse(`<div class="error">Error: ${data.error}</div>`);
+            } else {
+                const icon = data.completed ? '<img class="inline-icon" src="/static/images/icon-check.svg" alt="">' : '<img class="inline-icon" src="/static/images/icon-target.svg" alt="">';
+                const status = data.completed ? 'Challenge Complete!' : 'Not quite there yet';
+                let html = `<div class="challenge-result ${data.completed ? 'success' : 'pending'}">
+                    <div class="result-icon">${icon}</div>
+                    <div class="result-status">${status}</div>
+                    <div class="result-reason">${data.reason}</div>`;
+                if (data.completed) {
+                    html += `<p class="result-tip">Check the "I completed today's challenge" box and save to claim your +${challengeXP} XP!</p>`;
+                    document.getElementById('claim-challenge').checked = true;
+                }
+                html += '</div>';
+                showResponse(html);
+            }
+        } catch (e) {
+            showResponse(`<div class="error">Error: ${e.message}</div>`);
+        }
+    }
+    {% endif %}
+
+    async function sendChat() {
+        const input = document.getElementById('chat-input');
+        const message = input.value.trim();
+        if (!message) return;
+
+        const content = getContent();
+        const messagesDiv = document.getElementById('chat-messages');
+
+        // Add user message
+        messagesDiv.innerHTML += `<div class="chat-message user"><strong>You:</strong> ${escapeHtml(message)}</div>`;
+        input.value = '';
+
+        // Add loading
+        messagesDiv.innerHTML += `<div class="chat-message assistant loading" id="chat-loading">Claude is typing...</div>`;
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+        try {
+            const response = await fetch('/api/claude/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({content, message, history: chatHistory})
+            });
+            const data = await response.json();
+
+            // Remove loading
+            document.getElementById('chat-loading').remove();
+
+            if (data.error) {
+                messagesDiv.innerHTML += `<div class="chat-message error">Error: ${data.error}</div>`;
+            } else {
+                messagesDiv.innerHTML += `<div class="chat-message assistant"><strong>Claude:</strong> ${escapeHtml(data.response).replace(/\n/g, '<br>')}</div>`;
+                chatHistory.push({role: 'user', content: message});
+                chatHistory.push({role: 'assistant', content: data.response});
+            }
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        } catch (e) {
+            document.getElementById('chat-loading').remove();
+            messagesDiv.innerHTML += `<div class="chat-message error">Error: ${e.message}</div>`;
+        }
+    }
+</script>
+{% endblock %}

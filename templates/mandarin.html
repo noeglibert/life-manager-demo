@@ -1,0 +1,1028 @@
+{% extends "base.html" %}
+
+{% block title %}Mandarin - Life Manager{% endblock %}
+
+{% block content %}
+<div class="mandarin-page">
+    <div class="page-header">
+        <h1>Mandarin Learning</h1>
+        <p class="page-subtitle">Preparing for China — one phrase at a time</p>
+    </div>
+
+    <!-- TTS Status -->
+    <div class="tts-status" id="tts-status" style="display:none">
+        <span class="tts-warning">Your browser doesn't have a Chinese voice installed. Audio playback may not work.</span>
+    </div>
+
+    <!-- Stats Banner -->
+    <div class="mandarin-stats-banner">
+        <div class="stat-item">
+            <span class="stat-value" id="stat-streak">{{ game_stats.mandarin_streak or 0 }}</span>
+            <span class="stat-label">Day Streak</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-value" id="stat-learned">{{ game_stats.mandarin_cards_learned or 0 }}</span>
+            <span class="stat-label">Cards Learned</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-value" id="stat-accuracy">{{ accuracy }}%</span>
+            <span class="stat-label">Accuracy</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-value" id="stat-xp">{{ game_stats.mandarin_xp_total or 0 }}</span>
+            <span class="stat-label">Total XP</span>
+        </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="mandarin-tabs">
+        <button class="mandarin-tab active" data-tab="review" onclick="switchTab('review')">Review Session</button>
+        <button class="mandarin-tab" data-tab="listen-repeat" onclick="switchTab('listen-repeat')">Listen & Repeat</button>
+        <button class="mandarin-tab" data-tab="tones" onclick="switchTab('tones')">Tone Training</button>
+        <button class="mandarin-tab" data-tab="categories" onclick="switchTab('categories')">Categories</button>
+    </div>
+
+    <!-- ==================== REVIEW SESSION TAB (Audio-First) ==================== -->
+    <div class="mandarin-panel" id="panel-review">
+        <div id="session-start" class="session-start-area">
+            <div class="session-info">
+                <p><strong>{{ due_count }}</strong> cards due for review</p>
+                <p>Up to <strong>5</strong> new cards will be added</p>
+                <p class="audio-hint">Cards play audio automatically — listen first, then guess the meaning</p>
+            </div>
+            <div class="session-mode-toggle">
+                <label class="speed-toggle">
+                    <span>Speed:</span>
+                    <button class="speed-btn active" data-speed="normal" onclick="setSpeed('normal')">Normal</button>
+                    <button class="speed-btn" data-speed="slow" onclick="setSpeed('slow')">Slow</button>
+                </label>
+            </div>
+            <button class="btn-mandarin btn-start-session" onclick="startSession('review')">Start Review Session</button>
+        </div>
+
+        <div id="session-active" class="session-active-area" style="display:none">
+            <div class="session-progress">
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="session-progress-bar" style="width:0%"></div>
+                </div>
+                <span class="progress-text" id="progress-text">0 / 0</span>
+                <div class="speed-controls-inline">
+                    <button class="speed-btn-sm active" data-speed="normal" onclick="setSpeed('normal')" title="Normal speed">1x</button>
+                    <button class="speed-btn-sm" data-speed="slow" onclick="setSpeed('slow')" title="Slow speed">0.6x</button>
+                </div>
+            </div>
+
+            <div class="flashcard-container">
+                <div class="flashcard" id="flashcard" onclick="flipCard()">
+                    <div class="flashcard-front">
+                        <span class="card-category-badge" id="card-category"></span>
+                        <span class="card-new-badge" id="card-new-badge" style="display:none">NEW</span>
+                        <button class="btn-speaker btn-speaker-lg" id="btn-front-speak" onclick="event.stopPropagation(); speakChinese()">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                            </svg>
+                        </button>
+                        <p class="card-listen-prompt">Listen and guess the meaning</p>
+                        <p class="card-hint">Tap card to reveal answer</p>
+                    </div>
+                    <div class="flashcard-back">
+                        <div class="card-english-reveal" id="card-english"></div>
+                        <div class="card-divider"></div>
+                        <div class="card-audio-row">
+                            <div class="card-pinyin" id="card-pinyin"></div>
+                            <button class="btn-speaker btn-speaker-sm" onclick="event.stopPropagation(); speakChinese()" title="Play again">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                                </svg>
+                            </button>
+                            <button class="btn-speaker btn-speaker-sm btn-slow" onclick="event.stopPropagation(); speakChinese(0.5)" title="Play slow">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                                    <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                                </svg>
+                                <span class="slow-label">slow</span>
+                            </button>
+                        </div>
+                        <div class="card-characters" id="card-characters"></div>
+                        <div class="card-tone" id="card-tone"></div>
+                        <div class="card-usage" id="card-usage"></div>
+                        <button class="btn-explain" id="btn-explain" onclick="event.stopPropagation(); explainCard()">Explain with AI</button>
+                        <div class="card-explanation" id="card-explanation" style="display:none"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rating-buttons" id="rating-buttons" style="display:none">
+                <button class="btn-rating btn-hard" onclick="rateCard('hard')">
+                    Hard
+                    <small>1 day</small>
+                </button>
+                <button class="btn-rating btn-good" onclick="rateCard('good')">
+                    Good
+                    <small>progresses</small>
+                </button>
+                <button class="btn-rating btn-easy" onclick="rateCard('easy')">
+                    Easy
+                    <small>+1.3x bonus</small>
+                </button>
+            </div>
+        </div>
+
+        <div id="session-complete" class="session-complete-area" style="display:none">
+            <div class="complete-content">
+                <h2>Session Complete!</h2>
+                <div class="complete-stats">
+                    <div class="complete-stat">
+                        <span class="complete-value" id="complete-reviewed">0</span>
+                        <span class="complete-label">Cards Reviewed</span>
+                    </div>
+                    <div class="complete-stat">
+                        <span class="complete-value" id="complete-accuracy">0%</span>
+                        <span class="complete-label">Accuracy</span>
+                    </div>
+                    <div class="complete-stat">
+                        <span class="complete-value" id="complete-new">0</span>
+                        <span class="complete-label">New Cards</span>
+                    </div>
+                </div>
+                <div class="xp-award" id="xp-award">
+                    <span class="xp-amount">+0 XP</span>
+                </div>
+                <button class="btn-mandarin" onclick="resetSession()">Back to Dashboard</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== LISTEN & REPEAT TAB ==================== -->
+    <div class="mandarin-panel" id="panel-listen-repeat" style="display:none">
+        <div id="lr-start" class="session-start-area">
+            <div class="listen-repeat-intro">
+                <h3>Listen & Repeat</h3>
+                <p>Shadow native pronunciation. You'll hear a phrase, repeat it out loud, then hear it again slowly to compare.</p>
+                <div class="lr-steps">
+                    <div class="lr-step">
+                        <span class="lr-step-num">1</span>
+                        <span>Listen to the phrase</span>
+                    </div>
+                    <div class="lr-step">
+                        <span class="lr-step-num">2</span>
+                        <span>Repeat out loud</span>
+                    </div>
+                    <div class="lr-step">
+                        <span class="lr-step-num">3</span>
+                        <span>Listen again (slow) to compare</span>
+                    </div>
+                    <div class="lr-step">
+                        <span class="lr-step-num">4</span>
+                        <span>Rate your confidence</span>
+                    </div>
+                </div>
+            </div>
+            <button class="btn-mandarin btn-start-session" onclick="startListenRepeat()">Start Practice</button>
+        </div>
+
+        <div id="lr-active" class="session-active-area" style="display:none">
+            <div class="session-progress">
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="lr-progress-bar" style="width:0%"></div>
+                </div>
+                <span class="progress-text" id="lr-progress-text">0 / 0</span>
+            </div>
+
+            <div class="lr-card">
+                <div class="lr-phase" id="lr-phase">
+                    <!-- Phase 1: Listen -->
+                    <div class="lr-phase-content" id="lr-phase-listen">
+                        <div class="lr-phase-label">Step 1: Listen</div>
+                        <button class="btn-speaker btn-speaker-lg pulse-ring" onclick="speakLR()">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                                <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                            </svg>
+                        </button>
+                        <p class="lr-instruction">Tap to listen, then tap "I've listened" when ready</p>
+                        <button class="btn-mandarin btn-lr-next" onclick="lrNextPhase()">I've listened</button>
+                    </div>
+
+                    <!-- Phase 2: Repeat -->
+                    <div class="lr-phase-content" id="lr-phase-repeat" style="display:none">
+                        <div class="lr-phase-label">Step 2: Say it out loud</div>
+                        <div class="lr-mic-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                <line x1="12" y1="19" x2="12" y2="23"></line>
+                                <line x1="8" y1="23" x2="16" y2="23"></line>
+                            </svg>
+                        </div>
+                        <p class="lr-instruction">Try to repeat what you heard. Take your time.</p>
+                        <button class="btn-speaker btn-speaker-sm" onclick="speakLR()" title="Listen again">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                            </svg>
+                            <span>Replay</span>
+                        </button>
+                        <button class="btn-mandarin btn-lr-next" onclick="lrNextPhase()">I've repeated it</button>
+                    </div>
+
+                    <!-- Phase 3: Compare (slow) -->
+                    <div class="lr-phase-content" id="lr-phase-compare" style="display:none">
+                        <div class="lr-phase-label">Step 3: Listen slowly & compare</div>
+                        <button class="btn-speaker btn-speaker-lg" onclick="speakLR(0.5)">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                            </svg>
+                        </button>
+                        <p class="lr-slow-badge">0.5x speed</p>
+                        <div class="lr-reveal" id="lr-reveal">
+                            <div class="lr-pinyin" id="lr-pinyin"></div>
+                            <div class="lr-english" id="lr-english"></div>
+                            <div class="lr-characters" id="lr-characters"></div>
+                        </div>
+                        <button class="btn-mandarin btn-lr-next" onclick="lrNextPhase()">Rate my attempt</button>
+                    </div>
+
+                    <!-- Phase 4: Rate -->
+                    <div class="lr-phase-content" id="lr-phase-rate" style="display:none">
+                        <div class="lr-phase-label">How did it sound?</div>
+                        <div class="lr-rate-buttons">
+                            <button class="btn-rating btn-hard" onclick="rateLR('hard')">
+                                Didn't get it
+                                <small>Try again soon</small>
+                            </button>
+                            <button class="btn-rating btn-good" onclick="rateLR('good')">
+                                Close enough
+                                <small>Making progress</small>
+                            </button>
+                            <button class="btn-rating btn-easy" onclick="rateLR('easy')">
+                                Nailed it
+                                <small>Sounded natural</small>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="lr-complete" class="session-complete-area" style="display:none">
+            <div class="complete-content">
+                <h2>Practice Complete!</h2>
+                <div class="complete-stats">
+                    <div class="complete-stat">
+                        <span class="complete-value" id="lr-complete-reviewed">0</span>
+                        <span class="complete-label">Phrases Practiced</span>
+                    </div>
+                    <div class="complete-stat">
+                        <span class="complete-value" id="lr-complete-accuracy">0%</span>
+                        <span class="complete-label">Confidence</span>
+                    </div>
+                </div>
+                <div class="xp-award">
+                    <span class="xp-amount" id="lr-xp-amount">+0 XP</span>
+                </div>
+                <button class="btn-mandarin" onclick="resetLR()">Back to Dashboard</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== TONE TRAINING TAB (Audio-First) ==================== -->
+    <div class="mandarin-panel" id="panel-tones" style="display:none">
+        <div class="tone-chart">
+            <h3>The Four Tones of Mandarin</h3>
+            <p class="tone-chart-subtitle">Click each tone to hear it</p>
+            <div class="tone-grid">
+                <div class="tone-item" onclick="speakToneExample(1)">
+                    <div class="tone-visual">
+                        <svg viewBox="0 0 80 50" class="tone-svg">
+                            <line x1="10" y1="12" x2="70" y2="12" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <div class="tone-info">
+                        <strong>1st Tone</strong> — High flat
+                        <br><span class="tone-example">m&#x101; (mother)</span>
+                    </div>
+                    <button class="btn-speaker btn-speaker-sm tone-play-btn" onclick="event.stopPropagation(); speakToneExample(1)">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                    </button>
+                </div>
+                <div class="tone-item" onclick="speakToneExample(2)">
+                    <div class="tone-visual">
+                        <svg viewBox="0 0 80 50" class="tone-svg">
+                            <line x1="10" y1="38" x2="70" y2="8" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <div class="tone-info">
+                        <strong>2nd Tone</strong> — Rising
+                        <br><span class="tone-example">m&#xe1; (hemp)</span>
+                    </div>
+                    <button class="btn-speaker btn-speaker-sm tone-play-btn" onclick="event.stopPropagation(); speakToneExample(2)">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                    </button>
+                </div>
+                <div class="tone-item" onclick="speakToneExample(3)">
+                    <div class="tone-visual">
+                        <svg viewBox="0 0 80 50" class="tone-svg">
+                            <polyline points="10,18 40,42 70,12" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <div class="tone-info">
+                        <strong>3rd Tone</strong> — Dip (fall-rise)
+                        <br><span class="tone-example">m&#x1ce; (horse)</span>
+                    </div>
+                    <button class="btn-speaker btn-speaker-sm tone-play-btn" onclick="event.stopPropagation(); speakToneExample(3)">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                    </button>
+                </div>
+                <div class="tone-item" onclick="speakToneExample(4)">
+                    <div class="tone-visual">
+                        <svg viewBox="0 0 80 50" class="tone-svg">
+                            <line x1="10" y1="8" x2="70" y2="42" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <div class="tone-info">
+                        <strong>4th Tone</strong> — Falling
+                        <br><span class="tone-example">m&#xe0; (scold)</span>
+                    </div>
+                    <button class="btn-speaker btn-speaker-sm tone-play-btn" onclick="event.stopPropagation(); speakToneExample(4)">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tone Ear Training Quiz -->
+        <div class="tone-ear-training">
+            <h3>Tone Ear Training</h3>
+            <p class="tone-ear-subtitle">Listen to a word and identify the tone. Train your ear to distinguish the four tones.</p>
+
+            <div id="tone-quiz-start" class="tone-quiz-start">
+                <button class="btn-mandarin btn-start-session" onclick="startToneQuiz()">Start Tone Quiz</button>
+            </div>
+
+            <div id="tone-quiz-active" style="display:none">
+                <div class="tone-quiz-card">
+                    <div class="tone-quiz-progress">
+                        <span id="tone-quiz-score">0 / 0 correct</span>
+                        <span id="tone-quiz-round">Round 1 / 10</span>
+                    </div>
+
+                    <button class="btn-speaker btn-speaker-lg pulse-ring" id="tone-quiz-play" onclick="playToneQuizWord()">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                            <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                            <path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                        </svg>
+                    </button>
+                    <p class="tone-quiz-instruction">Which tone did you hear?</p>
+
+                    <div class="tone-quiz-options">
+                        <button class="tone-option" onclick="answerToneQuiz(1)">
+                            <svg viewBox="0 0 60 30" class="tone-opt-svg"><line x1="5" y1="8" x2="55" y2="8" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+                            <span>1st — Flat</span>
+                        </button>
+                        <button class="tone-option" onclick="answerToneQuiz(2)">
+                            <svg viewBox="0 0 60 30" class="tone-opt-svg"><line x1="5" y1="25" x2="55" y2="5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+                            <span>2nd — Rising</span>
+                        </button>
+                        <button class="tone-option" onclick="answerToneQuiz(3)">
+                            <svg viewBox="0 0 60 30" class="tone-opt-svg"><polyline points="5,10 30,27 55,5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <span>3rd — Dip</span>
+                        </button>
+                        <button class="tone-option" onclick="answerToneQuiz(4)">
+                            <svg viewBox="0 0 60 30" class="tone-opt-svg"><line x1="5" y1="5" x2="55" y2="25" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+                            <span>4th — Falling</span>
+                        </button>
+                    </div>
+
+                    <div class="tone-quiz-feedback" id="tone-quiz-feedback" style="display:none">
+                        <div class="tone-feedback-text" id="tone-feedback-text"></div>
+                        <div class="tone-feedback-word" id="tone-feedback-word"></div>
+                        <button class="btn-mandarin" onclick="nextToneQuizRound()">Next</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tone-quiz-complete" style="display:none">
+                <div class="session-complete-area">
+                    <div class="complete-content">
+                        <h2>Tone Quiz Complete!</h2>
+                        <div class="complete-stats">
+                            <div class="complete-stat">
+                                <span class="complete-value" id="tone-quiz-final-score">0/10</span>
+                                <span class="complete-label">Correct</span>
+                            </div>
+                            <div class="complete-stat">
+                                <span class="complete-value" id="tone-quiz-final-pct">0%</span>
+                                <span class="complete-label">Accuracy</span>
+                            </div>
+                        </div>
+                        <button class="btn-mandarin" onclick="resetToneQuiz()">Try Again</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tone-drill-start">
+            <p>Or practice tone pairs with flashcards from the Tones category.</p>
+            <button class="btn-mandarin btn-start-session" onclick="startSession('tone_drill')">Start Tone Drill (Flashcards)</button>
+        </div>
+    </div>
+
+    <!-- ==================== CATEGORIES TAB ==================== -->
+    <div class="mandarin-panel" id="panel-categories" style="display:none">
+        <div class="categories-grid" id="categories-grid">
+            {% for cat in categories %}
+            <div class="category-card {{ 'locked' if not cat.unlocked }}" data-category="{{ cat.id }}" onclick="{% if cat.unlocked %}previewCategory('{{ cat.id }}'){% endif %}">
+                <div class="category-icon">{{ cat.icon }}</div>
+                <div class="category-name">{{ cat.name }}</div>
+                <div class="category-progress">
+                    <div class="category-progress-bar">
+                        <div class="category-progress-fill" style="width: {{ (cat.learned / cat.total * 100) if cat.total > 0 else 0 }}%"></div>
+                    </div>
+                    <span class="category-count">{{ cat.learned }} / {{ cat.total }}</span>
+                </div>
+                {% if not cat.unlocked %}
+                <div class="category-lock">Locked</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Category Preview Modal -->
+        <div class="category-preview-overlay" id="category-preview" style="display:none">
+            <div class="category-preview-content">
+                <button class="category-preview-close" onclick="closeCategoryPreview()">&times;</button>
+                <h3 id="preview-title"></h3>
+                <div class="preview-cards-list" id="preview-cards"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ===== TTS Engine =====
+let zhVoice = null;
+let ttsReady = false;
+let speechRate = 1.0; // normal
+
+function initTTS() {
+    const loadVoices = () => {
+        const voices = speechSynthesis.getVoices();
+        // Prefer zh-CN voices, fall back to any zh voice
+        zhVoice = voices.find(v => v.lang === 'zh-CN') ||
+                  voices.find(v => v.lang.startsWith('zh')) ||
+                  null;
+        ttsReady = true;
+        if (!zhVoice && voices.length > 0) {
+            document.getElementById('tts-status').style.display = '';
+        }
+    };
+    if (speechSynthesis.getVoices().length > 0) {
+        loadVoices();
+    }
+    speechSynthesis.onvoiceschanged = loadVoices;
+}
+
+function speak(text, rate) {
+    speechSynthesis.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = 'zh-CN';
+    if (zhVoice) utter.voice = zhVoice;
+    utter.rate = rate !== undefined ? rate : speechRate;
+    utter.pitch = 1;
+    speechSynthesis.speak(utter);
+    return utter;
+}
+
+function speakChinese(overrideRate) {
+    if (currentIndex >= deck.length) return;
+    const card = deck[currentIndex];
+    speak(card.characters || card.pinyin, overrideRate);
+}
+
+function setSpeed(mode) {
+    speechRate = mode === 'slow' ? 0.6 : 1.0;
+    // Update all speed buttons
+    document.querySelectorAll('.speed-btn, .speed-btn-sm').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.speed === mode);
+    });
+}
+
+initTTS();
+
+// ===== State =====
+let deck = [];
+let currentIndex = 0;
+let isFlipped = false;
+let sessionStats = { reviewed: 0, correct: 0, newCards: 0, hard: 0 };
+let sessionStartTime = null;
+let currentSessionType = 'review';
+let sessionActive = false;
+let isSubmitting = false;
+
+// ===== Tab Switching =====
+function switchTab(tab) {
+    if (sessionActive && !confirm('You have an active session. Leave and lose progress?')) return;
+    if (sessionActive) { sessionActive = false; resetSession(); }
+    document.querySelectorAll('.mandarin-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`.mandarin-tab[data-tab="${tab}"]`).classList.add('active');
+    document.querySelectorAll('.mandarin-panel').forEach(p => p.style.display = 'none');
+    document.getElementById(`panel-${tab}`).style.display = '';
+}
+
+// ===== Session Management =====
+async function startSession(type) {
+    currentSessionType = type;
+    sessionStats = { reviewed: 0, correct: 0, newCards: 0, hard: 0 };
+    sessionStartTime = Date.now();
+
+    const resp = await fetch('/api/mandarin/session');
+    const data = await resp.json();
+
+    if (type === 'tone_drill') {
+        deck = data.deck.filter(c => c.is_tone_drill);
+        // For tone drills, switch to review tab to show the flashcard UI
+        document.querySelectorAll('.mandarin-panel').forEach(p => p.style.display = 'none');
+        document.getElementById('panel-review').style.display = '';
+    } else {
+        deck = data.deck;
+    }
+
+    if (deck.length === 0) {
+        alert('No cards available for review right now. Come back later!');
+        return;
+    }
+
+    currentIndex = 0;
+    sessionActive = true;
+    isSubmitting = false;
+    document.getElementById('session-start').style.display = 'none';
+    document.getElementById('session-active').style.display = '';
+    document.getElementById('session-complete').style.display = 'none';
+
+    showCard();
+}
+
+function showCard() {
+    if (currentIndex >= deck.length) {
+        completeSession();
+        return;
+    }
+
+    const card = deck[currentIndex];
+    isFlipped = false;
+    const fc = document.getElementById('flashcard');
+    fc.classList.remove('flipped');
+
+    // Front: just the speaker icon (audio-first)
+    document.getElementById('card-category').textContent = getCategoryName(card.category);
+    const newBadge = document.getElementById('card-new-badge');
+    newBadge.style.display = card.is_new ? '' : 'none';
+
+    // Back: reveal English + pinyin + details
+    document.getElementById('card-english').textContent = card.english;
+    document.getElementById('card-pinyin').textContent = card.pinyin;
+    document.getElementById('card-characters').textContent = card.characters || '';
+    document.getElementById('card-tone').textContent = card.tone_pattern ? `Tones: ${card.tone_pattern}` : '';
+    document.getElementById('card-usage').textContent = card.usage_note || '';
+
+    document.getElementById('rating-buttons').style.display = 'none';
+    document.getElementById('card-explanation').style.display = 'none';
+    document.getElementById('btn-explain').style.display = '';
+    document.getElementById('btn-explain').disabled = false;
+    document.getElementById('btn-explain').textContent = 'Explain with AI';
+
+    // Update progress
+    const pct = ((currentIndex) / deck.length * 100).toFixed(0);
+    document.getElementById('session-progress-bar').style.width = pct + '%';
+    document.getElementById('progress-text').textContent = `${currentIndex + 1} / ${deck.length}`;
+
+    // Auto-play audio after a short delay
+    setTimeout(() => speakChinese(), 300);
+}
+
+function getCategoryName(cat) {
+    const catMap = {
+        tones: 'Tones', greetings: 'Greetings', numbers: 'Numbers',
+        survival: 'Survival', food_dining: 'Food', shopping: 'Shopping',
+        directions: 'Directions', transportation: 'Transport',
+        hotel: 'Hotel', emergencies: 'Emergency'
+    };
+    return catMap[cat] || cat;
+}
+
+function flipCard() {
+    if (isFlipped) return;
+    isFlipped = true;
+    document.getElementById('flashcard').classList.add('flipped');
+    document.getElementById('rating-buttons').style.display = '';
+    // Play audio again on flip so you hear + see the answer together
+    setTimeout(() => speakChinese(), 200);
+}
+
+async function rateCard(rating) {
+    const card = deck[currentIndex];
+
+    sessionStats.reviewed++;
+    if (rating === 'good' || rating === 'easy') sessionStats.correct++;
+    if (rating === 'hard') sessionStats.hard++;
+    if (card.is_new) sessionStats.newCards++;
+
+    try {
+        const resp = await fetch('/api/mandarin/review', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ card_id: card.id, rating: rating }),
+        });
+        if (!resp.ok) {
+            alert('Failed to save review. Please check your connection.');
+            return;
+        }
+    } catch (e) {
+        alert('Network error. Please check your connection.');
+        return;
+    }
+
+    currentIndex++;
+    showCard();
+}
+
+async function completeSession() {
+    if (isSubmitting) return;
+    isSubmitting = true;
+    sessionActive = false;
+    const duration = Math.round((Date.now() - sessionStartTime) / 1000);
+
+    const resp = await fetch('/api/mandarin/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            cards_reviewed: sessionStats.reviewed,
+            cards_new: sessionStats.newCards,
+            cards_correct: sessionStats.correct,
+            cards_hard: sessionStats.hard,
+            duration_seconds: duration,
+            session_type: currentSessionType,
+        }),
+    });
+    const data = await resp.json();
+
+    document.getElementById('session-active').style.display = 'none';
+    document.getElementById('session-complete').style.display = '';
+
+    document.getElementById('complete-reviewed').textContent = sessionStats.reviewed;
+    const accPct = sessionStats.reviewed > 0 ? Math.round(sessionStats.correct / sessionStats.reviewed * 100) : 0;
+    document.getElementById('complete-accuracy').textContent = accPct + '%';
+    document.getElementById('complete-new').textContent = sessionStats.newCards;
+    document.querySelector('.xp-amount').textContent = `+${data.xp_earned} XP`;
+
+    document.getElementById('stat-streak').textContent = data.streak;
+    document.getElementById('stat-xp').textContent = data.total_xp;
+    document.getElementById('stat-learned').textContent = data.cards_learned;
+    document.getElementById('stat-accuracy').textContent = accPct + '%';
+}
+
+function resetSession() {
+    document.getElementById('session-start').style.display = '';
+    document.getElementById('session-active').style.display = 'none';
+    document.getElementById('session-complete').style.display = 'none';
+    fetch('/api/mandarin/stats').then(r => r.json()).then(data => {
+        const info = document.querySelector('.session-info');
+        if (info) info.innerHTML = `<p><strong>${data.due_count}</strong> cards due for review</p><p>Up to <strong>5</strong> new cards will be added</p><p class="audio-hint">Cards play audio automatically — listen first, then guess the meaning</p>`;
+    });
+}
+
+// ===== Listen & Repeat Mode =====
+let lrDeck = [];
+let lrIndex = 0;
+let lrPhase = 0; // 0=listen, 1=repeat, 2=compare, 3=rate
+let lrStats = { reviewed: 0, correct: 0 };
+
+async function startListenRepeat() {
+    const resp = await fetch('/api/mandarin/session');
+    const data = await resp.json();
+    lrDeck = data.deck;
+
+    if (lrDeck.length === 0) {
+        alert('No cards available right now. Come back later!');
+        return;
+    }
+
+    lrIndex = 0;
+    lrPhase = 0;
+    lrStats = { reviewed: 0, correct: 0 };
+    sessionActive = true;
+    sessionStartTime = Date.now();
+
+    document.getElementById('lr-start').style.display = 'none';
+    document.getElementById('lr-active').style.display = '';
+    document.getElementById('lr-complete').style.display = 'none';
+
+    showLRCard();
+}
+
+function showLRCard() {
+    if (lrIndex >= lrDeck.length) {
+        completeLR();
+        return;
+    }
+
+    lrPhase = 0;
+    const card = lrDeck[lrIndex];
+
+    // Update progress
+    const pct = ((lrIndex) / lrDeck.length * 100).toFixed(0);
+    document.getElementById('lr-progress-bar').style.width = pct + '%';
+    document.getElementById('lr-progress-text').textContent = `${lrIndex + 1} / ${lrDeck.length}`;
+
+    // Set reveal content
+    document.getElementById('lr-pinyin').textContent = card.pinyin;
+    document.getElementById('lr-english').textContent = card.english;
+    document.getElementById('lr-characters').textContent = card.characters || '';
+
+    // Show listen phase
+    showLRPhase(0);
+
+    // Auto-play
+    setTimeout(() => speakLR(), 300);
+}
+
+function speakLR(rate) {
+    const card = lrDeck[lrIndex];
+    if (card) speak(card.characters || card.pinyin, rate);
+}
+
+function showLRPhase(phase) {
+    ['lr-phase-listen', 'lr-phase-repeat', 'lr-phase-compare', 'lr-phase-rate'].forEach((id, i) => {
+        document.getElementById(id).style.display = i === phase ? '' : 'none';
+    });
+}
+
+function lrNextPhase() {
+    lrPhase++;
+    showLRPhase(lrPhase);
+    if (lrPhase === 2) {
+        // Compare phase: auto-play slow
+        setTimeout(() => speakLR(0.5), 300);
+    }
+}
+
+async function rateLR(rating) {
+    const card = lrDeck[lrIndex];
+    lrStats.reviewed++;
+    if (rating === 'good' || rating === 'easy') lrStats.correct++;
+
+    // Also update SRS
+    try {
+        await fetch('/api/mandarin/review', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ card_id: card.id, rating: rating }),
+        });
+    } catch (e) { /* silent */ }
+
+    lrIndex++;
+    showLRCard();
+}
+
+async function completeLR() {
+    sessionActive = false;
+    const duration = Math.round((Date.now() - sessionStartTime) / 1000);
+
+    const resp = await fetch('/api/mandarin/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            cards_reviewed: lrStats.reviewed,
+            cards_new: 0,
+            cards_correct: lrStats.correct,
+            cards_hard: lrStats.reviewed - lrStats.correct,
+            duration_seconds: duration,
+            session_type: 'listen_repeat',
+        }),
+    });
+    const data = await resp.json();
+
+    document.getElementById('lr-active').style.display = 'none';
+    document.getElementById('lr-complete').style.display = '';
+
+    document.getElementById('lr-complete-reviewed').textContent = lrStats.reviewed;
+    const accPct = lrStats.reviewed > 0 ? Math.round(lrStats.correct / lrStats.reviewed * 100) : 0;
+    document.getElementById('lr-complete-accuracy').textContent = accPct + '%';
+    document.getElementById('lr-xp-amount').textContent = `+${data.xp_earned} XP`;
+
+    // Update stats banner
+    document.getElementById('stat-streak').textContent = data.streak;
+    document.getElementById('stat-xp').textContent = data.total_xp;
+    document.getElementById('stat-learned').textContent = data.cards_learned;
+}
+
+function resetLR() {
+    document.getElementById('lr-start').style.display = '';
+    document.getElementById('lr-active').style.display = 'none';
+    document.getElementById('lr-complete').style.display = 'none';
+}
+
+// ===== Tone Ear Training Quiz =====
+const toneWords = [
+    { chars: '\u5988', pinyin: 'm\u0101', tone: 1, meaning: 'mother' },
+    { chars: '\u9ebb', pinyin: 'm\u00e1', tone: 2, meaning: 'hemp' },
+    { chars: '\u9a6c', pinyin: 'm\u01ce', tone: 3, meaning: 'horse' },
+    { chars: '\u9a82', pinyin: 'm\u00e0', tone: 4, meaning: 'scold' },
+    { chars: '\u5929', pinyin: 'ti\u0101n', tone: 1, meaning: 'sky' },
+    { chars: '\u7530', pinyin: 'ti\u00e1n', tone: 2, meaning: 'field' },
+    { chars: '\u8df3', pinyin: 'ti\u00e0o', tone: 4, meaning: 'jump' },
+    { chars: '\u4e66', pinyin: 'sh\u016b', tone: 1, meaning: 'book' },
+    { chars: '\u6811', pinyin: 'sh\u00f9', tone: 4, meaning: 'tree' },
+    { chars: '\u5403', pinyin: 'ch\u012b', tone: 1, meaning: 'eat' },
+    { chars: '\u8336', pinyin: 'ch\u00e1', tone: 2, meaning: 'tea' },
+    { chars: '\u5927', pinyin: 'd\u00e0', tone: 4, meaning: 'big' },
+    { chars: '\u4e94', pinyin: 'w\u01d4', tone: 3, meaning: 'five' },
+    { chars: '\u5341', pinyin: 'sh\u00ed', tone: 2, meaning: 'ten' },
+    { chars: '\u4e09', pinyin: 's\u0101n', tone: 1, meaning: 'three' },
+    { chars: '\u56db', pinyin: 's\u00ec', tone: 4, meaning: 'four' },
+    { chars: '\u4e70', pinyin: 'm\u01ce\u0069', tone: 3, meaning: 'buy' },
+    { chars: '\u5356', pinyin: 'm\u00e0i', tone: 4, meaning: 'sell' },
+    { chars: '\u597d', pinyin: 'h\u01ce\u006f', tone: 3, meaning: 'good' },
+    { chars: '\u70ed', pinyin: 'r\u00e8', tone: 4, meaning: 'hot' },
+];
+let toneQuizRounds = [];
+let toneQuizCurrent = 0;
+let toneQuizScore = 0;
+const TONE_QUIZ_TOTAL = 10;
+
+function shuffleArray(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+function startToneQuiz() {
+    toneQuizRounds = shuffleArray(toneWords).slice(0, TONE_QUIZ_TOTAL);
+    toneQuizCurrent = 0;
+    toneQuizScore = 0;
+
+    document.getElementById('tone-quiz-start').style.display = 'none';
+    document.getElementById('tone-quiz-active').style.display = '';
+    document.getElementById('tone-quiz-complete').style.display = 'none';
+
+    showToneQuizRound();
+}
+
+function showToneQuizRound() {
+    if (toneQuizCurrent >= toneQuizRounds.length) {
+        completeToneQuiz();
+        return;
+    }
+
+    document.getElementById('tone-quiz-score').textContent = `${toneQuizScore} / ${toneQuizCurrent} correct`;
+    document.getElementById('tone-quiz-round').textContent = `Round ${toneQuizCurrent + 1} / ${TONE_QUIZ_TOTAL}`;
+    document.getElementById('tone-quiz-feedback').style.display = 'none';
+
+    // Enable option buttons
+    document.querySelectorAll('.tone-option').forEach(btn => {
+        btn.disabled = false;
+        btn.classList.remove('correct', 'wrong');
+    });
+
+    // Auto-play
+    setTimeout(() => playToneQuizWord(), 300);
+}
+
+function playToneQuizWord() {
+    const word = toneQuizRounds[toneQuizCurrent];
+    speak(word.chars, 0.8); // slightly slower for clarity
+}
+
+function answerToneQuiz(tone) {
+    const word = toneQuizRounds[toneQuizCurrent];
+    const correct = tone === word.tone;
+    if (correct) toneQuizScore++;
+
+    // Highlight buttons
+    document.querySelectorAll('.tone-option').forEach((btn, i) => {
+        btn.disabled = true;
+        if (i + 1 === word.tone) btn.classList.add('correct');
+        if (i + 1 === tone && !correct) btn.classList.add('wrong');
+    });
+
+    // Show feedback
+    const feedback = document.getElementById('tone-quiz-feedback');
+    const feedbackText = document.getElementById('tone-feedback-text');
+    const feedbackWord = document.getElementById('tone-feedback-word');
+
+    feedbackText.textContent = correct ? 'Correct!' : `Wrong — it was tone ${word.tone}`;
+    feedbackText.className = `tone-feedback-text ${correct ? 'correct' : 'wrong'}`;
+    feedbackWord.textContent = `${word.pinyin} (${word.chars}) — "${word.meaning}"`;
+    feedback.style.display = '';
+
+    // Update score
+    document.getElementById('tone-quiz-score').textContent = `${toneQuizScore} / ${toneQuizCurrent + 1} correct`;
+}
+
+function nextToneQuizRound() {
+    toneQuizCurrent++;
+    showToneQuizRound();
+}
+
+function completeToneQuiz() {
+    document.getElementById('tone-quiz-active').style.display = 'none';
+    document.getElementById('tone-quiz-complete').style.display = '';
+
+    document.getElementById('tone-quiz-final-score').textContent = `${toneQuizScore}/${TONE_QUIZ_TOTAL}`;
+    document.getElementById('tone-quiz-final-pct').textContent = `${Math.round(toneQuizScore / TONE_QUIZ_TOTAL * 100)}%`;
+}
+
+function resetToneQuiz() {
+    document.getElementById('tone-quiz-start').style.display = '';
+    document.getElementById('tone-quiz-active').style.display = 'none';
+    document.getElementById('tone-quiz-complete').style.display = 'none';
+}
+
+function speakToneExample(tone) {
+    const examples = { 1: '\u5988', 2: '\u9ebb', 3: '\u9a6c', 4: '\u9a82' };
+    speak(examples[tone], 0.7);
+}
+
+// ===== AI Explain =====
+async function explainCard() {
+    const card = deck[currentIndex];
+    const btn = document.getElementById('btn-explain');
+    const explDiv = document.getElementById('card-explanation');
+    btn.textContent = 'Loading...';
+    btn.disabled = true;
+
+    try {
+        const resp = await fetch('/api/mandarin/explain', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ card_id: card.id }),
+        });
+        const data = await resp.json();
+        explDiv.textContent = data.explanation;
+        explDiv.style.display = '';
+        btn.style.display = 'none';
+    } catch (e) {
+        btn.textContent = 'Error - try again';
+        btn.disabled = false;
+    }
+}
+
+// ===== Category Preview =====
+async function previewCategory(catId) {
+    const resp = await fetch('/api/mandarin/categories');
+    const data = await resp.json();
+    const cat = data.categories.find(c => c.id === catId);
+    if (!cat) return;
+
+    document.getElementById('preview-title').textContent = `${cat.icon} ${cat.name}`;
+    const list = document.getElementById('preview-cards');
+    list.innerHTML = '';
+
+    cat.cards.forEach(card => {
+        const div = document.createElement('div');
+        div.className = `preview-card-item ${card.learned ? 'learned' : ''}`;
+
+        const status = document.createElement('span');
+        status.className = 'preview-status';
+        status.textContent = card.learned ? '\u2713' : '\u25CB';
+
+        const eng = document.createElement('span');
+        eng.className = 'preview-english';
+        eng.textContent = card.english;
+
+        const pin = document.createElement('span');
+        pin.className = 'preview-pinyin';
+        pin.textContent = card.pinyin;
+
+        // Speaker button for each card in preview
+        const speakBtn = document.createElement('button');
+        speakBtn.className = 'btn-speaker btn-speaker-xs';
+        speakBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>';
+        speakBtn.onclick = (e) => { e.stopPropagation(); speak(card.characters || card.pinyin, 0.8); };
+
+        const chars = document.createElement('span');
+        chars.className = 'preview-chars';
+        chars.textContent = card.characters;
+
+        div.append(status, eng, pin, speakBtn, chars);
+        list.appendChild(div);
+    });
+
+    document.getElementById('category-preview').style.display = '';
+}
+
+function closeCategoryPreview() {
+    document.getElementById('category-preview').style.display = 'none';
+}
+</script>
+{% endblock %}

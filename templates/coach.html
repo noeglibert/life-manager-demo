@@ -1,0 +1,632 @@
+{% extends "base.html" %}
+
+{% block title %}Your Coach - Life Manager{% endblock %}
+
+{% block content %}
+<div class="coach-page">
+    <div class="coach-layout-e">
+        <!-- Top Navigation Bar -->
+        <nav class="coach-topnav-e">
+            <div class="coach-topnav-scroll">
+                {% for a in areas %}
+                <a href="#"
+                   class="coach-area-pill{% if loop.first %} active{% endif %}"
+                   data-area="{{ a.id }}"
+                   onclick="event.preventDefault(); switchArea('{{ a.id }}')"
+                >
+                    <span class="coach-pill-icon"><img class="inline-icon" src="/static/images/{{ svg_icon_file(a.icon) }}" alt=""></span>
+                    <span class="coach-pill-label">{{ a.label }}</span>
+                    {% if area_counts[a.id] > 0 %}
+                    <span class="coach-pill-badge" data-badge>{{ area_counts[a.id] }}</span>
+                    {% endif %}
+                </a>
+                {% endfor %}
+            </div>
+            <div class="coach-topnav-actions">
+                <button class="coach-topbar-action" id="coach-goals-btn" onclick="toggleGoals()" title="Goals">
+                    <img class="inline-icon" src="/static/images/icon-target.svg" alt="">
+                </button>
+                <button class="coach-topbar-action" id="coach-export-btn" onclick="exportConversation()" title="Export">
+                    <img class="inline-icon" src="/static/images/icon-scroll.svg" alt="">
+                </button>
+                <button class="coach-topbar-action" id="coach-persona-btn" onclick="togglePreferences()" title="Persona">
+                    <img class="inline-icon" src="/static/images/icon-brain.svg" alt="">
+                </button>
+                <button class="coach-topbar-clear" id="coach-clear-btn" onclick="clearArea()" style="display:none;">Clear</button>
+            </div>
+        </nav>
+
+        <!-- Main Content -->
+        <div class="coach-main-e">
+            <!-- Area Header -->
+            <div class="coach-topbar" id="coach-topbar">
+                <div class="coach-topbar-left">
+                    <span class="coach-topbar-icon" id="area-header-icon"><img class="stat-icon-svg" src="/static/images/{{ svg_icon_file(areas[0].icon) }}" alt=""></span>
+                    <div>
+                        <div class="coach-topbar-title" id="area-header-title">{{ areas[0].label }}</div>
+                        <div class="coach-topbar-desc" id="area-header-desc">Reflect on your thoughts & feelings</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Goals Panel (collapsible) -->
+            <div class="coach-goals-panel" id="coach-goals-panel" style="display:none;">
+                <div class="goals-panel-header">
+                    <h3><img class="inline-icon" src="/static/images/icon-target.svg" alt=""> Goals</h3>
+                    <button class="goals-panel-close" onclick="toggleGoals()">&times;</button>
+                </div>
+                <div class="goals-list" id="goals-list">
+                    <div class="goals-loading">Loading goals...</div>
+                </div>
+                <div class="goals-add-form" id="goals-add-form">
+                    <input type="text" id="goal-title-input" placeholder="New goal..." class="goal-input">
+                    <input type="date" id="goal-date-input" class="goal-input goal-date-input">
+                    <button class="btn-primary btn-sm" onclick="addGoal()">Add</button>
+                </div>
+            </div>
+
+            <!-- Preferences Panel (collapsible) -->
+            <div class="coach-prefs-panel" id="coach-prefs-panel" style="display:none;">
+                <div class="prefs-panel-header">
+                    <h3><img class="inline-icon" src="/static/images/icon-brain.svg" alt=""> Coaching Style</h3>
+                    <button class="prefs-panel-close" onclick="togglePreferences()">&times;</button>
+                </div>
+                <div class="prefs-options">
+                    <label class="prefs-radio-label">
+                        <input type="radio" name="persona" value="balanced" checked> <strong>Balanced</strong>
+                        <span class="prefs-radio-desc">Warm but honest — celebrates wins AND calls out patterns</span>
+                    </label>
+                    <label class="prefs-radio-label">
+                        <input type="radio" name="persona" value="motivational"> <strong>Motivational</strong>
+                        <span class="prefs-radio-desc">High-energy, celebrates every win, pushes you to believe in yourself</span>
+                    </label>
+                    <label class="prefs-radio-label">
+                        <input type="radio" name="persona" value="analytical"> <strong>Analytical</strong>
+                        <span class="prefs-radio-desc">Data-driven, focuses on numbers, trends, and evidence-based advice</span>
+                    </label>
+                    <label class="prefs-radio-label">
+                        <input type="radio" name="persona" value="tough"> <strong>Tough Love</strong>
+                        <span class="prefs-radio-desc">Direct, challenges excuses, pushes harder, holds you accountable</span>
+                    </label>
+                    <label class="prefs-radio-label">
+                        <input type="radio" name="persona" value="empathetic"> <strong>Empathetic</strong>
+                        <span class="prefs-radio-desc">Compassionate, validates feelings first, then gently guides</span>
+                    </label>
+                </div>
+                <button class="btn-primary btn-sm" onclick="savePreferences()">Save Style</button>
+            </div>
+
+            <!-- Messages -->
+            <div class="coach-messages-e" id="coach-messages">
+                <div class="coach-empty-e" id="coach-empty">
+                    <div class="coach-empty-icon" id="coach-empty-icon">
+                        <img class="coach-empty-svg" src="{{ url_for('static', filename='images/logo-coach.svg') }}" alt="">
+                    </div>
+                    <h3 class="coach-empty-heading">What's on your mind today, Noe?</h3>
+                    <p class="coach-empty-text">Share anything — progress, struggles, questions. Your coach is here.</p>
+                    <div class="coach-starters" id="coach-prompts"></div>
+                </div>
+            </div>
+
+            <!-- Input -->
+            <div class="coach-compose">
+                <div class="coach-compose-row">
+                    <textarea
+                        id="coach-input"
+                        rows="2"
+                        placeholder="Share something about journal..."
+                        onkeydown="handleCoachKey(event)"
+                    ></textarea>
+                    <button class="coach-compose-send" id="coach-send-btn" onclick="sendCoachMessage()" disabled>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+                    </button>
+                </div>
+                <div class="coach-compose-hint">Enter to send &middot; Shift+Enter for new line</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const ICON_MAP = {
+    writing: 'icon-writing.svg', muscle: 'icon-muscle.svg', scale: 'icon-scale.svg',
+    seedling: 'icon-seedling.svg', sun: 'icon-sun.svg', heart: 'icon-heart.svg'
+};
+function iconImg(name, cls) {
+    const file = ICON_MAP[name] || `icon-${name}.svg`;
+    return `<img class="${cls || 'inline-icon'}" src="/static/images/${file}" alt="">`;
+}
+
+const AREAS_DATA = {
+    journal: {
+        label: "Journal", icon: "writing", accent: "#C2692A",
+        desc: "Reflect on your thoughts & feelings",
+        emptyTitle: "What's on your mind today, Noe?",
+        prompts: ["I've been feeling...", "Today I realized...", "Something I'm grateful for..."]
+    },
+    exercise: {
+        label: "Exercise", icon: "muscle", accent: "#4A7C59",
+        desc: "Track workouts & build consistency",
+        emptyTitle: "How's the body feeling, Noe?",
+        prompts: ["I worked out today...", "I've been skipping gym because...", "My fitness goal is..."]
+    },
+    weight: {
+        label: "Weight", icon: "scale", accent: "#6B4E71",
+        desc: "Your weight-loss journey & progress",
+        emptyTitle: "Ready to check in on your journey, Noe?",
+        prompts: ["My current weight is...", "I've been struggling with...", "My goal is to reach..."]
+    },
+    meals: {
+        label: "Meals", icon: "seedling", accent: "#3D7068",
+        desc: "Meal prep, nutrition & habits",
+        emptyTitle: "What have you been eating, Noe?",
+        prompts: ["Today I ate...", "I want to meal prep...", "My biggest food challenge is..."]
+    },
+    daily: {
+        label: "Daily Life", icon: "sun", accent: "#8B6914",
+        desc: "Day-to-day wins, challenges & routines",
+        emptyTitle: "How's life treating you, Noe?",
+        prompts: ["Today was...", "I'm proud that...", "Something I want to change..."]
+    },
+    relationships: {
+        label: "Relationships", icon: "heart", accent: "#A0402A",
+        desc: "Connections, communication & bonds",
+        emptyTitle: "Who's on your mind, Noe?",
+        prompts: ["I want to talk about...", "A relationship I want to improve...", "Something I appreciate about..."]
+    },
+    growth: {
+        label: "Growth", icon: "seedling", accent: "#4A6E8A",
+        desc: "Skills, mindset & becoming better",
+        emptyTitle: "What are you working on, Noe?",
+        prompts: ["I want to develop...", "A habit I'm building...", "Something holding me back..."]
+    }
+};
+
+let currentArea = 'journal';
+let areaMessages = {};
+let areaGoals = {};
+let loading = false;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadArea('journal');
+    loadPreferences();
+    updateInputState();
+    document.getElementById('coach-input').addEventListener('input', updateInputState);
+});
+
+function updateInputState() {
+    const input = document.getElementById('coach-input');
+    const btn = document.getElementById('coach-send-btn');
+    btn.disabled = !input.value.trim() || loading;
+}
+
+function switchArea(areaId) {
+    currentArea = areaId;
+
+    // Update pill active state
+    document.querySelectorAll('.coach-area-pill').forEach(a => a.classList.remove('active'));
+    document.querySelector(`.coach-area-pill[data-area="${areaId}"]`).classList.add('active');
+
+    // Update topbar
+    const data = AREAS_DATA[areaId];
+    document.getElementById('area-header-icon').innerHTML = iconImg(data.icon, 'stat-icon-svg');
+    document.getElementById('area-header-title').textContent = data.label;
+    document.getElementById('area-header-desc').textContent = data.desc;
+
+    // Update input placeholder
+    document.getElementById('coach-input').placeholder = `Share something about ${data.label.toLowerCase()}...`;
+
+    // Use cache if available, otherwise fetch
+    if (areaMessages[areaId] !== undefined) {
+        renderMessages(areaId);
+    } else {
+        loadArea(areaId);
+    }
+
+    // Refresh goals if panel is open
+    if (document.getElementById('coach-goals-panel').style.display !== 'none') {
+        loadGoals(areaId);
+    }
+}
+
+async function loadArea(areaId) {
+    if (areaMessages[areaId]) {
+        renderMessages(areaId);
+        return;
+    }
+    try {
+        const res = await fetch(`/api/coach/history/${areaId}`);
+        const result = await res.json();
+        areaMessages[areaId] = result.messages || [];
+        renderMessages(areaId);
+    } catch (e) {
+        areaMessages[areaId] = [];
+        renderMessages(areaId);
+    }
+}
+
+function renderMessages(areaId) {
+    const messagesEl = document.getElementById('coach-messages');
+    const data = AREAS_DATA[areaId];
+    const msgs = areaMessages[areaId] || [];
+
+    document.getElementById('coach-clear-btn').style.display = msgs.length > 0 ? '' : 'none';
+
+    if (msgs.length === 0) {
+        messagesEl.innerHTML = `
+            <div class="coach-empty-e">
+                <div class="coach-empty-icon">
+                    <img class="coach-empty-svg" src="/static/images/logo-coach.svg" alt="">
+                </div>
+                <h3 class="coach-empty-heading">${data.emptyTitle}</h3>
+                <p class="coach-empty-text">Share anything — progress, struggles, questions. Your coach is here.</p>
+                <div class="coach-starters">
+                    ${data.prompts.map(p => `<button class="coach-starter-btn" onclick="usePrompt(this)">${escapeHtml(p)}</button>`).join('')}
+                </div>
+            </div>`;
+        return;
+    }
+
+    let html = '';
+    for (const msg of msgs) {
+        if (msg.role === 'user') {
+            html += `<div class="coach-bubble-row coach-bubble-row-user"><div class="coach-bubble coach-bubble-user">${escapeHtml(msg.content)}</div></div>`;
+        } else {
+            const rendered = msg.html || formatMarkdown(msg.content);
+            html += `
+                <div class="coach-bubble-row coach-bubble-row-ai">
+                    <div class="coach-ai-avatar">
+                        <img class="coach-avatar-svg" src="/static/images/logo-coach.svg" alt="">
+                    </div>
+                    <div class="coach-bubble coach-bubble-ai">${rendered}</div>
+                </div>`;
+        }
+    }
+    html += '<div id="coach-messages-end"></div>';
+    messagesEl.innerHTML = html;
+    scrollToBottom();
+}
+
+function handleCoachKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendCoachMessage();
+    }
+}
+
+async function sendCoachMessage() {
+    const input = document.getElementById('coach-input');
+    const message = input.value.trim();
+    if (!message || loading) return;
+
+    loading = true;
+    input.value = '';
+    updateInputState();
+
+    const data = AREAS_DATA[currentArea];
+    if (!areaMessages[currentArea]) areaMessages[currentArea] = [];
+
+    areaMessages[currentArea].push({ role: 'user', content: message });
+    renderMessages(currentArea);
+
+    // Loading indicator
+    const messagesEl = document.getElementById('coach-messages');
+    const endEl = document.getElementById('coach-messages-end');
+    if (endEl) {
+        endEl.insertAdjacentHTML('beforebegin', `
+            <div class="coach-bubble-row coach-bubble-row-ai" id="coach-loading">
+                <div class="coach-ai-avatar">
+                    <img class="coach-avatar-svg" src="/static/images/logo-coach.svg" alt="">
+                </div>
+                <div class="coach-bubble coach-bubble-ai coach-thinking">
+                    <span class="coach-dot"></span><span class="coach-dot"></span><span class="coach-dot"></span>
+                </div>
+            </div>`);
+    }
+    scrollToBottom();
+
+    try {
+        const res = await fetch('/api/coach/message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ area: currentArea, message: message })
+        });
+        const result = await res.json();
+        const loadingEl = document.getElementById('coach-loading');
+        if (loadingEl) loadingEl.remove();
+
+        let replyContent = result.reply || result.error || 'Something went wrong.';
+        let replyHtml = result.reply_html || null;
+
+        // Show plan update notifications
+        if (result.plan_updates && result.plan_updates.length > 0) {
+            const notice = '<div class="plan-update-notice"><strong>📋 Plan updated:</strong> ' + result.plan_updates.join(' · ') + '</div>';
+            replyHtml = (replyHtml || replyContent) + notice;
+        }
+
+        // Handle schedule regeneration
+        if (result.trigger_regenerate) {
+            const regenNotice = '<div class="plan-update-notice"><strong>🔄 Regenerating full schedule...</strong> This may take a minute.</div>';
+            replyHtml = (replyHtml || replyContent) + regenNotice;
+            areaMessages[currentArea].push({ role: 'assistant', content: replyContent, html: replyHtml });
+            renderMessages(currentArea);
+            try {
+                const regenController = new AbortController();
+                setTimeout(() => regenController.abort(), 5 * 60 * 1000);
+                const regenResp = await fetch('/api/activity/generate-schedule', { method: 'POST', signal: regenController.signal });
+                const regenData = await regenResp.json();
+                const lastMsg = areaMessages[currentArea][areaMessages[currentArea].length - 1];
+                if (regenData.success) {
+                    lastMsg.html = lastMsg.html.replace('Regenerating full schedule...</strong> This may take a minute.', `Schedule regenerated!</strong> ${regenData.count} days created. <a href="/activity" style="color: var(--accent); text-decoration: underline;">View calendar</a>`);
+                } else {
+                    lastMsg.html = lastMsg.html.replace('Regenerating full schedule...</strong> This may take a minute.', `Regeneration failed:</strong> ${regenData.error}`);
+                }
+                renderMessages(currentArea);
+            } catch (regenErr) {
+                console.error('Regen error:', regenErr);
+            }
+            updatePillCount(currentArea);
+            loading = false;
+            updateInputState();
+            input.focus();
+            return;
+        }
+
+        areaMessages[currentArea].push({
+            role: 'assistant',
+            content: replyContent,
+            html: replyHtml
+        });
+        renderMessages(currentArea);
+        updatePillCount(currentArea);
+    } catch (e) {
+        const loadingEl = document.getElementById('coach-loading');
+        if (loadingEl) loadingEl.remove();
+        areaMessages[currentArea].push({ role: 'assistant', content: 'Connection error. Try again.' });
+        renderMessages(currentArea);
+    }
+
+    loading = false;
+    updateInputState();
+    input.focus();
+}
+
+function updatePillCount(areaId) {
+    const pill = document.querySelector(`.coach-area-pill[data-area="${areaId}"]`);
+    const count = (areaMessages[areaId] || []).filter(m => m.role === 'user').length;
+    let badge = pill.querySelector('[data-badge]');
+    if (count > 0) {
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'coach-pill-badge';
+            badge.setAttribute('data-badge', '');
+            pill.appendChild(badge);
+        }
+        badge.textContent = count;
+    } else if (badge) {
+        badge.remove();
+    }
+}
+
+async function clearArea() {
+    const data = AREAS_DATA[currentArea];
+    if (!confirm(`Clear all ${data.label} conversations?`)) return;
+    try {
+        await fetch(`/api/coach/history/${currentArea}`, { method: 'DELETE' });
+        areaMessages[currentArea] = [];
+        renderMessages(currentArea);
+        updatePillCount(currentArea);
+    } catch (e) {
+        alert('Failed to clear conversation.');
+    }
+}
+
+function usePrompt(btn) {
+    const input = document.getElementById('coach-input');
+    input.value = btn.textContent;
+    input.focus();
+    updateInputState();
+}
+
+function scrollToBottom() {
+    const el = document.getElementById('coach-messages');
+    el.scrollTop = el.scrollHeight;
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatMarkdown(text) {
+    let html = escapeHtml(text);
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+    html = html.replace(/\n\n/g, '</p><p>');
+    html = html.replace(/\n/g, '<br>');
+    return `<p>${html}</p>`;
+}
+
+// ============ Goals ============
+function toggleGoals() {
+    const panel = document.getElementById('coach-goals-panel');
+    const prefsPanel = document.getElementById('coach-prefs-panel');
+    prefsPanel.style.display = 'none';
+    if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+        loadGoals(currentArea);
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+async function loadGoals(area) {
+    const listEl = document.getElementById('goals-list');
+    listEl.innerHTML = '<div class="goals-loading">Loading...</div>';
+    try {
+        const res = await fetch(`/api/coach/goals?area=${area || ''}`);
+        const data = await res.json();
+        const goals = data.goals || [];
+        areaGoals[area] = goals;
+
+        if (goals.length === 0) {
+            listEl.innerHTML = '<div class="goals-empty">No goals yet. Set one below!</div>';
+            return;
+        }
+
+        listEl.innerHTML = goals.map(g => {
+            const statusClass = g.status === 'completed' ? 'goal-completed' : g.status === 'abandoned' ? 'goal-abandoned' : 'goal-active';
+            const statusIcon = g.status === 'completed' ? '&#10003;' : g.status === 'abandoned' ? '&#10007;' : '&#9675;';
+            return `
+                <div class="goal-item ${statusClass}" data-goal-id="${g.id}">
+                    <div class="goal-item-main">
+                        <span class="goal-status-icon">${statusIcon}</span>
+                        <div class="goal-item-text">
+                            <span class="goal-item-title">${escapeHtml(g.title)}</span>
+                            ${g.target_date ? `<span class="goal-item-date">Target: ${g.target_date}</span>` : ''}
+                            ${g.description ? `<span class="goal-item-desc">${escapeHtml(g.description)}</span>` : ''}
+                        </div>
+                        <div class="goal-item-actions">
+                            ${g.status === 'active' ? `
+                                <button class="goal-action-btn goal-complete-btn" onclick="updateGoalStatus(${g.id}, 'completed')" title="Complete">&#10003;</button>
+                                <button class="goal-action-btn goal-abandon-btn" onclick="updateGoalStatus(${g.id}, 'abandoned')" title="Abandon">&#10007;</button>
+                            ` : `
+                                <button class="goal-action-btn" onclick="updateGoalStatus(${g.id}, 'active')" title="Reactivate">&#8634;</button>
+                            `}
+                            <button class="goal-action-btn goal-delete-btn" onclick="deleteGoal(${g.id})" title="Delete">&times;</button>
+                        </div>
+                    </div>
+                    ${(g.progress_notes && g.progress_notes.length > 0) ? `
+                        <div class="goal-progress-notes">
+                            ${g.progress_notes.map(n => `<div class="goal-note"><span class="goal-note-date">${n.date}</span> ${escapeHtml(n.text)}</div>`).join('')}
+                        </div>
+                    ` : ''}
+                </div>`;
+        }).join('');
+    } catch (e) {
+        listEl.innerHTML = '<div class="goals-empty">Error loading goals.</div>';
+    }
+}
+
+async function addGoal() {
+    const titleInput = document.getElementById('goal-title-input');
+    const dateInput = document.getElementById('goal-date-input');
+    const title = titleInput.value.trim();
+    if (!title) return;
+
+    try {
+        await fetch('/api/coach/goals', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title: title,
+                area: currentArea,
+                target_date: dateInput.value || null
+            })
+        });
+        titleInput.value = '';
+        dateInput.value = '';
+        loadGoals(currentArea);
+    } catch (e) {
+        alert('Failed to add goal.');
+    }
+}
+
+async function updateGoalStatus(goalId, status) {
+    try {
+        await fetch(`/api/coach/goals/${goalId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+        });
+        loadGoals(currentArea);
+    } catch (e) {
+        alert('Failed to update goal.');
+    }
+}
+
+async function deleteGoal(goalId) {
+    if (!confirm('Delete this goal?')) return;
+    try {
+        await fetch(`/api/coach/goals/${goalId}`, { method: 'DELETE' });
+        loadGoals(currentArea);
+    } catch (e) {
+        alert('Failed to delete goal.');
+    }
+}
+
+// ============ Export ============
+async function exportConversation() {
+    try {
+        const res = await fetch(`/api/coach/export/${currentArea}`);
+        const data = await res.json();
+        if (data.error) {
+            alert(data.error);
+            return;
+        }
+        // Download as markdown file
+        const blob = new Blob([data.markdown], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `coaching-${data.area}-${new Date().toISOString().slice(0,10)}.md`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        alert('Failed to export conversation.');
+    }
+}
+
+// ============ Preferences ============
+function togglePreferences() {
+    const panel = document.getElementById('coach-prefs-panel');
+    const goalsPanel = document.getElementById('coach-goals-panel');
+    goalsPanel.style.display = 'none';
+    if (panel.style.display === 'none') {
+        panel.style.display = 'block';
+    } else {
+        panel.style.display = 'none';
+    }
+}
+
+async function loadPreferences() {
+    try {
+        const res = await fetch('/api/coach/preferences');
+        const data = await res.json();
+        const persona = data.preferences?.persona || 'balanced';
+        const radio = document.querySelector(`input[name="persona"][value="${persona}"]`);
+        if (radio) radio.checked = true;
+    } catch (e) {
+        // ignore, default to balanced
+    }
+}
+
+async function savePreferences() {
+    const selected = document.querySelector('input[name="persona"]:checked');
+    if (!selected) return;
+
+    try {
+        await fetch('/api/coach/preferences', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ persona: selected.value })
+        });
+        document.getElementById('coach-prefs-panel').style.display = 'none';
+        // Show brief confirmation
+        const btn = document.getElementById('coach-persona-btn');
+        btn.style.background = 'var(--primary)';
+        btn.style.borderRadius = '6px';
+        setTimeout(() => { btn.style.background = ''; }, 1200);
+    } catch (e) {
+        alert('Failed to save preferences.');
+    }
+}
+</script>
+{% endblock %}

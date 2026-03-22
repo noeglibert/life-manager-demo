@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: life-manager-demo
+    runtime: docker
+    plan: free
+    envVars:
+      - key: DEMO_MODE
+        value: "true"
+      - key: SECRET_KEY
+        value: demo-secret-key

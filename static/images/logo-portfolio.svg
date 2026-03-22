@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <filter id="pencilTexture">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+  
+  <g filter="url(#pencilTexture)">
+    <!-- Briefcase/Portfolio outline - multiple strokes for sketchy feel -->
+    <!-- Main briefcase body -->
+    <path d="M20 45 L20 95 Q20 100 25 100 L95 100 Q100 100 100 95 L100 45 Q100 40 95 40 L25 40 Q20 40 20 45" 
+          stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M21 46 L21 94 Q21 99 26 99 L94 99 Q99 99 99 94 L99 46 Q99 41 94 41 L26 41 Q21 41 21 46" 
+          stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M19 44 L19 96 Q19 101 24 101 L96 101 Q101 101 101 96 L101 44 Q101 39 96 39 L24 39 Q19 39 19 44" 
+          stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.3"/>
+    
+    <!-- Handle on top -->
+    <path d="M42 40 L42 28 Q42 25 45 25 L75 25 Q78 25 78 28 L78 40" 
+          stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M43 41 L43 29 Q43 26 46 26 L74 26 Q77 26 77 29 L77 41" 
+          stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    
+    <!-- Handle grip -->
+    <path d="M45 32 L75 32" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M46 33 L74 33" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.6"/>
+    
+    <!-- Clasp/Lock -->
+    <rect x="55" y="52" width="10" height="8" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round" rx="2"/>
+    <rect x="55.5" y="52.5" width="9" height="7" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" rx="2" opacity="0.6"/>
+    <circle cx="60" cy="56" r="2" stroke="#5D4037" stroke-width="1.5" fill="none"/>
+    
+    <!-- Front panel seam -->
+    <path d="M60 40 L60 100" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M61 41 L61 99" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.5"/>
+    
+    <!-- Pocket details -->
+    <path d="M30 70 Q30 65 35 65 L55 65 Q60 65 60 70 L60 90 L30 90 L30 70" 
+          stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M31 71 Q31 66 36 66 L54 66 Q59 66 59 71 L59 89 L31 89 L31 71" 
+          stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.5"/>
+    
+    <!-- Corner reinforcements -->
+    <path d="M22 42 L28 42 L28 48" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M98 42 L92 42 L92 48" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M22 98 L28 98 L28 92" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <path d="M98 98 L92 98 L92 92" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    
+    <!-- Documents/papers peeking out - representing portfolio contents -->
+    <path d="M65 48 L80 48 Q82 48 82 50 L82 90" stroke="#8B5A2B" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <path d="M66 49 L79 49 Q81 49 81 51 L81 89" stroke="#D4A574" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M68 53 L78 53" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M68 58 L77 58" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M68 63 L75 63" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.5"/>
+    
+    <!-- Highlight/shine on leather -->
+    <path d="M25 48 Q30 46 35 50" stroke="#D4A574" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M85 45 Q90 43 92 48" stroke="#D4A574" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+    
+    <!-- Stitching details -->
+    <path d="M24 43 L24 47" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <path d="M96 43 L96 47" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <path d="M24 93 L24 97" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <path d="M96 93 L96 97" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.4"/>
+  </g>
+  
+  <!-- Extra sketch marks for authenticity -->
+  <path d="M16 60 L18 62" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+  <path d="M104 75 L102 77" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+</svg>

@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <filter id="pencilTexture">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+  
+  <!-- Sketchy connection lines - multiple strokes for hand-drawn feel -->
+  <g filter="url(#pencilTexture)">
+    <!-- Center to top-left -->
+    <path d="M58 58 Q44 42 31 31" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+    <path d="M60 60 Q46 44 32 32" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M62 59 Q47 43 33 30" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.5"/>
+    
+    <!-- Center to top-right -->
+    <path d="M62 58 Q78 38 91 26" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+    <path d="M60 60 Q76 40 90 27" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M61 61 Q77 41 89 28" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.5"/>
+    
+    <!-- Center to bottom-left -->
+    <path d="M58 62 Q38 72 24 82" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+    <path d="M60 60 Q40 70 25 80" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M59 61 Q39 71 26 81" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.5"/>
+    
+    <!-- Center to bottom-right -->
+    <path d="M62 62 Q80 70 96 76" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+    <path d="M60 60 Q78 68 95 75" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+    
+    <!-- Center to bottom -->
+    <path d="M59 62 Q59 85 59 103" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.7"/>
+    <path d="M60 60 Q61 84 60 104" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M61 63 Q60 86 61 102" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.5"/>
+  </g>
+  
+  <!-- Sketchy outer nodes -->
+  <g filter="url(#pencilTexture)">
+    <!-- Top-left -->
+    <circle cx="30" cy="30" r="11" fill="none" stroke="#5D4037" stroke-width="2"/>
+    <circle cx="30" cy="30" r="12" fill="none" stroke="#8B5A2B" stroke-width="1" opacity="0.5"/>
+    <circle cx="30" cy="30" r="10" fill="none" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+    <path d="M24 26 Q30 24 34 28" stroke="#D4A574" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.6"/>
+    
+    <!-- Top-right -->
+    <circle cx="90" cy="26" r="9" fill="none" stroke="#5D4037" stroke-width="2"/>
+    <circle cx="90" cy="26" r="10" fill="none" stroke="#8B5A2B" stroke-width="1" opacity="0.5"/>
+    <path d="M85 23 Q90 21 94 24" stroke="#D4A574" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+    
+    <!-- Bottom-left -->
+    <circle cx="24" cy="80" r="10" fill="none" stroke="#5D4037" stroke-width="2"/>
+    <circle cx="24" cy="80" r="11" fill="none" stroke="#8B5A2B" stroke-width="1" opacity="0.5"/>
+    <path d="M19 76 Q24 74 28 77" stroke="#D4A574" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+    
+    <!-- Bottom-right -->
+    <circle cx="96" cy="75" r="8" fill="none" stroke="#5D4037" stroke-width="2"/>
+    <circle cx="96" cy="75" r="9" fill="none" stroke="#8B5A2B" stroke-width="1" opacity="0.5"/>
+    <path d="M92 72 Q96 70 99 73" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.6"/>
+    
+    <!-- Bottom -->
+    <circle cx="60" cy="104" r="9" fill="none" stroke="#5D4037" stroke-width="2"/>
+    <circle cx="60" cy="104" r="10" fill="none" stroke="#8B5A2B" stroke-width="1" opacity="0.5"/>
+    <path d="M55 100 Q60 98 64 101" stroke="#D4A574" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+  </g>
+  
+  <!-- Center node - more detailed sketch -->
+  <g filter="url(#pencilTexture)">
+    <circle cx="60" cy="60" r="17" fill="none" stroke="#5D4037" stroke-width="2.5"/>
+    <circle cx="60" cy="60" r="18" fill="none" stroke="#8B5A2B" stroke-width="1.5" opacity="0.6"/>
+    <circle cx="60" cy="60" r="16" fill="none" stroke="#8B5A2B" stroke-width="1" opacity="0.4"/>
+    <!-- Inner circle -->
+    <circle cx="60" cy="60" r="7" fill="none" stroke="#5D4037" stroke-width="2"/>
+    <circle cx="60" cy="60" r="8" fill="none" stroke="#8B5A2B" stroke-width="1" opacity="0.5"/>
+    <!-- Highlight scribble -->
+    <path d="M52 52 Q58 48 66 54" stroke="#D4A574" stroke-width="4" fill="none" stroke-linecap="round" opacity="0.5"/>
+  </g>
+  
+  <!-- Extra sketch marks for authenticity -->
+  <path d="M42 45 L44 47" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+  <path d="M76 46 L78 44" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+</svg>

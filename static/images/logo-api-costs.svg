@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <filter id="pencilTexture">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#pencilTexture)">
+    <!-- Main coin circle -->
+    <circle cx="60" cy="60" r="38" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <circle cx="60" cy="60" r="37" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <circle cx="60" cy="60" r="39" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.3"/>
+
+    <!-- Inner rim of coin -->
+    <circle cx="60" cy="60" r="32" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.6"/>
+    <circle cx="60" cy="60" r="31.5" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.3"/>
+
+    <!-- Dollar sign - main strokes -->
+    <path d="M60 38 L60 82" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M61 39 L61 81" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+
+    <!-- Dollar S curve - top half -->
+    <path d="M72 48 Q72 42 65 42 L55 42 Q48 42 48 48 Q48 54 55 56 L65 58"
+          stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M71 49 Q71 43 64 43 L56 43 Q49 43 49 49 Q49 55 56 57 L64 59"
+          stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+
+    <!-- Dollar S curve - bottom half -->
+    <path d="M65 58 Q72 60 72 66 Q72 72 65 72 L55 72 Q48 72 48 66"
+          stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M64 59 Q71 61 71 67 Q71 71 64 71 L56 71 Q49 71 49 67"
+          stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+
+    <!-- Small bar chart lines behind coin (representing usage tracking) -->
+    <path d="M18 90 L18 75" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M26 90 L26 70" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M34 90 L34 80" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+
+    <path d="M86 90 L86 78" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M94 90 L94 68" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M102 90 L102 73" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+
+    <!-- Baselines for bar charts -->
+    <path d="M15 90 L37 90" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <path d="M83 90 L105 90" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+
+    <!-- Coin highlight/shine -->
+    <path d="M45 42 Q48 38 52 40" stroke="#D4A574" stroke-width="2.5" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M70 75 Q73 72 75 74" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.4"/>
+
+    <!-- Coin edge detail (serration marks) -->
+    <path d="M40 25 L42 28" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <path d="M80 25 L78 28" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <path d="M25 45 L28 47" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <path d="M95 45 L92 47" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <path d="M25 75 L28 73" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <path d="M95 75 L92 73" stroke="#8B5A2B" stroke-width="1" fill="none" stroke-linecap="round" opacity="0.4"/>
+  </g>
+
+  <!-- Extra sketch marks for authenticity -->
+  <path d="M14 55 L16 57" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+  <path d="M106 65 L104 63" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+</svg>

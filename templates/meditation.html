@@ -1,0 +1,557 @@
+{% extends "base.html" %}
+
+{% block title %}Meditation - Life Manager{% endblock %}
+
+{% block content %}
+<div class="meditation-page">
+    <div class="page-header">
+        <h1>Meditation</h1>
+    </div>
+
+    <!-- Stats Banner -->
+    <div class="meditation-stats-banner">
+        <div class="stat-item">
+            <span class="stat-icon">{{ svg_icon('beads', 'stat-icon-svg') }}</span>
+            <div class="stat-info">
+                <span class="stat-number" id="stat-streak">{{ game_stats.meditation_streak or 0 }}</span>
+                <span class="stat-label">Day Streak</span>
+            </div>
+        </div>
+        <div class="stat-item">
+            <span class="stat-icon">{{ svg_icon('clock', 'stat-icon-svg') }}</span>
+            <div class="stat-info">
+                <span class="stat-number" id="stat-minutes">{{ game_stats.meditation_minutes_total or 0 }}</span>
+                <span class="stat-label">Total Minutes</span>
+            </div>
+        </div>
+        <div class="stat-item">
+            <span class="stat-icon">{{ svg_icon('beads', 'stat-icon-svg') }}</span>
+            <div class="stat-info">
+                <span class="stat-number" id="stat-sessions">{{ game_stats.meditation_sessions_total or 0 }}</span>
+                <span class="stat-label">Sessions</span>
+            </div>
+        </div>
+        <div class="stat-item">
+            <span class="stat-icon">{{ svg_icon('star', 'stat-icon-svg') }}</span>
+            <div class="stat-info">
+                <span class="stat-number" id="stat-xp">{{ game_stats.meditation_xp_total or 0 }}</span>
+                <span class="stat-label">Meditation XP</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mode Selector Tabs -->
+    <div class="meditation-mode-tabs">
+        <button class="mode-tab active" data-mode="timer" onclick="switchMode('timer')">Timer</button>
+        <button class="mode-tab" data-mode="breathing" onclick="switchMode('breathing')">Breathing</button>
+    </div>
+
+    <!-- ========== TIMER MODE ========== -->
+    <div class="meditation-panel" id="timer-panel">
+        <div class="duration-selector" id="duration-selector">
+            <button class="duration-btn" data-seconds="60">1 min</button>
+            <button class="duration-btn" data-seconds="180">3 min</button>
+            <button class="duration-btn active" data-seconds="300">5 min</button>
+            <button class="duration-btn" data-seconds="600">10 min</button>
+            <button class="duration-btn" data-seconds="900">15 min</button>
+            <button class="duration-btn" data-seconds="1200">20 min</button>
+            <button class="duration-btn" data-seconds="1800">30 min</button>
+        </div>
+
+        <div class="timer-circle-container">
+            <svg class="timer-ring" viewBox="0 0 200 200">
+                <circle class="timer-ring-bg" cx="100" cy="100" r="90" />
+                <circle class="timer-ring-progress" id="timer-ring-progress" cx="100" cy="100" r="90" />
+            </svg>
+            <div class="timer-display">
+                <span id="timer-minutes">05</span>:<span id="timer-seconds">00</span>
+            </div>
+        </div>
+
+        <div class="timer-controls">
+            <button id="btn-start" class="btn-meditation btn-start" onclick="Timer.start()">Start</button>
+            <button id="btn-pause" class="btn-meditation btn-pause" onclick="Timer.pause()" style="display:none">Pause</button>
+            <button id="btn-resume" class="btn-meditation btn-resume" onclick="Timer.resume()" style="display:none">Resume</button>
+            <button id="btn-stop" class="btn-meditation btn-stop" onclick="Timer.stop()" style="display:none">Stop</button>
+        </div>
+
+        <div class="timer-options">
+            <label class="option-toggle">
+                <input type="checkbox" id="bell-interval" />
+                <span>Bell every 5 minutes</span>
+            </label>
+            <label class="option-toggle">
+                <input type="checkbox" id="ambient-track" checked />
+                <span>Open ambient track</span>
+            </label>
+        </div>
+    </div>
+
+    <!-- ========== BREATHING MODE ========== -->
+    <div class="meditation-panel" id="breathing-panel" style="display:none">
+        <div class="breathing-patterns">
+            <div class="pattern-card active" data-pattern="box" data-inhale="4" data-hold1="4" data-exhale="4" data-hold2="4" onclick="selectPattern(this)">
+                <h3>Box Breathing</h3>
+                <p>4-4-4-4</p>
+                <span class="pattern-desc">Balanced calm</span>
+            </div>
+            <div class="pattern-card" data-pattern="478" data-inhale="4" data-hold1="7" data-exhale="8" data-hold2="0" onclick="selectPattern(this)">
+                <h3>4-7-8</h3>
+                <p>4-7-8</p>
+                <span class="pattern-desc">Deep relaxation</span>
+            </div>
+            <div class="pattern-card" data-pattern="deep" data-inhale="4" data-hold1="0" data-exhale="6" data-hold2="0" onclick="selectPattern(this)">
+                <h3>Deep Breathing</h3>
+                <p>4-6</p>
+                <span class="pattern-desc">Simple & calming</span>
+            </div>
+            <div class="pattern-card" data-pattern="custom" data-inhale="4" data-hold1="4" data-exhale="4" data-hold2="4" onclick="selectPattern(this)">
+                <h3>Custom</h3>
+                <p>Set your own</p>
+                <span class="pattern-desc">Your rhythm</span>
+            </div>
+        </div>
+
+        <div class="custom-pattern-inputs" id="custom-inputs" style="display:none">
+            <label>Inhale <input type="number" id="custom-inhale" value="4" min="1" max="12">s</label>
+            <label>Hold <input type="number" id="custom-hold1" value="4" min="0" max="12">s</label>
+            <label>Exhale <input type="number" id="custom-exhale" value="4" min="1" max="12">s</label>
+            <label>Hold <input type="number" id="custom-hold2" value="4" min="0" max="12">s</label>
+        </div>
+
+        <div class="breathing-duration">
+            <label>Duration:
+                <select id="breathing-duration-select">
+                    <option value="60">1 min</option>
+                    <option value="180">3 min</option>
+                    <option value="300" selected>5 min</option>
+                    <option value="600">10 min</option>
+                </select>
+            </label>
+        </div>
+
+        <div class="breathing-circle-container">
+            <div class="breathing-circle" id="breathing-circle">
+                <span class="breathing-instruction" id="breathing-instruction">Ready</span>
+            </div>
+            <div class="breathing-timer" id="breathing-timer">5:00</div>
+        </div>
+
+        <div class="breathing-options">
+            <label class="option-toggle">
+                <input type="checkbox" id="ambient-track-breathing" checked />
+                <span>Open ambient track</span>
+            </label>
+        </div>
+
+        <div class="breathing-controls">
+            <button id="btn-breathe-start" class="btn-meditation btn-start" onclick="Breathing.start()">Begin</button>
+            <button id="btn-breathe-stop" class="btn-meditation btn-stop" onclick="Breathing.stop()" style="display:none">Stop</button>
+        </div>
+    </div>
+
+    <!-- ========== SESSION COMPLETE OVERLAY ========== -->
+    <div class="meditation-complete-overlay" id="complete-overlay" style="display:none">
+        <div class="meditation-complete-card">
+            <div class="complete-icon">{{ svg_icon('beads', 'challenge-icon-svg') }}</div>
+            <h2>Session Complete</h2>
+            <div class="complete-stats">
+                <p><strong id="complete-duration">5:00</strong> meditated</p>
+                <p class="xp-earned">+<span id="complete-xp">15</span> XP</p>
+            </div>
+            <div id="complete-achievements"></div>
+            <button class="btn-primary" onclick="dismissComplete()">Continue</button>
+        </div>
+    </div>
+
+    <!-- ========== WEEKLY CHART ========== -->
+    <div class="meditation-weekly-chart">
+        <h3>This Week</h3>
+        <div class="week-bars" id="week-bars"></div>
+    </div>
+
+    <!-- Today's sessions -->
+    <div class="meditation-today-log">
+        <h3>Today's Sessions</h3>
+        {% if today_sessions %}
+            {% for s in today_sessions %}
+            <div class="session-log-item">
+                <span class="log-type">{{ '🕐' if s.session_type == 'timer' else '🌬️' }}</span>
+                <span class="log-detail">{{ (s.duration_seconds // 60) }}m {{ s.session_type }}{% if s.breathing_pattern %} ({{ s.breathing_pattern }}){% endif %}</span>
+                <span class="log-xp">+{{ s.xp_earned }} XP</span>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p class="empty-state">No sessions yet today. Start meditating!</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const weeklyData = {{ weekly_data | tojson }};
+const CIRCUMFERENCE = 2 * Math.PI * 90;
+const AMBIENT_TRACK_URL = 'https://www.youtube.com/watch?v=CDFxLsF4d4Q';
+
+function openAmbientTrack(checkboxId) {
+    const cb = document.getElementById(checkboxId);
+    if (cb && cb.checked) {
+        window.open(AMBIENT_TRACK_URL, '_blank');
+    }
+}
+
+// ===== AUDIO (Web Audio API) =====
+let audioCtx = null;
+function getAudioCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtx;
+}
+
+function playGong() {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 180;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.5, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 3);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 3);
+}
+
+function playBell() {
+    const ctx = getAudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 800;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 1.5);
+}
+
+// ===== MODE SWITCHING =====
+function switchMode(mode) {
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    document.querySelector(`.mode-tab[data-mode="${mode}"]`).classList.add('active');
+    document.getElementById('timer-panel').style.display = mode === 'timer' ? '' : 'none';
+    document.getElementById('breathing-panel').style.display = mode === 'breathing' ? '' : 'none';
+}
+
+// ===== TIMER =====
+const Timer = {
+    totalSeconds: 300,
+    remaining: 300,
+    interval: null,
+    running: false,
+
+    setDuration(seconds) {
+        if (this.running) return;
+        this.totalSeconds = seconds;
+        this.remaining = seconds;
+        this.updateDisplay();
+        this.updateRing();
+        document.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector(`.duration-btn[data-seconds="${seconds}"]`).classList.add('active');
+    },
+
+    start() {
+        // Init audio context on user gesture
+        getAudioCtx();
+        openAmbientTrack('ambient-track');
+        this.running = true;
+        document.body.classList.add('meditation-active');
+        document.getElementById('btn-start').style.display = 'none';
+        document.getElementById('btn-pause').style.display = '';
+        document.getElementById('btn-stop').style.display = '';
+        document.getElementById('duration-selector').style.opacity = '0.4';
+        document.getElementById('duration-selector').style.pointerEvents = 'none';
+        this.interval = setInterval(() => this.tick(), 1000);
+    },
+
+    tick() {
+        this.remaining--;
+        this.updateDisplay();
+        this.updateRing();
+        const bellEnabled = document.getElementById('bell-interval').checked;
+        if (bellEnabled && this.remaining > 0 && (this.totalSeconds - this.remaining) % 300 === 0 && (this.totalSeconds - this.remaining) > 0) {
+            playBell();
+        }
+        if (this.remaining <= 0) {
+            this.complete();
+        }
+    },
+
+    updateDisplay() {
+        const m = Math.floor(this.remaining / 60);
+        const s = this.remaining % 60;
+        document.getElementById('timer-minutes').textContent = String(m).padStart(2, '0');
+        document.getElementById('timer-seconds').textContent = String(s).padStart(2, '0');
+    },
+
+    updateRing() {
+        const progress = (this.totalSeconds - this.remaining) / this.totalSeconds;
+        const offset = CIRCUMFERENCE * (1 - progress);
+        document.getElementById('timer-ring-progress').style.strokeDashoffset = offset;
+    },
+
+    pause() {
+        clearInterval(this.interval);
+        this.running = false;
+        document.getElementById('btn-pause').style.display = 'none';
+        document.getElementById('btn-resume').style.display = '';
+    },
+
+    resume() {
+        this.running = true;
+        document.getElementById('btn-resume').style.display = 'none';
+        document.getElementById('btn-pause').style.display = '';
+        this.interval = setInterval(() => this.tick(), 1000);
+    },
+
+    stop() {
+        clearInterval(this.interval);
+        this.running = false;
+        document.body.classList.remove('meditation-active');
+        const elapsed = this.totalSeconds - this.remaining;
+        if (elapsed >= 30) {
+            recordSession('timer', null, elapsed, this.totalSeconds, false);
+        }
+        this.reset();
+    },
+
+    complete() {
+        clearInterval(this.interval);
+        this.running = false;
+        playGong();
+        document.body.classList.remove('meditation-active');
+        recordSession('timer', null, this.totalSeconds, this.totalSeconds, true);
+        this.reset();
+    },
+
+    reset() {
+        this.remaining = this.totalSeconds;
+        this.updateDisplay();
+        this.updateRing();
+        document.getElementById('btn-start').style.display = '';
+        document.getElementById('btn-pause').style.display = 'none';
+        document.getElementById('btn-resume').style.display = 'none';
+        document.getElementById('btn-stop').style.display = 'none';
+        document.getElementById('duration-selector').style.opacity = '';
+        document.getElementById('duration-selector').style.pointerEvents = '';
+    }
+};
+
+// Duration buttons
+document.querySelectorAll('.duration-btn').forEach(btn => {
+    btn.addEventListener('click', () => Timer.setDuration(parseInt(btn.dataset.seconds)));
+});
+
+// ===== BREATHING =====
+function selectPattern(el) {
+    document.querySelectorAll('.pattern-card').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+    const isCustom = el.dataset.pattern === 'custom';
+    document.getElementById('custom-inputs').style.display = isCustom ? '' : 'none';
+}
+
+const Breathing = {
+    pattern: null,
+    patternName: 'box',
+    totalSeconds: 300,
+    elapsed: 0,
+    running: false,
+    currentPhase: 'inhale',
+    phaseRemaining: 0,
+    interval: null,
+
+    getPattern() {
+        const active = document.querySelector('.pattern-card.active');
+        this.patternName = active.dataset.pattern;
+        if (this.patternName === 'custom') {
+            return {
+                inhale: parseInt(document.getElementById('custom-inhale').value) || 4,
+                hold1: parseInt(document.getElementById('custom-hold1').value) || 0,
+                exhale: parseInt(document.getElementById('custom-exhale').value) || 4,
+                hold2: parseInt(document.getElementById('custom-hold2').value) || 0
+            };
+        }
+        return {
+            inhale: parseInt(active.dataset.inhale),
+            hold1: parseInt(active.dataset.hold1),
+            exhale: parseInt(active.dataset.exhale),
+            hold2: parseInt(active.dataset.hold2)
+        };
+    },
+
+    start() {
+        getAudioCtx();
+        openAmbientTrack('ambient-track-breathing');
+        this.pattern = this.getPattern();
+        this.totalSeconds = parseInt(document.getElementById('breathing-duration-select').value);
+        this.elapsed = 0;
+        this.running = true;
+        document.body.classList.add('meditation-active');
+        document.getElementById('btn-breathe-start').style.display = 'none';
+        document.getElementById('btn-breathe-stop').style.display = '';
+        this.beginPhase('inhale');
+        this.interval = setInterval(() => this.tick(), 1000);
+    },
+
+    beginPhase(phase) {
+        this.currentPhase = phase;
+        const duration = this.pattern[phase];
+        if (duration === 0) {
+            this.nextPhase();
+            return;
+        }
+        this.phaseRemaining = duration;
+        const circle = document.getElementById('breathing-circle');
+        const instruction = document.getElementById('breathing-instruction');
+        circle.classList.remove('inhale', 'exhale', 'hold');
+
+        if (phase === 'inhale') {
+            instruction.textContent = 'Breathe In';
+            circle.style.transitionDuration = duration + 's';
+            // Small delay to ensure transition triggers after class removal
+            requestAnimationFrame(() => circle.classList.add('inhale'));
+        } else if (phase === 'exhale') {
+            instruction.textContent = 'Breathe Out';
+            circle.style.transitionDuration = duration + 's';
+            requestAnimationFrame(() => circle.classList.add('exhale'));
+        } else {
+            instruction.textContent = 'Hold';
+            circle.classList.add('hold');
+        }
+    },
+
+    tick() {
+        this.elapsed++;
+        this.phaseRemaining--;
+        const rem = this.totalSeconds - this.elapsed;
+        document.getElementById('breathing-timer').textContent =
+            Math.floor(rem / 60) + ':' + String(rem % 60).padStart(2, '0');
+
+        if (this.phaseRemaining <= 0) {
+            this.nextPhase();
+        }
+        if (this.elapsed >= this.totalSeconds) {
+            this.complete();
+        }
+    },
+
+    nextPhase() {
+        const order = ['inhale', 'hold1', 'exhale', 'hold2'];
+        const idx = order.indexOf(this.currentPhase);
+        const next = order[(idx + 1) % 4];
+        this.beginPhase(next);
+    },
+
+    complete() {
+        clearInterval(this.interval);
+        this.running = false;
+        playGong();
+        document.body.classList.remove('meditation-active');
+        recordSession('breathing', this.patternName, this.elapsed, this.totalSeconds, true);
+        this.resetUI();
+    },
+
+    stop() {
+        clearInterval(this.interval);
+        this.running = false;
+        document.body.classList.remove('meditation-active');
+        if (this.elapsed >= 30) {
+            recordSession('breathing', this.patternName, this.elapsed, this.totalSeconds, false);
+        }
+        this.resetUI();
+    },
+
+    resetUI() {
+        const circle = document.getElementById('breathing-circle');
+        circle.classList.remove('inhale', 'exhale', 'hold');
+        circle.style.transitionDuration = '0.5s';
+        document.getElementById('breathing-instruction').textContent = 'Ready';
+        document.getElementById('breathing-timer').textContent =
+            Math.floor(this.totalSeconds / 60) + ':' + String(this.totalSeconds % 60).padStart(2, '0');
+        document.getElementById('btn-breathe-start').style.display = '';
+        document.getElementById('btn-breathe-stop').style.display = 'none';
+    }
+};
+
+// ===== API & COMPLETION =====
+async function recordSession(type, pattern, duration, target, completed) {
+    try {
+        const response = await fetch('/api/meditate/complete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type, pattern, duration, target, completed })
+        });
+        const data = await response.json();
+        if (data.success) {
+            showCompleteOverlay(duration, data.xp_earned, data.achievements, data.leveled_up);
+            // Update stats
+            document.getElementById('stat-streak').textContent = data.streak;
+            document.getElementById('stat-sessions').textContent = data.total_sessions;
+            document.getElementById('stat-minutes').textContent = data.total_minutes;
+        }
+    } catch (e) {
+        console.error('Error recording session:', e);
+    }
+}
+
+function showCompleteOverlay(duration, xp, achievements, leveledUp) {
+    const m = Math.floor(duration / 60);
+    const s = duration % 60;
+    document.getElementById('complete-duration').textContent = m + ':' + String(s).padStart(2, '0');
+    document.getElementById('complete-xp').textContent = xp;
+    const achEl = document.getElementById('complete-achievements');
+    achEl.innerHTML = '';
+    if (achievements && achievements.length > 0) {
+        achievements.forEach(a => {
+            achEl.innerHTML += `<p class="achievement-unlock">🏆 ${a}</p>`;
+        });
+    }
+    if (leveledUp) {
+        achEl.innerHTML += `<p class="achievement-unlock">🎉 Level Up!</p>`;
+    }
+    document.getElementById('complete-overlay').style.display = 'flex';
+}
+
+function dismissComplete() {
+    document.getElementById('complete-overlay').style.display = 'none';
+    // Reload to update today's session log
+    window.location.reload();
+}
+
+// ===== WEEKLY CHART =====
+function renderWeeklyChart() {
+    const container = document.getElementById('week-bars');
+    const days = Object.keys(weeklyData);
+    const values = Object.values(weeklyData);
+    const maxVal = Math.max(...values, 1);
+
+    container.innerHTML = days.map((day, i) => {
+        const pct = (values[i] / maxVal) * 100;
+        const isToday = i === days.length - 1;
+        return `<div class="week-bar-col">
+            <div class="week-bar-value">${values[i]}m</div>
+            <div class="week-bar" style="height: ${Math.max(pct, 4)}%${isToday ? '; background: var(--accent-green);' : ''}"></div>
+            <div class="week-bar-label">${day}</div>
+        </div>`;
+    }).join('');
+}
+
+renderWeeklyChart();
+
+// Init timer ring
+document.getElementById('timer-ring-progress').style.strokeDasharray = CIRCUMFERENCE;
+document.getElementById('timer-ring-progress').style.strokeDashoffset = CIRCUMFERENCE;
+Timer.updateDisplay();
+</script>
+{% endblock %}

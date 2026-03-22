@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>{% block title %}Life Manager{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='images/logo.svg') }}">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+{% if DEMO_MODE %}
+<!-- Demo banner -->
+<div id="demo-banner" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;text-align:center;padding:10px 16px;font-size:14px;font-weight:500;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
+    You're viewing a <strong>read-only demo</strong> of Life Manager &mdash; all data is fictional.
+    <a href="https://noe-newsletter.netlify.app/" target="_blank" style="color:#e0e7ff;text-decoration:underline;margin-left:8px;">Subscribe to the newsletter &rarr;</a>
+</div>
+<style>
+    .le-sidebar { top: 40px !important; height: calc(100vh - 40px) !important; }
+    .le-main { padding-top: 40px !important; }
+    .le-mobile-bar { top: 40px !important; }
+</style>
+<script>
+// Intercept form submissions and fetch 403s with a friendly toast
+document.addEventListener('DOMContentLoaded', function() {
+    // Intercept form submissions
+    document.addEventListener('submit', function(e) {
+        e.preventDefault();
+        showDemoToast();
+    });
+    // Intercept fetch 403s
+    const _fetch = window.fetch;
+    window.fetch = function() {
+        return _fetch.apply(this, arguments).then(function(response) {
+            if (response.status === 403) {
+                showDemoToast();
+            }
+            return response;
+        });
+    };
+});
+function showDemoToast() {
+    let existing = document.getElementById('demo-toast');
+    if (existing) existing.remove();
+    let toast = document.createElement('div');
+    toast.id = 'demo-toast';
+    toast.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:10000;background:#1e1b4b;color:#e0e7ff;padding:14px 24px;border-radius:12px;font-size:14px;box-shadow:0 4px 16px rgba(0,0,0,0.4);animation:fadeIn .3s ease';
+    toast.innerHTML = 'This is a read-only demo &mdash; changes are disabled.';
+    document.body.appendChild(toast);
+    setTimeout(function() { toast.remove(); }, 3000);
+}
+</script>
+{% endif %}
+
+<!-- Layout E: Fixed dark sidebar -->
+<aside class="le-sidebar" id="le-sidebar">
+    <div class="le-sidebar-brand">
+        <a href="{{ url_for('index') }}">
+            <img class="le-brand-logo" src="{{ url_for('static', filename='images/life-manager-logo.svg') }}" alt="Life Manager">
+            <div class="le-brand-text">
+                <h1>Life Manager</h1>
+                <span class="le-brand-sub">Build better habits</span>
+            </div>
+        </a>
+    </div>
+    <div class="le-divider"></div>
+
+    <div class="le-section">
+        <div class="le-label">Habits</div>
+        <ul class="le-nav">
+            <li><a href="{{ url_for('index') }}" class="{% if request.endpoint == 'index' %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-dashboard.svg') }}" alt=""> Dashboard</a></li>
+            <li><a href="{{ url_for('journal_list') }}" class="{% if request.endpoint in ['journal_list', 'journal_entry', 'journal_today'] %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-journal.svg') }}" alt=""> Journal</a></li>
+            <li><a href="{{ url_for('meditate') }}" class="{% if request.endpoint == 'meditate' %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-meditation.svg') }}" alt=""> Meditate</a></li>
+            <li><a href="{{ url_for('learn') }}" class="{% if request.endpoint in ['learn', 'learn_session', 'learn_interests'] %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-learning.svg') }}" alt=""> Learn</a></li>
+            <li><a href="{{ url_for('nutrition') }}" class="{% if request.endpoint in ['nutrition', 'nutrition_setup', 'nutrition_plan'] %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-nutrition.svg') }}" alt=""> Nutrition</a></li>
+            <li><a href="{{ url_for('activity') }}" class="{% if request.endpoint in ['activity', 'activity_log', 'activity_plan', 'activity_expert', 'activity_history'] %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-activity.svg') }}" alt=""> Activity</a></li>
+            <li><a href="{{ url_for('coach') }}" class="{% if request.endpoint == 'coach' %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-coach.svg') }}" alt=""> Coach</a></li>
+            <li><a href="{{ url_for('mandarin') }}" class="{% if request.endpoint == 'mandarin' %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-mandarin.svg') }}" alt=""> Mandarin</a></li>
+        </ul>
+    </div>
+
+    <div class="le-section">
+        <div class="le-label">More</div>
+        <ul class="le-nav">
+            <li><a href="{{ url_for('newsletter') }}" class="{% if request.endpoint in ['newsletter', 'newsletter_editor'] %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-newsletter.svg') }}" alt=""> Newsletter</a></li>
+            <li><a href="{{ url_for('highlights_list') }}" class="{% if request.endpoint == 'highlights_list' %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-highlights.svg') }}" alt=""> Highlights</a></li>
+            <li><a href="{{ url_for('contacts_list') }}" class="{% if request.endpoint in ['contacts_list', 'contact_detail', 'contact_new', 'contact_edit'] %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-contacts.svg') }}" alt=""> Contacts</a></li>
+            <li><a href="{{ url_for('portfolio') }}" class="{% if request.endpoint == 'portfolio' %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-portfolio.svg') }}" alt=""> Portfolio</a></li>
+            <li><a href="{{ url_for('finance') }}" class="{% if request.endpoint == 'finance' %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-finance.svg') }}" alt=""> Finance</a></li>
+            <li><a href="{{ url_for('wordle') }}" class="{% if request.endpoint == 'wordle' %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-wordle.svg') }}" alt=""> Wordle</a></li>
+            <li><a href="{{ url_for('api_usage_dashboard') }}" class="{% if request.endpoint == 'api_usage_dashboard' %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-api-costs.svg') }}" alt=""> API Costs</a></li>
+        </ul>
+    </div>
+
+    <div class="le-sidebar-footer">
+        <div class="le-actions">
+            <a href="{{ url_for('journal_today') }}" class="le-action-btn le-action-today"><img class="le-icon" src="{{ url_for('static', filename='images/logo-today.svg') }}" alt=""> Today's Entry</a>
+        </div>
+        <div class="le-actions-row">
+            <button class="le-action-btn" onclick="toggleTheme()"><span id="theme-icon"><img class="le-icon" src="/static/images/icon-moon.svg" alt=""></span> Theme</button>
+            {% if not DEMO_MODE %}<a href="{{ url_for('logout') }}" class="le-action-btn"><img class="le-icon" src="/static/images/icon-lock.svg" alt=""> Lock</a>{% endif %}
+        </div>
+    </div>
+</aside>
+
+<!-- Mobile top bar (hidden on desktop) -->
+<div class="le-mobile-bar" id="le-mobile-bar">
+    <button class="le-hamburger" onclick="toggleSidebar()">&#9776;</button>
+    <span class="le-mobile-title">Life Manager</span>
+</div>
+
+<!-- Main content area -->
+<div class="le-main">
+    <div class="le-page">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+</div>
+
+<!-- Sidebar overlay for mobile -->
+<div class="le-overlay" id="le-overlay" onclick="toggleSidebar()"></div>
+
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+function toggleSidebar() {
+    document.getElementById('le-sidebar').classList.toggle('open');
+    document.getElementById('le-overlay').classList.toggle('open');
+}
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

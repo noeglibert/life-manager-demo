@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <filter id="pencilTexture">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="5" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#pencilTexture)">
+    <!-- Running figure — head -->
+    <circle cx="62" cy="25" r="8" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <circle cx="63" cy="26" r="8" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+
+    <!-- Body/torso (leaning forward) -->
+    <path d="M60 33 Q55 50 50 62" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M61 34 Q56 51 51 63" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+
+    <!-- Front arm (reaching forward) -->
+    <path d="M57 40 Q70 38 78 30" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M58 41 Q71 39 79 31" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+
+    <!-- Back arm (swinging back) -->
+    <path d="M57 42 Q42 48 35 55" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M58 43 Q43 49 36 56" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+
+    <!-- Front leg (extended forward) -->
+    <path d="M50 62 Q65 75 80 85" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M51 63 Q66 76 81 86" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <!-- Front foot -->
+    <path d="M80 85 Q85 87 90 85" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+    <!-- Back leg (pushing off) -->
+    <path d="M50 62 Q40 75 30 90" stroke="#5D4037" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M51 63 Q41 76 31 91" stroke="#8B5A2B" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <!-- Back foot -->
+    <path d="M30 90 Q27 93 25 92" stroke="#5D4037" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+    <!-- Ground line -->
+    <path d="M15 98 Q60 95 105 98" stroke="#5D4037" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.3"/>
+
+    <!-- Motion lines -->
+    <path d="M20 30 L28 30" stroke="#D4A574" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+    <path d="M15 40 L25 40" stroke="#D4A574" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.4"/>
+    <path d="M18 50 L26 50" stroke="#D4A574" stroke-width="1.5" fill="none" stroke-linecap="round" opacity="0.3"/>
+
+    <!-- Energy dots -->
+    <circle cx="85" cy="22" r="2" stroke="#D4A574" stroke-width="1.5" fill="none" opacity="0.5"/>
+    <circle cx="92" cy="28" r="1.5" stroke="#D4A574" stroke-width="1" fill="none" opacity="0.4"/>
+    <circle cx="88" cy="15" r="1.5" stroke="#D4A574" stroke-width="1" fill="none" opacity="0.3"/>
+  </g>
+
+  <!-- Extra sketch marks -->
+  <path d="M10 95 L13 96" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+  <path d="M105 93 L108 95" stroke="#8B5A2B" stroke-width="1" opacity="0.3"/>
+</svg>
