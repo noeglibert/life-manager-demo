@@ -17,6 +17,8 @@ from models import (
     TrainingDay, CoachConversation, CoachGoal, CoachMood, CoachSummary,
     CoachPreference, MandarinCard, MandarinReview, MandarinSession,
     GarminDailyStats, FinanceTransaction, FinanceBudget, FinanceRecurringCost,
+    Ticker, TradeLot, TradeSale, LotConsumption, Dividend, EntryZone,
+    Catalyst, Risk, TickerChatMessage,
 )
 
 TODAY = date.today()
@@ -1101,6 +1103,159 @@ def seed_mandarin():
     print("  Seeded 30 Mandarin cards, 20 reviews, 10 sessions")
 
 
+def seed_investing():
+    """Investing hub: 5 tickers with tiny placeholder positions, lots, sale, dividends, zones, catalysts, risks, chat."""
+    # Wipe in dependency order
+    TickerChatMessage.query.delete()
+    LotConsumption.query.delete()
+    TradeSale.query.delete()
+    Dividend.query.delete()
+    EntryZone.query.delete()
+    Catalyst.query.delete()
+    Risk.query.delete()
+    TradeLot.query.delete()
+    Ticker.query.delete()
+    db.session.flush()
+
+    # 5 tickers: 3 owned, 1 sold, 1 idea — tiny demo positions, NOT real holdings
+    aapl = Ticker(symbol='AAPL', company_name='Apple Inc.', isin='US0378331005',
+                  exchange='NY', currency='USD', status='owned',
+                  layer='Tech Giants', conviction=8, horizon='long',
+                  thesis='# Apple — Demo Thesis\n\nDurable services moat, sticky ecosystem, healthy capital returns. '
+                         'Watch iPhone unit growth and Vision Pro adoption.\n\n*Demo data — not a real position.*',
+                  step_up_basis_eur_per_share=210.50, step_up_basis_source='manual')
+    msft = Ticker(symbol='MSFT', company_name='Microsoft Corp.', isin='US5949181045',
+                  exchange='NY', currency='USD', status='owned',
+                  layer='Tech Giants', conviction=9, horizon='long',
+                  thesis='# Microsoft — Demo Thesis\n\nAzure + Copilot tailwind, enterprise lock-in. '
+                         'Monitor capex cycle and AI ROI.\n\n*Demo data — not a real position.*',
+                  step_up_basis_eur_per_share=375.00, step_up_basis_source='manual')
+    vwce = Ticker(symbol='VWCE.DE', company_name='Vanguard FTSE All-World UCITS ETF',
+                  isin='IE00BK5BQT80', exchange='DE', currency='EUR', status='owned',
+                  layer='Diversified ETF', conviction=10, horizon='long',
+                  thesis='# VWCE — Demo Core Holding\n\nGlobal diversification, low TER. DCA monthly. '
+                         '\n\n*Demo data — not a real position.*',
+                  step_up_basis_eur_per_share=112.40, step_up_basis_source='manual')
+    nvda = Ticker(symbol='NVDA', company_name='NVIDIA Corp.', isin='US67066G1040',
+                  exchange='NY', currency='USD', status='sold',
+                  layer='AI Infrastructure', conviction=7, horizon='swing',
+                  thesis='# NVIDIA — Demo Closed Position\n\nTrimmed on valuation. Will revisit on a meaningful pullback.'
+                         '\n\n*Demo data — not a real position.*')
+    tsla = Ticker(symbol='TSLA', company_name='Tesla Inc.', isin='US88160R1014',
+                  exchange='NY', currency='USD', status='researching',
+                  layer='EV / Energy', conviction=4, horizon='swing',
+                  thesis='# Tesla — Demo Research\n\nWaiting for clarity on margin trajectory. '
+                         'Robotaxi narrative remains speculative.\n\n*Demo data — no position.*')
+
+    db.session.add_all([aapl, msft, vwce, nvda, tsla])
+    db.session.flush()
+
+    # --- Lots (buys) ---
+    aapl_lot1 = TradeLot(ticker_id=aapl.id, trade_date=d(420), shares=2.0,
+                         price_native=180.0, currency='USD',
+                         gross_native=360.0, fees_native=4.50, fx_rate=1.08,
+                         net_eur=337.50, cost_basis_eur=337.50, remaining_shares=2.0,
+                         source='manual', reasoning='Demo entry — small starter position.')
+    msft_lot1 = TradeLot(ticker_id=msft.id, trade_date=d(380), shares=1.0,
+                         price_native=410.0, currency='USD',
+                         gross_native=410.0, fees_native=5.00, fx_rate=1.09,
+                         net_eur=380.73, cost_basis_eur=380.73, remaining_shares=1.0,
+                         source='manual', reasoning='Demo entry — Azure thesis.')
+    vwce_lot1 = TradeLot(ticker_id=vwce.id, trade_date=d(300), shares=5.0,
+                         price_native=110.0, currency='EUR',
+                         gross_native=550.0, fees_native=2.50, fx_rate=None,
+                         net_eur=552.50, cost_basis_eur=552.50, remaining_shares=5.0,
+                         source='manual', reasoning='Demo DCA — core ETF.')
+    vwce_lot2 = TradeLot(ticker_id=vwce.id, trade_date=d(180), shares=3.0,
+                         price_native=115.0, currency='EUR',
+                         gross_native=345.0, fees_native=2.50, fx_rate=None,
+                         net_eur=347.50, cost_basis_eur=347.50, remaining_shares=3.0,
+                         source='manual', reasoning='Demo DCA add.')
+    nvda_lot1 = TradeLot(ticker_id=nvda.id, trade_date=d(500), shares=1.0,
+                         price_native=100.0, currency='USD',
+                         gross_native=100.0, fees_native=3.00, fx_rate=1.08,
+                         net_eur=95.37, cost_basis_eur=95.37, remaining_shares=0.0,  # fully sold
+                         source='manual', reasoning='Demo entry — fully closed below.')
+    db.session.add_all([aapl_lot1, msft_lot1, vwce_lot1, vwce_lot2, nvda_lot1])
+    db.session.flush()
+
+    # --- Sale + consumption (NVDA closed at $130) ---
+    nvda_sale = TradeSale(ticker_id=nvda.id, trade_date=d(120), shares=1.0,
+                          price_native=130.0, currency='USD',
+                          gross_native=130.0, fees_native=3.50, fx_rate=1.07,
+                          net_eur=118.22, proceeds_eur=118.22, realized_gain_eur=22.85,
+                          source='manual', reasoning='Demo close — locked in gain.')
+    db.session.add(nvda_sale)
+    db.session.flush()
+    db.session.add(LotConsumption(sale_id=nvda_sale.id, lot_id=nvda_lot1.id,
+                                  shares_consumed=1.0, cost_basis_eur=95.37,
+                                  proceeds_eur=118.22, gain_eur=22.85, method='fifo'))
+
+    # --- Dividends (AAPL + MSFT, 2 each) ---
+    db.session.add_all([
+        Dividend(ticker_id=aapl.id, payment_date=d(90), ex_date=d(95),
+                 shares_at_record=2.0, dividend_per_share_native=0.24, currency='USD', fx_rate=1.08,
+                 gross_eur=0.44, foreign_withholding_eur=0.07, belgian_withholding_eur=0.11,
+                 fees_eur=0.02, net_eur=0.24, source='manual'),
+        Dividend(ticker_id=aapl.id, payment_date=d(0), ex_date=d(5),
+                 shares_at_record=2.0, dividend_per_share_native=0.25, currency='USD', fx_rate=1.07,
+                 gross_eur=0.47, foreign_withholding_eur=0.07, belgian_withholding_eur=0.12,
+                 fees_eur=0.02, net_eur=0.26, source='manual'),
+        Dividend(ticker_id=msft.id, payment_date=d(60), ex_date=d(65),
+                 shares_at_record=1.0, dividend_per_share_native=0.75, currency='USD', fx_rate=1.07,
+                 gross_eur=0.70, foreign_withholding_eur=0.11, belgian_withholding_eur=0.18,
+                 fees_eur=0.02, net_eur=0.39, source='manual'),
+    ])
+
+    # --- Entry zones ---
+    db.session.add_all([
+        EntryZone(ticker_id=aapl.id, zone_type='add', price_low=165.0, price_high=175.0,
+                  currency='USD', notes='Demo: add zone on pullback.', active=True),
+        EntryZone(ticker_id=msft.id, zone_type='trim', price_low=460.0, price_high=480.0,
+                  currency='USD', notes='Demo: trim if valuation stretches.', active=True),
+        EntryZone(ticker_id=tsla.id, zone_type='buy', price_low=160.0, price_high=180.0,
+                  currency='USD', notes='Demo: would consider entry here.', active=True),
+    ])
+
+    # --- Catalysts ---
+    db.session.add_all([
+        Catalyst(ticker_id=aapl.id, catalyst_date=d(-30), catalyst_type='earnings',
+                 title='Q3 earnings (demo)', description='Services growth + Vision Pro update.',
+                 source='manual', resolved=False),
+        Catalyst(ticker_id=msft.id, catalyst_date=d(-15), catalyst_type='earnings',
+                 title='FY Q4 earnings (demo)', description='Azure growth + Copilot attach rates.',
+                 source='manual', resolved=False),
+        Catalyst(ticker_id=tsla.id, catalyst_date=d(-45), catalyst_type='product_launch',
+                 title='Robotaxi event (demo)', description='Watch for credible timeline + economics.',
+                 source='manual', resolved=False),
+    ])
+
+    # --- Risks ---
+    db.session.add_all([
+        Risk(ticker_id=aapl.id, description='iPhone unit decline in China.', severity='medium', active=True),
+        Risk(ticker_id=msft.id, description='AI capex outpacing monetization.', severity='medium', active=True),
+        Risk(ticker_id=tsla.id, description='Margin compression from price cuts.', severity='high', active=True),
+        Risk(ticker_id=vwce.id, description='Concentration in US mega-caps inside the index.', severity='low', active=True),
+    ])
+
+    # --- Sample chat thread on AAPL ---
+    db.session.add_all([
+        TickerChatMessage(ticker_id=aapl.id, role='user',
+                          content='What\'s the bull case in one paragraph?',
+                          created_at=dt(20, hour=10)),
+        TickerChatMessage(ticker_id=aapl.id, role='assistant',
+                          content='*(Demo response — Claude chat is disabled in demo mode.)*\n\n'
+                                  'Apple\'s bull case rests on the services flywheel: ~$90B+ in high-margin '
+                                  'recurring revenue, an installed base north of 2B devices, and emerging '
+                                  'optionality from on-device AI and Vision Pro. Capital returns remain '
+                                  'aggressive, and any iPhone replacement cycle catalyst could re-rate the stock.',
+                          created_at=dt(20, hour=10, minute=1)),
+    ])
+
+    db.session.flush()
+    print("  Seeded Investing: 5 tickers, 5 lots, 1 sale, 3 dividends, 3 zones, 3 catalysts, 4 risks, 1 chat")
+
+
 # Import pricing for API usage seed
 from app import CLAUDE_PRICING
 
@@ -1121,6 +1276,7 @@ def run_seed():
         seed_meditation()
         seed_nutrition()
         seed_portfolio()
+        seed_investing()
         seed_activity()
         seed_coach()
         seed_newsletter()

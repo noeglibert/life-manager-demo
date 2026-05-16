@@ -104,6 +104,7 @@
                         </div>
                         <div class="log-input-row">
                             <input type="text" id="mealInput" placeholder="Describe your meal... (e.g., grilled chicken with rice and salad)" required>
+                            <input type="date" id="mealDate" value="{{ today.isoformat() }}" title="Meal date">
                             <button type="submit" class="btn-primary log-btn" id="logBtn">Log</button>
                         </div>
                         <div class="log-hint">Claude will estimate calories and macros for you</div>
@@ -256,7 +257,7 @@ document.getElementById('quickLogForm').addEventListener('submit', async (e) => 
         const resp = await fetch('/api/nutrition/log', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ description: desc, meal_type: selectedMealType })
+            body: JSON.stringify({ description: desc, meal_type: selectedMealType, date: document.getElementById('mealDate').value })
         });
         const data = await resp.json();
 

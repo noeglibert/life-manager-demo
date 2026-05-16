@@ -413,6 +413,22 @@ class NewsletterSubscriber(db.Model):
         return f'<NewsletterSubscriber {self.email} ({self.language})>'
 
 
+class SurveyResponse(db.Model):
+    """A response to a newsletter survey"""
+    id = db.Column(db.Integer, primary_key=True)
+    survey_name = db.Column(db.String(100), nullable=False)  # e.g. 'arc-2'
+    email = db.Column(db.String(300))
+    q1 = db.Column(db.String(500))
+    q2 = db.Column(db.String(500))
+    q3 = db.Column(db.String(500))  # pipe-separated for multi-select
+    q4 = db.Column(db.String(500))
+    submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
+    netlify_id = db.Column(db.String(100), unique=True)  # dedup key
+
+    def __repr__(self):
+        return f'<SurveyResponse {self.survey_name} {self.email or "anon"}>'
+
+
 class PortfolioStock(db.Model):
     """A stock in the portfolio (holding) or watchlist"""
     id = db.Column(db.Integer, primary_key=True)
@@ -973,3 +989,372 @@ class DCASchedule(db.Model):
 
     def __repr__(self):
         return f'<DCASchedule stock={self.stock_id} {self.monthly_amount}/month>'
+
+
+class Trip(db.Model):
+    """A travel trip — links a FinanceTransaction.category to dates, destination, budget."""
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    destination = db.Column(db.String(100))
+    start_date = db.Column(db.Date)
+    end_date = db.Column(db.Date)
+    category = db.Column(db.String(50), unique=True)  # links to FinanceTransaction.category
+    status = db.Column(db.String(20), default='planned')  # planned/active/completed
+    budget = db.Column(db.Float)
+    notes = db.Column(db.Text)
+    color = db.Column(db.String(10), default='#FF5722')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'name': self.name,
+            'destination': self.destination,
+            'start_date': self.start_date.isoformat() if self.start_date else None,
+            'end_date': self.end_date.isoformat() if self.end_date else None,
+            'category': self.category,
+            'status': self.status,
+            'budget': self.budget,
+            'notes': self.notes,
+            'color': self.color,
+        }
+
+    def __repr__(self):
+        return f'<Trip {self.name} ({self.category})>'
+
+
+# ============================================================================
+# Investing feature (replaces Portfolio)
+# Belgian capital gains tax tracking: 10% on realized gains > €10K (Jan 1 2026)
+# ============================================================================
+
+class Ticker(db.Model):
+    """A stock or ETF tracked in the Investing hub — holding, idea, or sold."""
+    id = db.Column(db.Integer, primary_key=True)
+    symbol = db.Column(db.String(20), nullable=False, unique=True)
+    company_name = db.Column(db.String(200), nullable=False)
+    isin = db.Column(db.String(12), index=True)
+    exchange = db.Column(db.String(30))  # NY, AS, PA, CO, L, DE, ...
+    currency = db.Column(db.String(5), default='USD')  # native trading currency
+
+    # Position lifecycle
+    status = db.Column(db.String(20), default='idea')
+    # 'idea' | 'researching' | 'ready_to_buy' | 'owned' | 'sold'
+
+    # Research / journal fields
+    layer = db.Column(db.String(100))  # sector or thematic bucket
+    conviction = db.Column(db.Integer)  # 1-10
+    horizon = db.Column(db.String(20))  # 'long' | 'swing' | None
+    thesis = db.Column(db.Text)  # markdown
+
+    # Tax: step-up basis for holdings owned on Dec 31 2025
+    step_up_basis_eur_per_share = db.Column(db.Float)
+    step_up_basis_source = db.Column(db.String(20))  # 'yfinance' | 'bolero_q4_2025' | 'manual'
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    lots = db.relationship('TradeLot', backref='ticker', cascade='all, delete-orphan', lazy='dynamic')
+    sales = db.relationship('TradeSale', backref='ticker', cascade='all, delete-orphan', lazy='dynamic')
+    dividends = db.relationship('Dividend', backref='ticker', cascade='all, delete-orphan', lazy='dynamic')
+    entry_zones = db.relationship('EntryZone', backref='ticker', cascade='all, delete-orphan', lazy='dynamic')
+    catalysts = db.relationship('Catalyst', backref='ticker', cascade='all, delete-orphan', lazy='dynamic')
+    risks = db.relationship('Risk', backref='ticker', cascade='all, delete-orphan', lazy='dynamic')
+    chat_messages = db.relationship('TickerChatMessage', backref='ticker', cascade='all, delete-orphan', lazy='dynamic')
+
+    def current_shares(self):
+        """Sum of remaining shares across open lots."""
+        return sum(lot.remaining_shares for lot in self.lots if lot.remaining_shares > 0)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'symbol': self.symbol,
+            'company_name': self.company_name,
+            'isin': self.isin,
+            'exchange': self.exchange,
+            'currency': self.currency,
+            'status': self.status,
+            'layer': self.layer,
+            'conviction': self.conviction,
+            'horizon': self.horizon,
+            'thesis': self.thesis,
+            'step_up_basis_eur_per_share': self.step_up_basis_eur_per_share,
+            'step_up_basis_source': self.step_up_basis_source,
+            'current_shares': self.current_shares(),
+        }
+
+    def __repr__(self):
+        return f'<Ticker {self.symbol} ({self.status})>'
+
+
+class TradeLot(db.Model):
+    """A buy transaction. Cost basis is in EUR (per Belgian tax rules)."""
+    id = db.Column(db.Integer, primary_key=True)
+    ticker_id = db.Column(db.Integer, db.ForeignKey('ticker.id'), nullable=False)
+
+    trade_date = db.Column(db.Date, nullable=False, index=True)
+    settlement_date = db.Column(db.Date)
+
+    shares = db.Column(db.Float, nullable=False)
+    price_native = db.Column(db.Float, nullable=False)
+    currency = db.Column(db.String(5), nullable=False)
+
+    gross_native = db.Column(db.Float)  # price * shares before fees
+    fees_native = db.Column(db.Float, default=0)  # commission + sec fee + impôt de bourse
+    fx_rate = db.Column(db.Float)  # 1 EUR = X native (None for EUR trades)
+    net_eur = db.Column(db.Float, nullable=False)  # what was actually debited (Débit Net)
+
+    # Cost basis (defaults to net_eur, separate field so it can be overridden)
+    cost_basis_eur = db.Column(db.Float, nullable=False)
+    remaining_shares = db.Column(db.Float, nullable=False)
+
+    bordereau = db.Column(db.String(20), unique=True, index=True)
+    source = db.Column(db.String(20), default='manual')  # 'bolero_pdf' | 'manual' | 'migrated'
+    reasoning = db.Column(db.Text)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    consumptions = db.relationship('LotConsumption', backref='lot', cascade='all, delete-orphan', lazy='dynamic')
+
+    def cost_basis_eur_per_share(self):
+        return self.cost_basis_eur / self.shares if self.shares else 0
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'ticker_id': self.ticker_id,
+            'trade_date': self.trade_date.isoformat() if self.trade_date else None,
+            'settlement_date': self.settlement_date.isoformat() if self.settlement_date else None,
+            'shares': self.shares,
+            'price_native': self.price_native,
+            'currency': self.currency,
+            'gross_native': self.gross_native,
+            'fees_native': self.fees_native,
+            'fx_rate': self.fx_rate,
+            'net_eur': self.net_eur,
+            'cost_basis_eur': self.cost_basis_eur,
+            'cost_basis_eur_per_share': self.cost_basis_eur_per_share(),
+            'remaining_shares': self.remaining_shares,
+            'bordereau': self.bordereau,
+            'source': self.source,
+            'reasoning': self.reasoning,
+        }
+
+    def __repr__(self):
+        return f'<TradeLot {self.ticker.symbol if self.ticker else "?"} {self.shares}@{self.price_native}{self.currency}>'
+
+
+class TradeSale(db.Model):
+    """A sell transaction. Proceeds in EUR. Linked to consumed lots."""
+    id = db.Column(db.Integer, primary_key=True)
+    ticker_id = db.Column(db.Integer, db.ForeignKey('ticker.id'), nullable=False)
+
+    trade_date = db.Column(db.Date, nullable=False, index=True)
+    settlement_date = db.Column(db.Date)
+
+    shares = db.Column(db.Float, nullable=False)
+    price_native = db.Column(db.Float, nullable=False)
+    currency = db.Column(db.String(5), nullable=False)
+
+    gross_native = db.Column(db.Float)
+    fees_native = db.Column(db.Float, default=0)
+    fx_rate = db.Column(db.Float)
+    net_eur = db.Column(db.Float, nullable=False)
+
+    proceeds_eur = db.Column(db.Float, nullable=False)
+    realized_gain_eur = db.Column(db.Float)  # cached: sum of consumption gains
+
+    bordereau = db.Column(db.String(20), unique=True, index=True)
+    source = db.Column(db.String(20), default='manual')
+    reasoning = db.Column(db.Text)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    consumptions = db.relationship('LotConsumption', backref='sale', cascade='all, delete-orphan', lazy='dynamic')
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'ticker_id': self.ticker_id,
+            'trade_date': self.trade_date.isoformat() if self.trade_date else None,
+            'settlement_date': self.settlement_date.isoformat() if self.settlement_date else None,
+            'shares': self.shares,
+            'price_native': self.price_native,
+            'currency': self.currency,
+            'gross_native': self.gross_native,
+            'fees_native': self.fees_native,
+            'fx_rate': self.fx_rate,
+            'net_eur': self.net_eur,
+            'proceeds_eur': self.proceeds_eur,
+            'realized_gain_eur': self.realized_gain_eur,
+            'bordereau': self.bordereau,
+            'source': self.source,
+            'reasoning': self.reasoning,
+        }
+
+
+class LotConsumption(db.Model):
+    """Links a TradeSale to one or more TradeLot rows (FIFO or specific-ID)."""
+    id = db.Column(db.Integer, primary_key=True)
+    sale_id = db.Column(db.Integer, db.ForeignKey('trade_sale.id'), nullable=False)
+    lot_id = db.Column(db.Integer, db.ForeignKey('trade_lot.id'), nullable=False)
+
+    shares_consumed = db.Column(db.Float, nullable=False)
+    cost_basis_eur = db.Column(db.Float, nullable=False)  # proportional from lot
+    proceeds_eur = db.Column(db.Float, nullable=False)  # proportional from sale
+    gain_eur = db.Column(db.Float, nullable=False)  # proceeds - cost basis
+
+    method = db.Column(db.String(15), default='fifo')  # 'fifo' | 'specific_id'
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'sale_id': self.sale_id,
+            'lot_id': self.lot_id,
+            'shares_consumed': self.shares_consumed,
+            'cost_basis_eur': self.cost_basis_eur,
+            'proceeds_eur': self.proceeds_eur,
+            'gain_eur': self.gain_eur,
+            'method': self.method,
+        }
+
+
+class Dividend(db.Model):
+    """A dividend payment. Tracked separately from capital gains
+    (already taxed at source via précompte mobilier in Belgium)."""
+    id = db.Column(db.Integer, primary_key=True)
+    ticker_id = db.Column(db.Integer, db.ForeignKey('ticker.id'), nullable=False)
+
+    payment_date = db.Column(db.Date, nullable=False, index=True)
+    ex_date = db.Column(db.Date)
+
+    shares_at_record = db.Column(db.Float, nullable=False)
+    dividend_per_share_native = db.Column(db.Float, nullable=False)
+    currency = db.Column(db.String(5), nullable=False)
+    fx_rate = db.Column(db.Float)
+
+    gross_eur = db.Column(db.Float, nullable=False)
+    foreign_withholding_eur = db.Column(db.Float, default=0)  # Prélèvement étranger
+    belgian_withholding_eur = db.Column(db.Float, default=0)  # Précompte mobilier (30%)
+    fees_eur = db.Column(db.Float, default=0)  # Frais + TVA
+    net_eur = db.Column(db.Float, nullable=False)  # Crédit Net
+
+    bordereau = db.Column(db.String(20), unique=True, index=True)
+    source = db.Column(db.String(20), default='manual')
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'ticker_id': self.ticker_id,
+            'payment_date': self.payment_date.isoformat() if self.payment_date else None,
+            'ex_date': self.ex_date.isoformat() if self.ex_date else None,
+            'shares_at_record': self.shares_at_record,
+            'dividend_per_share_native': self.dividend_per_share_native,
+            'currency': self.currency,
+            'fx_rate': self.fx_rate,
+            'gross_eur': self.gross_eur,
+            'foreign_withholding_eur': self.foreign_withholding_eur,
+            'belgian_withholding_eur': self.belgian_withholding_eur,
+            'fees_eur': self.fees_eur,
+            'net_eur': self.net_eur,
+            'bordereau': self.bordereau,
+        }
+
+
+class EntryZone(db.Model):
+    """Price zone where you'd buy, add, trim, or sell."""
+    id = db.Column(db.Integer, primary_key=True)
+    ticker_id = db.Column(db.Integer, db.ForeignKey('ticker.id'), nullable=False)
+
+    zone_type = db.Column(db.String(10), nullable=False)  # 'buy' | 'add' | 'trim' | 'sell'
+    price_low = db.Column(db.Float, nullable=False)
+    price_high = db.Column(db.Float, nullable=False)
+    currency = db.Column(db.String(5), nullable=False)
+
+    notes = db.Column(db.Text)
+    active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'ticker_id': self.ticker_id,
+            'zone_type': self.zone_type,
+            'price_low': self.price_low,
+            'price_high': self.price_high,
+            'currency': self.currency,
+            'notes': self.notes,
+            'active': self.active,
+        }
+
+
+class Catalyst(db.Model):
+    """A scheduled event that could move the stock."""
+    id = db.Column(db.Integer, primary_key=True)
+    ticker_id = db.Column(db.Integer, db.ForeignKey('ticker.id'), nullable=False)
+
+    catalyst_date = db.Column(db.Date, nullable=False, index=True)
+    catalyst_type = db.Column(db.String(30))  # 'earnings' | 'product_launch' | 'fda' | 'macro' | 'guidance' | 'other'
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+
+    source = db.Column(db.String(20), default='manual')  # 'manual' | 'yfinance_earnings'
+    resolved = db.Column(db.Boolean, default=False)
+    outcome = db.Column(db.Text)  # post-event reflection
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'ticker_id': self.ticker_id,
+            'catalyst_date': self.catalyst_date.isoformat() if self.catalyst_date else None,
+            'catalyst_type': self.catalyst_type,
+            'title': self.title,
+            'description': self.description,
+            'source': self.source,
+            'resolved': self.resolved,
+            'outcome': self.outcome,
+        }
+
+
+class Risk(db.Model):
+    """A thesis-invalidating risk factor."""
+    id = db.Column(db.Integer, primary_key=True)
+    ticker_id = db.Column(db.Integer, db.ForeignKey('ticker.id'), nullable=False)
+
+    description = db.Column(db.Text, nullable=False)
+    severity = db.Column(db.String(10), default='medium')  # 'low' | 'medium' | 'high'
+    active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'ticker_id': self.ticker_id,
+            'description': self.description,
+            'severity': self.severity,
+            'active': self.active,
+        }
+
+
+class TickerChatMessage(db.Model):
+    """A message in the per-ticker Claude chat thread."""
+    id = db.Column(db.Integer, primary_key=True)
+    ticker_id = db.Column(db.Integer, db.ForeignKey('ticker.id'), nullable=False)
+
+    role = db.Column(db.String(10), nullable=False)  # 'user' | 'assistant'
+    content = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'ticker_id': self.ticker_id,
+            'role': self.role,
+            'content': self.content,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }

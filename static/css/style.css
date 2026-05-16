@@ -5321,9 +5321,14 @@ a.session-item:hover {
 }
 
 .holding-actions-cell {
-    display: flex;
-    gap: 6px;
-    align-items: center;
+    text-align: right;
+    white-space: nowrap;
+    width: 1%;
+    padding-right: 18px;
+}
+
+.holding-actions-cell .btn-deep-dive {
+    margin-right: 6px;
 }
 
 .btn-sell {
@@ -5445,6 +5450,12 @@ a.session-item:hover {
 .verdict-avoid {
     background: rgba(245, 101, 101, 0.15);
     color: var(--accent-red);
+}
+
+.verdict-pre-ipo {
+    background: rgba(99, 102, 241, 0.12);
+    color: var(--accent-primary);
+    border: 1px dashed var(--accent-primary);
 }
 
 /* Add Stock Form */
@@ -7455,12 +7466,22 @@ body.meditation-active .meditation-today-log {
     gap: 0.5rem;
 }
 
-.log-input-row input {
+.log-input-row input[type="text"] {
     flex: 1;
     padding: 0.7rem 1rem;
     border: 2px solid var(--border);
     border-radius: 10px;
     font-size: 0.95rem;
+    background: var(--card-bg);
+    color: var(--text-dark);
+}
+
+.log-input-row input[type="date"] {
+    width: auto;
+    padding: 0.7rem 0.75rem;
+    border: 2px solid var(--border);
+    border-radius: 10px;
+    font-size: 0.85rem;
     background: var(--card-bg);
     color: var(--text-dark);
 }
@@ -8487,6 +8508,124 @@ body.meditation-active .meditation-today-log {
     color: #e53e3e;
 }
 
+/* Survey Results Dashboard */
+.survey-results-card {
+    margin-top: 0;
+}
+
+.survey-charts {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.survey-chart-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.survey-chart-title {
+    font-family: var(--font-heading);
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--charcoal);
+    margin-bottom: 0.25rem;
+}
+
+.survey-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.survey-bar-label {
+    flex: 0 0 220px;
+    font-size: 0.78rem;
+    color: var(--slate);
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.survey-bar-track {
+    flex: 1;
+    height: 18px;
+    background: var(--bg-light);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.survey-bar-fill {
+    height: 100%;
+    background: var(--gold);
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+
+.survey-bar-count {
+    flex: 0 0 60px;
+    font-size: 0.75rem;
+    color: var(--slate-light);
+    text-align: right;
+}
+
+.survey-table-wrap {
+    overflow-x: auto;
+    margin-top: 0.5rem;
+}
+
+.survey-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78rem;
+}
+
+.survey-table th {
+    text-align: left;
+    padding: 0.5rem 0.6rem;
+    border-bottom: 2px solid var(--border-color);
+    font-weight: 600;
+    color: var(--charcoal);
+    white-space: nowrap;
+}
+
+.survey-table td {
+    padding: 0.45rem 0.6rem;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--slate);
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.survey-table tr:hover td {
+    background: var(--bg-light);
+}
+
+.survey-who {
+    font-weight: 600;
+    color: var(--charcoal);
+    white-space: nowrap;
+}
+
+.survey-when {
+    white-space: nowrap;
+    color: var(--slate-light);
+    font-size: 0.72rem;
+}
+
+@media (max-width: 768px) {
+    .survey-bar-label {
+        flex: 0 0 120px;
+        font-size: 0.72rem;
+    }
+    .survey-bar-count {
+        flex: 0 0 50px;
+    }
+}
+
 /* Language Tabs */
 .lang-tabs {
     display: flex;
@@ -8760,8 +8899,9 @@ body.meditation-active .meditation-today-log {
     transition: color 0.2s;
 }
 
-.nl-autosave-status.unsaved {
-    color: var(--slate);
+.nl-save-btn {
+    padding: 0.3rem 1rem;
+    font-size: 0.8rem;
 }
 
 /* Mode bar */
@@ -8814,7 +8954,6 @@ body.meditation-active .meditation-today-log {
 /* Editor body */
 .nl-editor-body {
     position: relative;
-    overflow-anchor: none;
 }
 
 /* Toolbar */
@@ -8859,7 +8998,8 @@ body.meditation-active .meditation-today-log {
 /* Textarea */
 .nl-editor-textarea {
     width: 100%;
-    min-height: 500px;
+    height: calc(100vh - 220px);
+    min-height: 300px;
     padding: 1.5rem;
     font-size: 1rem;
     font-family: 'DM Mono', 'SF Mono', 'Fira Code', Consolas, monospace;
@@ -8871,7 +9011,7 @@ body.meditation-active .meditation-today-log {
     resize: vertical;
     box-sizing: border-box;
     tab-size: 4;
-    overflow-anchor: none;
+    overflow-y: auto;
 }
 
 .nl-editor-textarea:focus {
@@ -8890,7 +9030,7 @@ body.meditation-active .meditation-today-log {
     border: 1.5px solid var(--border);
     border-radius: 12px;
     min-height: 500px;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .nl-preview-content {
@@ -9276,7 +9416,8 @@ body.meditation-active .meditation-today-log {
     }
 
     .nl-editor-textarea {
-        min-height: 350px;
+        height: calc(100vh - 200px);
+        min-height: 250px;
         padding: 1rem;
         font-size: 0.9rem;
     }
@@ -14491,4 +14632,158 @@ body.meditation-active .meditation-today-log {
 .timer-circle-container {
     -webkit-user-select: none;
     user-select: none;
+}
+
+/* ===== Finance Trips Dashboard ===== */
+.finance-trips-card {
+    background: var(--surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 1.25rem;
+}
+
+.finance-trips-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 0.85rem;
+}
+
+.finance-trip-card {
+    background: var(--surface-hover);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 0.85rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.finance-trip-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.finance-trip-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: var(--slate-dark);
+}
+
+.finance-trip-dest {
+    font-size: 0.75rem;
+    color: var(--slate-light);
+    margin-top: 0.1rem;
+}
+
+.finance-trip-status {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    font-weight: 600;
+}
+
+.finance-trip-status.status-planned {
+    background: #E3F2FD;
+    color: #1976D2;
+}
+
+.finance-trip-status.status-active {
+    background: #FFF3E0;
+    color: #F57C00;
+}
+
+.finance-trip-status.status-completed {
+    background: #E8F5E9;
+    color: #388E3C;
+}
+
+.finance-trip-dates {
+    font-size: 0.78rem;
+    color: var(--slate-dark);
+}
+
+.finance-trip-cost {
+    margin-top: 0.2rem;
+}
+
+.finance-trip-total {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--slate-dark);
+}
+
+.finance-trip-meta {
+    font-size: 0.75rem;
+    color: var(--slate-light);
+}
+
+.finance-trip-budget {
+    margin-top: 0.15rem;
+}
+
+.finance-trip-budget-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--slate-light);
+    margin-bottom: 0.25rem;
+}
+
+.finance-trip-notes {
+    font-size: 0.75rem;
+    color: var(--slate-light);
+    font-style: italic;
+    border-left: 2px solid var(--border-color);
+    padding-left: 0.5rem;
+}
+
+.finance-trip-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.4rem;
+}
+
+.finance-trip-actions button {
+    background: none;
+    border: 1px solid var(--border-color);
+    color: var(--slate-light);
+    padding: 0.25rem 0.65rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.72rem;
+}
+
+.finance-trip-actions button:hover {
+    background: var(--surface);
+    color: var(--slate-dark);
+}
+
+.finance-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 1rem;
+}
+
+.finance-modal-content {
+    background: var(--surface);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    width: 100%;
+    max-width: 560px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.finance-modal-content h3 {
+    margin-top: 0;
+    margin-bottom: 1rem;
 }

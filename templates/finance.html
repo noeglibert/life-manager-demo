@@ -96,6 +96,115 @@
             <h3>Monthly Trend</h3>
             <div style="position: relative; height: 250px;"><canvas id="trendChart"></canvas></div>
         </div>
+
+        <!-- ===== TRIPS DASHBOARD ===== -->
+        <div class="finance-trips-card" style="margin-top: 1.5rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+                <h3 style="margin: 0;">Trips</h3>
+                <button class="btn-primary" style="padding: 0.4rem 0.9rem; font-size: 0.85rem;" onclick="openTripModal()">+ Add Trip</button>
+            </div>
+            <div class="finance-trips-grid">
+                {% for t in trips %}
+                <div class="finance-trip-card" style="border: 2px solid {{ t.color }};">
+                    <div class="finance-trip-header">
+                        <div>
+                            <div class="finance-trip-name">{{ t.name }}</div>
+                            {% if t.destination %}<div class="finance-trip-dest">{{ t.destination }}</div>{% endif %}
+                        </div>
+                        <span class="finance-trip-status status-{{ t.status }}">{{ t.status }}</span>
+                    </div>
+                    <div class="finance-trip-dates">
+                        {% if t.start_date and t.end_date %}
+                            {{ t.start_date }} &rarr; {{ t.end_date }}
+                            {% if t.duration_days %}<span style="color: var(--slate-light); font-size: 0.75rem;">&middot; {{ t.duration_days }} days</span>{% endif %}
+                        {% else %}
+                            <span style="color: var(--slate-light); font-size: 0.8rem;">No dates set</span>
+                        {% endif %}
+                    </div>
+                    <div class="finance-trip-cost">
+                        <div class="finance-trip-total">{{ "%.2f"|format(t.total_spent) }} &euro;</div>
+                        <div class="finance-trip-meta">
+                            {{ t.txn_count }} txn{% if t.txn_count != 1 %}s{% endif %}
+                            {% if t.daily_avg %} &middot; {{ "%.0f"|format(t.daily_avg) }} &euro;/day{% endif %}
+                        </div>
+                    </div>
+                    {% if t.budget %}
+                    <div class="finance-trip-budget">
+                        <div class="finance-trip-budget-row">
+                            <span>Budget</span>
+                            <span>{{ "%.0f"|format(t.total_spent) }} / {{ "%.0f"|format(t.budget) }} &euro;</span>
+                        </div>
+                        <div class="finance-budget-bar">
+                            <div class="finance-budget-fill {% if t.budget_pct > 100 %}over{% elif t.budget_pct > 80 %}warning{% endif %}"
+                                 style="width: {{ [t.budget_pct, 100] | min }}%"></div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if t.notes %}<div class="finance-trip-notes">{{ t.notes }}</div>{% endif %}
+                    <div class="finance-trip-actions">
+                        <button onclick='editTrip({{ t | tojson }})'>Edit</button>
+                        <button onclick="deleteTrip({{ t.id }}, '{{ t.name }}')">Delete</button>
+                    </div>
+                </div>
+                {% endfor %}
+                {% if not trips %}
+                <p style="color: var(--slate-light); padding: 1rem; grid-column: 1/-1;">No trips yet. Click "Add Trip" to plan one.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Trip Modal -->
+        <div id="tripModal" class="finance-modal" style="display: none;">
+            <div class="finance-modal-content">
+                <h3 id="tripModalTitle">Add Trip</h3>
+                <div class="finance-form-grid">
+                    <div class="form-group">
+                        <label>Name *</label>
+                        <input type="text" id="tripName" placeholder="e.g. Iceland Trip">
+                    </div>
+                    <div class="form-group">
+                        <label>Destination</label>
+                        <input type="text" id="tripDest" placeholder="e.g. Reykjavik, Iceland">
+                    </div>
+                    <div class="form-group">
+                        <label>Start date</label>
+                        <input type="date" id="tripStart">
+                    </div>
+                    <div class="form-group">
+                        <label>End date</label>
+                        <input type="date" id="tripEnd">
+                    </div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <input type="text" id="tripCategory" placeholder="defaults to trip name">
+                    </div>
+                    <div class="form-group">
+                        <label>Budget (&euro;)</label>
+                        <input type="number" id="tripBudget" step="10" placeholder="optional">
+                    </div>
+                    <div class="form-group">
+                        <label>Status</label>
+                        <select id="tripStatus">
+                            <option value="planned">Planned</option>
+                            <option value="active">Active</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Color</label>
+                        <input type="color" id="tripColor" value="#FF5722">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea id="tripNotes" rows="2" placeholder="Optional notes..."></textarea>
+                </div>
+                <div class="finance-form-actions">
+                    <button class="btn-secondary" onclick="closeTripModal()">Cancel</button>
+                    <button class="btn-primary" onclick="saveTrip()">Save</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- ===== TRANSACTIONS TAB ===== -->
@@ -684,6 +793,77 @@ async function deleteRecurring(id) {
         if (data.success) {
             document.getElementById('recurring-' + id)?.remove();
         }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+// ===== TRIPS =====
+let editingTripId = null;
+
+function openTripModal() {
+    editingTripId = null;
+    document.getElementById('tripModalTitle').textContent = 'Add Trip';
+    ['tripName','tripDest','tripStart','tripEnd','tripCategory','tripBudget','tripNotes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('tripStatus').value = 'planned';
+    document.getElementById('tripColor').value = '#FF5722';
+    document.getElementById('tripModal').style.display = 'flex';
+}
+
+function editTrip(trip) {
+    editingTripId = trip.id;
+    document.getElementById('tripModalTitle').textContent = 'Edit Trip';
+    document.getElementById('tripName').value = trip.name || '';
+    document.getElementById('tripDest').value = trip.destination || '';
+    document.getElementById('tripStart').value = trip.start_date || '';
+    document.getElementById('tripEnd').value = trip.end_date || '';
+    document.getElementById('tripCategory').value = trip.category || '';
+    document.getElementById('tripBudget').value = trip.budget || '';
+    document.getElementById('tripStatus').value = trip.status || 'planned';
+    document.getElementById('tripColor').value = trip.color || '#FF5722';
+    document.getElementById('tripNotes').value = trip.notes || '';
+    document.getElementById('tripModal').style.display = 'flex';
+}
+
+function closeTripModal() {
+    document.getElementById('tripModal').style.display = 'none';
+}
+
+async function saveTrip() {
+    const payload = {
+        name: document.getElementById('tripName').value.trim(),
+        destination: document.getElementById('tripDest').value.trim(),
+        start_date: document.getElementById('tripStart').value || null,
+        end_date: document.getElementById('tripEnd').value || null,
+        category: document.getElementById('tripCategory').value.trim(),
+        budget: document.getElementById('tripBudget').value || null,
+        status: document.getElementById('tripStatus').value,
+        color: document.getElementById('tripColor').value,
+        notes: document.getElementById('tripNotes').value.trim(),
+    };
+    if (!payload.name) { alert('Name is required.'); return; }
+    const url = editingTripId ? `/api/trips/${editingTripId}` : '/api/trips';
+    const method = editingTripId ? 'PUT' : 'POST';
+    try {
+        const resp = await fetch(url, {
+            method,
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const data = await resp.json();
+        if (data.success) window.location.reload();
+        else alert(data.error || 'Failed to save trip');
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+async function deleteTrip(id, name) {
+    if (!confirm(`Delete trip "${name}"? Transactions are not affected.`)) return;
+    try {
+        const resp = await fetch(`/api/trips/${id}`, { method: 'DELETE' });
+        const data = await resp.json();
+        if (data.success) window.location.reload();
     } catch (err) {
         alert('Error: ' + err.message);
     }

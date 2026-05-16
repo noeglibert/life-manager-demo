@@ -188,7 +188,7 @@ function renderBarChart(containerId, data, valueKey, opts = {}) {
 
     el.innerHTML = data.map((d, i) => {
         const val = d[valueKey] || 0;
-        const pct = Math.max((val / maxVal) * 100, val > 0 ? 3 : 0);
+        const pct = Math.max((val / maxVal) * 100, val > 0 ? 10 : 0);
         const goalVal = goalKey ? (d[goalKey] || 0) : 0;
         const metGoal = goalKey && val >= goalVal;
         const barColor = metGoal ? '#27ae60' : color;
@@ -269,7 +269,7 @@ function renderSleepChart(containerId, data) {
 }
 
 // Render all charts
-renderBarChart('chart-steps', chartData, 'steps', { goalKey: 'step_goal', color: 'var(--accent)' });
+renderBarChart('chart-steps', chartData, 'steps', { color: '#27ae60' });
 renderBarChart('chart-hr', chartData, 'resting_hr', { color: '#e74c3c', unit: '' });
 renderRangeChart('chart-battery', chartData, 'body_battery_high', 'body_battery_low');
 renderSleepChart('chart-sleep', chartData);

@@ -1,0 +1,550 @@
+{% extends "base.html" %}
+
+{% block title %}{{ ticker.symbol }} - Investing - Life Manager{% endblock %}
+
+{% block content %}
+<style>
+    @media (max-width: 900px) {
+        .ticker-detail-grid {
+            grid-template-columns: 1fr !important;
+        }
+    }
+</style>
+<div class="ticker-detail-page" style="max-width:1400px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+        {% if ticker.status == 'owned' %}
+            <a href="{{ url_for('investing_holdings') }}" style="font-size:13px; opacity:.7;">&larr; Back to Holdings</a>
+        {% elif ticker.status == 'sold' %}
+            <a href="{{ url_for('investing_journal') }}" style="font-size:13px; opacity:.7;">&larr; Back to Journal</a>
+        {% else %}
+            <a href="{{ url_for('investing_watchlist') }}" style="font-size:13px; opacity:.7;">&larr; Back to Watchlist</a>
+        {% endif %}
+        <button onclick="copySecondOpinionPrompt()" id="second-opinion-btn" style="padding:6px 12px; border:1px solid #444; border-radius:6px; background:transparent; color:inherit; cursor:pointer; font-size:12px;">📋 Copy second-opinion prompt</button>
+    </div>
+
+    <div class="ticker-header" style="display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; margin-bottom:16px;">
+        <h1 style="margin:0;">{{ ticker.symbol }}</h1>
+        <div style="opacity:.7;">{{ ticker.company_name }}</div>
+        {% if ticker.isin %}<code style="font-size:12px; opacity:.5;">{{ ticker.isin }}</code>{% endif %}
+        <span style="margin-left:auto;">
+            <select id="status-select" onchange="updateField('status', this.value)" style="padding:4px 8px; border:1px solid #444; border-radius:4px; background:transparent; color:inherit;">
+                {% for s in ['idea', 'researching', 'ready_to_buy', 'owned', 'sold'] %}
+                    <option value="{{ s }}" {% if ticker.status == s %}selected{% endif %}>{{ s.replace('_', ' ') }}</option>
+                {% endfor %}
+            </select>
+        </span>
+    </div>
+
+    <!-- Position summary (only for owned tickers) -->
+    {% if open_shares > 0 %}
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:12px; margin-bottom:24px;">
+            <div style="padding:12px; border:1px solid #333; border-radius:6px;">
+                <div style="font-size:11px; opacity:.6;">Open shares</div>
+                <div style="font-size:20px; font-weight:600;">{{ '{:.4g}'.format(open_shares) }}</div>
+            </div>
+            <div style="padding:12px; border:1px solid #333; border-radius:6px;">
+                <div style="font-size:11px; opacity:.6;">Avg cost (&euro;/sh)</div>
+                <div style="font-size:20px; font-weight:600;">&euro;{{ '{:,.2f}'.format(avg_cost_eur) }}</div>
+            </div>
+            <div style="padding:12px; border:1px solid #333; border-radius:6px;">
+                <div style="font-size:11px; opacity:.6;">Cost basis</div>
+                <div style="font-size:20px; font-weight:600;">&euro;{{ '{:,.2f}'.format(total_cost_basis_eur) }}</div>
+            </div>
+            <div style="padding:12px; border:1px solid #333; border-radius:6px;">
+                <div style="font-size:11px; opacity:.6;">Realized gains</div>
+                <div style="font-size:20px; font-weight:600; color:{% if realized_gain_eur >= 0 %}#16a34a{% else %}#dc2626{% endif %};">
+                    {% if realized_gain_eur >= 0 %}+{% endif %}&euro;{{ '{:,.2f}'.format(realized_gain_eur) }}
+                </div>
+            </div>
+            <div style="padding:12px; border:1px solid #333; border-radius:6px;"
+                 data-unrealized-card
+                 data-cost-basis="{{ total_cost_basis_eur }}"
+                 data-symbol="{{ ticker.symbol }}"
+                 data-ytd-realized="{{ ytd_realized_total_eur or 0 }}">
+                <div style="font-size:11px; opacity:.6;">Unrealized P&amp;L <span style="opacity:.6;">(vs tax basis)</span></div>
+                <div id="unrealized-value" style="font-size:20px; font-weight:600;">&euro;—</div>
+                <div id="unrealized-pct" style="font-size:11px; opacity:.5;">if sold today</div>
+                <div id="unrealized-tax" style="font-size:11px; opacity:.6; margin-top:4px;"></div>
+            </div>
+            <div style="padding:12px; border:1px solid #333; border-radius:6px;">
+                <div style="font-size:11px; opacity:.6;">Dividends received</div>
+                <div style="font-size:20px; font-weight:600;">&euro;{{ '{:,.2f}'.format(total_dividends_eur) }}</div>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Two columns: your view on left, market data on right (chat is full-width below) -->
+    <div class="ticker-detail-grid" style="display:grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap:24px;">
+
+        <!-- LEFT COLUMN: your view -->
+        <div>
+            <h3 style="margin-top:0;">Your view</h3>
+
+            <!-- Thesis -->
+            <div style="margin-bottom:20px;">
+                <label style="font-size:12px; opacity:.7; display:block; margin-bottom:4px;">Thesis (markdown)</label>
+                <textarea id="thesis" rows="6" style="width:100%; padding:8px; background:#0a0a0a; color:inherit; border:1px solid #333; border-radius:6px; font-family:inherit; font-size:13px; resize:vertical;" placeholder="Why do you like this stock? What's your edge?">{{ ticker.thesis or '' }}</textarea>
+                <button onclick="updateField('thesis', document.getElementById('thesis').value)" style="margin-top:6px; padding:4px 12px; border:1px solid #444; border-radius:4px; background:transparent; color:inherit; cursor:pointer; font-size:12px;">Save thesis</button>
+                <span id="thesis-saved" style="margin-left:8px; font-size:11px; opacity:.6;"></span>
+            </div>
+
+            <!-- Conviction, horizon, sector -->
+            <div style="display:grid; grid-template-columns:1fr 1fr 1.5fr; gap:12px; margin-bottom:20px;">
+                <div>
+                    <label style="font-size:12px; opacity:.7; display:block; margin-bottom:4px;">Conviction (1&ndash;10)</label>
+                    <input id="conviction" type="number" min="1" max="10" value="{{ ticker.conviction or '' }}" onchange="updateField('conviction', this.value ? parseInt(this.value) : null)" style="width:100%; padding:6px; background:#0a0a0a; color:inherit; border:1px solid #333; border-radius:4px;">
+                </div>
+                <div>
+                    <label style="font-size:12px; opacity:.7; display:block; margin-bottom:4px;">Horizon</label>
+                    <select id="horizon" onchange="updateField('horizon', this.value || null)" style="width:100%; padding:6px; background:#0a0a0a; color:inherit; border:1px solid #333; border-radius:4px;">
+                        <option value="">—</option>
+                        <option value="long" {% if ticker.horizon == 'long' %}selected{% endif %}>Long term</option>
+                        <option value="swing" {% if ticker.horizon == 'swing' %}selected{% endif %}>Swing</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:12px; opacity:.7; display:block; margin-bottom:4px;">Sector / layer</label>
+                    <input id="layer" type="text" value="{{ ticker.layer or '' }}" onblur="updateField('layer', this.value || null)" placeholder="e.g. Tech / AI" style="width:100%; padding:6px; background:#0a0a0a; color:inherit; border:1px solid #333; border-radius:4px;">
+                </div>
+            </div>
+
+            <!-- Entry zones -->
+            <div style="margin-bottom:20px;">
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <label style="font-size:12px; opacity:.7;">Entry / exit zones</label>
+                    <button onclick="document.getElementById('zone-form').style.display='block'" style="padding:2px 8px; border:1px solid #444; border-radius:4px; background:transparent; color:inherit; cursor:pointer; font-size:11px;">+ Add</button>
+                </div>
+                <div style="margin-top:6px;">
+                    {% for z in zones %}
+                        <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 8px; border:1px solid #333; border-radius:4px; margin-bottom:4px; font-size:13px;">
+                            <span><strong style="color:{% if z.zone_type in ('buy','add') %}#16a34a{% else %}#f59e0b{% endif %};">{{ z.zone_type }}</strong> {{ z.price_low }}&ndash;{{ z.price_high }} {{ z.currency }}{% if z.notes %} — <span style="opacity:.6;">{{ z.notes }}</span>{% endif %}</span>
+                            <button onclick="deleteZone({{ z.id }})" style="background:transparent; color:#dc2626; border:none; cursor:pointer; opacity:.7;">&times;</button>
+                        </div>
+                    {% endfor %}
+                </div>
+                <div id="zone-form" style="display:none; margin-top:8px; padding:8px; border:1px solid #333; border-radius:4px;">
+                    <div style="display:grid; grid-template-columns:repeat(4, 1fr); gap:6px; font-size:12px;">
+                        <select id="z-type" style="background:#0a0a0a; color:inherit; border:1px solid #333; padding:6px; border-radius:4px;">
+                            <option value="buy">buy</option><option value="add">add</option><option value="trim">trim</option><option value="sell">sell</option>
+                        </select>
+                        <input id="z-low" type="number" step="any" placeholder="low" style="background:#0a0a0a; color:inherit; border:1px solid #333; padding:6px; border-radius:4px;">
+                        <input id="z-high" type="number" step="any" placeholder="high" style="background:#0a0a0a; color:inherit; border:1px solid #333; padding:6px; border-radius:4px;">
+                        <input id="z-cur" type="text" value="{{ ticker.currency }}" maxlength="5" style="background:#0a0a0a; color:inherit; border:1px solid #333; padding:6px; border-radius:4px;">
+                    </div>
+                    <button onclick="saveZone()" style="margin-top:8px; background:#3b82f6; color:#fff; border:none; padding:8px 16px; border-radius:4px; cursor:pointer; font-size:13px; font-weight:500;">Add zone</button>
+                    <div id="z-error" style="display:none; margin-top:6px; padding:6px 8px; background:#3a0a0a; border:1px solid #dc2626; border-radius:4px; color:#fca5a5; font-size:12px;"></div>
+                </div>
+            </div>
+
+            <!-- Risks -->
+            <div style="margin-bottom:20px;">
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <label style="font-size:12px; opacity:.7;">Risks &amp; red flags</label>
+                    <button onclick="document.getElementById('risk-form').style.display='block'" style="padding:2px 8px; border:1px solid #444; border-radius:4px; background:transparent; color:inherit; cursor:pointer; font-size:11px;">+ Add</button>
+                </div>
+                <div style="margin-top:6px;">
+                    {% for r in risks %}
+                        <div style="display:flex; align-items:start; justify-content:space-between; padding:6px 8px; border-left:3px solid {% if r.severity == 'high' %}#dc2626{% elif r.severity == 'medium' %}#f59e0b{% else %}#555{% endif %}; background:#0f0f0f; margin-bottom:4px; font-size:13px;">
+                            <span><strong>[{{ r.severity }}]</strong> {{ r.description }}</span>
+                            <button onclick="deleteRisk({{ r.id }})" style="background:transparent; color:#dc2626; border:none; cursor:pointer; opacity:.7;">&times;</button>
+                        </div>
+                    {% endfor %}
+                </div>
+                <div id="risk-form" style="display:none; margin-top:8px; padding:8px; border:1px solid #333; border-radius:4px;">
+                    <textarea id="r-desc" rows="2" placeholder="What could invalidate the thesis?" style="width:100%; background:#0a0a0a; color:inherit; border:1px solid #333; padding:6px; border-radius:4px; font-family:inherit; font-size:12px; resize:vertical;"></textarea>
+                    <div style="margin-top:6px;">
+                        <select id="r-severity" style="background:#0a0a0a; color:inherit; border:1px solid #333; padding:6px; border-radius:4px; font-size:12px; margin-right:8px;">
+                            <option value="low">low</option><option value="medium" selected>medium</option><option value="high">high</option>
+                        </select>
+                        <button onclick="saveRisk()" style="background:#3b82f6; color:#fff; border:none; padding:8px 16px; border-radius:4px; cursor:pointer; font-size:13px; font-weight:500;">Add risk</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Catalysts -->
+            <div style="margin-bottom:20px;">
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <label style="font-size:12px; opacity:.7;">Catalysts &amp; events</label>
+                    <button onclick="document.getElementById('cat-form').style.display='block'" style="padding:2px 8px; border:1px solid #444; border-radius:4px; background:transparent; color:inherit; cursor:pointer; font-size:11px;">+ Add</button>
+                </div>
+                <div style="margin-top:6px;">
+                    {% for c in catalysts %}
+                        <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 8px; border:1px solid #333; border-radius:4px; margin-bottom:4px; font-size:13px;">
+                            <span>
+                                <strong>{{ c.catalyst_date.isoformat() }}</strong>
+                                {% if c.catalyst_type %} <em style="opacity:.6;">[{{ c.catalyst_type }}]</em>{% endif %}
+                                — {{ c.title }}
+                            </span>
+                            <button onclick="deleteCatalyst({{ c.id }})" style="background:transparent; color:#dc2626; border:none; cursor:pointer; opacity:.7;">&times;</button>
+                        </div>
+                    {% endfor %}
+                </div>
+                <div id="cat-form" style="display:none; margin-top:8px; padding:8px; border:1px solid #333; border-radius:4px;">
+                    <div style="display:grid; grid-template-columns:auto 1fr 1fr; gap:6px; font-size:12px;">
+                        <input id="c-date" type="date" style="background:#0a0a0a; color:inherit; border:1px solid #333; padding:4px; border-radius:4px;">
+                        <select id="c-type" style="background:#0a0a0a; color:inherit; border:1px solid #333; padding:4px; border-radius:4px;">
+                            <option value="earnings">earnings</option><option value="product_launch">product launch</option><option value="fda">fda</option><option value="macro">macro</option><option value="guidance">guidance</option><option value="other">other</option>
+                        </select>
+                        <input id="c-title" type="text" placeholder="Title" style="background:#0a0a0a; color:inherit; border:1px solid #333; padding:4px; border-radius:4px;">
+                    </div>
+                    <button onclick="saveCatalyst()" style="margin-top:8px; background:#3b82f6; color:#fff; border:none; padding:8px 16px; border-radius:4px; cursor:pointer; font-size:13px; font-weight:500;">Add catalyst</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: market data + history -->
+        <div>
+            <h3 style="margin-top:0;">History &amp; market data</h3>
+
+            <!-- Lots -->
+            {% if lots %}
+                <h4 style="margin-bottom:8px;">Lots ({{ lots|length }})</h4>
+                <table style="width:100%; border-collapse:collapse; font-size:12px; margin-bottom:16px;">
+                    <thead><tr style="background:#1a1a1a; text-align:left;">
+                        <th style="padding:6px;">Date</th><th style="padding:6px;">Shares</th><th style="padding:6px; text-align:right;">Price</th><th style="padding:6px; text-align:right;">Cost (&euro;)</th><th style="padding:6px; text-align:right;">Open</th><th style="padding:6px;">Source</th>
+                    </tr></thead>
+                    <tbody>
+                        {% for l in lots %}
+                            <tr><td style="padding:6px;">{{ l.trade_date.isoformat() }}</td>
+                                <td style="padding:6px;">{{ '{:.4g}'.format(l.shares) }}</td>
+                                <td style="padding:6px; text-align:right;">{{ '{:.4g}'.format(l.price_native) }} {{ l.currency }}</td>
+                                <td style="padding:6px; text-align:right;">{{ '{:,.2f}'.format(l.cost_basis_eur) }}</td>
+                                <td style="padding:6px; text-align:right;">{{ '{:.4g}'.format(l.remaining_shares) }}</td>
+                                <td style="padding:6px; opacity:.6;">{{ l.source }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+
+            <!-- Sales -->
+            {% if sales %}
+                <h4 style="margin-bottom:8px;">Sales ({{ sales|length }})</h4>
+                <table style="width:100%; border-collapse:collapse; font-size:12px; margin-bottom:16px;">
+                    <thead><tr style="background:#1a1a1a; text-align:left;">
+                        <th style="padding:6px;">Date</th><th style="padding:6px;">Shares</th><th style="padding:6px; text-align:right;">Price</th><th style="padding:6px; text-align:right;">Proceeds (&euro;)</th><th style="padding:6px; text-align:right;">Gain (&euro;)</th>
+                    </tr></thead>
+                    <tbody>
+                        {% for s in sales %}
+                            <tr><td style="padding:6px;">{{ s.trade_date.isoformat() }}</td>
+                                <td style="padding:6px;">{{ '{:.4g}'.format(s.shares) }}</td>
+                                <td style="padding:6px; text-align:right;">{{ '{:.4g}'.format(s.price_native) }} {{ s.currency }}</td>
+                                <td style="padding:6px; text-align:right;">{{ '{:,.2f}'.format(s.proceeds_eur) }}</td>
+                                <td style="padding:6px; text-align:right; color:{% if (s.realized_gain_eur or 0) >= 0 %}#16a34a{% else %}#dc2626{% endif %};">
+                                    {{ '{:+,.2f}'.format(s.realized_gain_eur or 0) }}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+
+            <!-- Dividends -->
+            {% if dividends %}
+                <h4 style="margin-bottom:8px;">Dividends ({{ dividends|length }})</h4>
+                <table style="width:100%; border-collapse:collapse; font-size:12px; margin-bottom:16px;">
+                    <thead><tr style="background:#1a1a1a; text-align:left;">
+                        <th style="padding:6px;">Payment</th><th style="padding:6px; text-align:right;">Gross (&euro;)</th><th style="padding:6px; text-align:right;">Withheld</th><th style="padding:6px; text-align:right;">Net (&euro;)</th>
+                    </tr></thead>
+                    <tbody>
+                        {% for d in dividends %}
+                            <tr><td style="padding:6px;">{{ d.payment_date.isoformat() }}</td>
+                                <td style="padding:6px; text-align:right;">{{ '{:,.2f}'.format(d.gross_eur or 0) }}</td>
+                                <td style="padding:6px; text-align:right; opacity:.7;">{{ '{:,.2f}'.format((d.foreign_withholding_eur or 0) + (d.belgian_withholding_eur or 0)) }}</td>
+                                <td style="padding:6px; text-align:right;">{{ '{:,.2f}'.format(d.net_eur or 0) }}</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Full-width chat row -->
+    <div style="margin-top:24px; padding:16px; border:1px solid #333; border-radius:8px; background:#0a0a0a;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+            <strong style="font-size:14px;">Chat with Claude about {{ ticker.symbol }}</strong>
+            <button onclick="clearChat()" style="padding:2px 10px; border:1px solid #444; border-radius:4px; background:transparent; color:#dc2626; cursor:pointer; font-size:11px;">Clear</button>
+        </div>
+
+        <div id="chat-messages" style="max-height:600px; overflow-y:auto; padding-right:8px; margin-bottom:12px; display:flex; flex-direction:column; gap:10px;"></div>
+
+        <div id="chat-empty" style="text-align:center; opacity:.5; font-size:12px; padding:20px 0;">
+            Ask anything about {{ ticker.symbol }} — Claude has your thesis, conviction, risks, zones, catalysts, and trade history as context.
+        </div>
+
+        <div id="chat-typing" style="display:none; opacity:.6; font-size:12px; padding:6px 0;">Claude is thinking...</div>
+
+        <div style="display:flex; gap:6px;">
+            <textarea id="chat-input" rows="2" placeholder="Ask about thesis, valuation, recent moves, scenarios..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); sendChat();}" style="flex:1; padding:8px; background:#0a0a0a; color:inherit; border:1px solid #333; border-radius:6px; font-family:inherit; font-size:13px; resize:vertical;"></textarea>
+            <button id="chat-send" onclick="sendChat()" style="padding:8px 16px; background:#3b82f6; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:500; align-self:stretch;">Send</button>
+        </div>
+        <div id="chat-meta" style="margin-top:6px; font-size:10px; opacity:.4; text-align:right;"></div>
+    </div>
+</div>
+
+<script>
+const TICKER_ID = {{ ticker.id }};
+
+async function updateField(field, value) {
+    const r = await fetch(`/api/investing/ticker/${TICKER_ID}`, {
+        method: 'PATCH',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({[field]: value}),
+    });
+    if (r.ok && field === 'thesis') {
+        document.getElementById('thesis-saved').textContent = 'Saved ' + new Date().toLocaleTimeString();
+    }
+}
+
+function showZoneError(msg) {
+    const el = document.getElementById('z-error');
+    if (!el) { console.error('z-error div missing'); return; }
+    el.textContent = msg;
+    el.style.display = 'block';
+}
+
+async function saveZone() {
+    console.log('saveZone clicked');
+    const errEl = document.getElementById('z-error');
+    if (errEl) errEl.style.display = 'none';
+    const lowRaw = document.getElementById('z-low').value;
+    const highRaw = document.getElementById('z-high').value;
+    const low = parseFloat(lowRaw);
+    const high = parseFloat(highRaw);
+    const cur = (document.getElementById('z-cur').value || '').trim();
+    console.log('inputs:', {lowRaw, highRaw, cur, parsedLow: low, parsedHigh: high});
+    if (Number.isNaN(low) || Number.isNaN(high)) {
+        showZoneError('Enter both a low and a high price (numbers).');
+        return;
+    }
+    if (low > high) {
+        showZoneError('Low must be ≤ high.');
+        return;
+    }
+    if (!cur) {
+        showZoneError('Currency required.');
+        return;
+    }
+    const payload = {
+        zone_type: document.getElementById('z-type').value,
+        price_low: low,
+        price_high: high,
+        currency: cur,
+    };
+    console.log('POST payload:', payload);
+    try {
+        const r = await fetch(`/api/investing/ticker/${TICKER_ID}/zone`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload),
+        });
+        console.log('response status:', r.status);
+        if (r.ok) {
+            location.reload();
+        } else {
+            const txt = await r.text();
+            showZoneError(`Server error ${r.status}: ${txt.substring(0, 200)}`);
+        }
+    } catch (e) {
+        console.error('saveZone fetch failed:', e);
+        showZoneError('Request failed: ' + e.message);
+    }
+}
+
+async function deleteZone(id) {
+    if (!confirm('Delete this zone?')) return;
+    await fetch(`/api/investing/zone/${id}`, {method: 'DELETE'});
+    location.reload();
+}
+
+async function saveRisk() {
+    const payload = {
+        description: document.getElementById('r-desc').value,
+        severity: document.getElementById('r-severity').value,
+    };
+    if (!payload.description.trim()) return;
+    const r = await fetch(`/api/investing/ticker/${TICKER_ID}/risk`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload),
+    });
+    if (r.ok) location.reload();
+}
+
+async function deleteRisk(id) {
+    if (!confirm('Delete this risk?')) return;
+    await fetch(`/api/investing/risk/${id}`, {method: 'DELETE'});
+    location.reload();
+}
+
+async function saveCatalyst() {
+    const payload = {
+        catalyst_date: document.getElementById('c-date').value,
+        catalyst_type: document.getElementById('c-type').value,
+        title: document.getElementById('c-title').value,
+    };
+    if (!payload.catalyst_date || !payload.title.trim()) return;
+    const r = await fetch(`/api/investing/ticker/${TICKER_ID}/catalyst`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload),
+    });
+    if (r.ok) location.reload();
+}
+
+async function deleteCatalyst(id) {
+    if (!confirm('Delete this catalyst?')) return;
+    await fetch(`/api/investing/catalyst/${id}`, {method: 'DELETE'});
+    location.reload();
+}
+
+// ---------------- Chat-per-ticker ----------------
+
+function renderMarkdown(text) {
+    // Minimal markdown: bold **x**, code `x`, line breaks
+    let html = text
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/`([^`]+)`/g, '<code style="background:#222;padding:1px 4px;border-radius:3px;">$1</code>')
+        .replace(/^- (.+)$/gm, '• $1')
+        .replace(/\n/g, '<br>');
+    return html;
+}
+
+function renderMessage(msg) {
+    const div = document.createElement('div');
+    const isUser = msg.role === 'user';
+    div.style.cssText = `padding:10px 12px; border-radius:8px; max-width:88%; font-size:13px; line-height:1.5; ${isUser ? 'background:#1e3a5f; align-self:flex-end;' : 'background:#1a1a1a; align-self:flex-start; border:1px solid #2a2a2a;'}`;
+    div.innerHTML = renderMarkdown(msg.content);
+    return div;
+}
+
+async function loadChatHistory() {
+    try {
+        const r = await fetch(`/api/investing/ticker/${TICKER_ID}/chat`);
+        const data = await r.json();
+        const container = document.getElementById('chat-messages');
+        container.innerHTML = '';
+        if (data.messages && data.messages.length) {
+            document.getElementById('chat-empty').style.display = 'none';
+            for (const m of data.messages) {
+                container.appendChild(renderMessage(m));
+            }
+            container.scrollTop = container.scrollHeight;
+        }
+    } catch (e) { /* silent */ }
+}
+
+async function sendChat() {
+    const input = document.getElementById('chat-input');
+    const text = input.value.trim();
+    if (!text) return;
+    const sendBtn = document.getElementById('chat-send');
+    const container = document.getElementById('chat-messages');
+    const emptyMsg = document.getElementById('chat-empty');
+    const typing = document.getElementById('chat-typing');
+    const meta = document.getElementById('chat-meta');
+
+    emptyMsg.style.display = 'none';
+    container.appendChild(renderMessage({role: 'user', content: text}));
+    container.scrollTop = container.scrollHeight;
+    input.value = '';
+    sendBtn.disabled = true;
+    sendBtn.textContent = '...';
+    typing.style.display = 'block';
+
+    try {
+        const r = await fetch(`/api/investing/ticker/${TICKER_ID}/chat`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({message: text}),
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Chat error');
+        container.appendChild(renderMessage({role: 'assistant', content: data.reply}));
+        container.scrollTop = container.scrollHeight;
+        if (data.usage) {
+            const u = data.usage;
+            let parts = [`in:${u.input_tokens}`, `out:${u.output_tokens}`];
+            if (u.cache_creation_input_tokens) parts.push(`cache_write:${u.cache_creation_input_tokens}`);
+            if (u.cache_read_input_tokens) parts.push(`cache_hit:${u.cache_read_input_tokens}`);
+            meta.textContent = parts.join(' · ');
+        }
+    } catch (e) {
+        container.appendChild(renderMessage({role: 'assistant', content: 'Error: ' + e.message}));
+    } finally {
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Send';
+        typing.style.display = 'none';
+        input.focus();
+    }
+}
+
+async function clearChat() {
+    if (!confirm('Clear all chat history for this ticker?')) return;
+    await fetch(`/api/investing/ticker/${TICKER_ID}/chat/clear`, {method: 'POST'});
+    document.getElementById('chat-messages').innerHTML = '';
+    document.getElementById('chat-empty').style.display = 'block';
+    document.getElementById('chat-meta').textContent = '';
+}
+
+async function copySecondOpinionPrompt() {
+    const btn = document.getElementById('second-opinion-btn');
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Building…';
+    try {
+        const r = await fetch(`/api/investing/ticker/${TICKER_ID}/second-opinion-prompt`);
+        const data = await r.json();
+        if (!data.prompt) throw new Error('No prompt returned');
+        await navigator.clipboard.writeText(data.prompt);
+        btn.textContent = '✓ Copied — paste into claude.ai';
+        setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 3000);
+    } catch (e) {
+        btn.textContent = 'Failed: ' + e.message;
+        setTimeout(() => { btn.textContent = original; btn.disabled = false; }, 4000);
+    }
+}
+
+async function loadUnrealizedPnl() {
+    const card = document.querySelector('[data-unrealized-card]');
+    if (!card) return;  // not an owned ticker
+    const symbol = card.dataset.symbol;
+    const cost = parseFloat(card.dataset.costBasis);
+    const ytdRealized = parseFloat(card.dataset.ytdRealized || 0);
+    const EXEMPTION = 10000;
+    try {
+        const r = await fetch('/api/investing/live-prices');
+        const data = await r.json();
+        const stock = (data.stocks || []).find(s => s.symbol === symbol);
+        const valueEl = document.getElementById('unrealized-value');
+        const pctEl = document.getElementById('unrealized-pct');
+        const taxEl = document.getElementById('unrealized-tax');
+        if (!stock || stock.error || stock.live_value_eur == null) {
+            valueEl.textContent = 'n/a';
+            pctEl.textContent = stock && stock.error ? stock.error : 'price unavailable';
+            return;
+        }
+        const pnl = stock.live_value_eur - cost;
+        const pct = cost > 0 ? (pnl / cost) * 100 : 0;
+        const sign = pnl >= 0 ? '+' : '';
+        valueEl.textContent = sign + '€' + pnl.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        valueEl.style.color = pnl >= 0 ? '#16a34a' : '#dc2626';
+        pctEl.textContent = sign + pct.toFixed(1) + '% · €' + stock.live_value_eur.toLocaleString('en-US', {maximumFractionDigits: 0}) + ' value · cost basis €' + cost.toLocaleString('en-US', {maximumFractionDigits: 0});
+
+        // Tax-impact line: what happens to YTD realized if this is sold today
+        const projectedYtd = ytdRealized + pnl;
+        let taxMsg;
+        if (projectedYtd <= EXEMPTION) {
+            const headroom = EXEMPTION - projectedYtd;
+            taxMsg = `If sold: YTD realized → €${projectedYtd.toFixed(0)} / €10K (€${headroom.toFixed(0)} headroom) · <strong>tax-free</strong>`;
+            taxEl.style.color = '#16a34a';
+        } else {
+            const taxable = projectedYtd - EXEMPTION;
+            const owed = taxable * 0.10;
+            taxMsg = `If sold: YTD realized → €${projectedYtd.toFixed(0)} → <strong>€${owed.toFixed(0)} tax owed</strong> (10% on €${taxable.toFixed(0)} above exemption)`;
+            taxEl.style.color = '#dc2626';
+        }
+        taxEl.innerHTML = taxMsg;
+    } catch (e) { /* silent */ }
+}
+
+document.addEventListener('DOMContentLoaded', loadChatHistory);
+document.addEventListener('DOMContentLoaded', loadUnrealizedPnl);
+</script>
+{% endblock %}

@@ -1,0 +1,1239 @@
+{% extends "base.html" %}
+
+{% block title %}Investing - Life Manager{% endblock %}
+
+{% block content %}
+<div class="investing-page">
+    <div class="page-header">
+        <h1>Investing</h1>
+        <p class="page-subtitle">Holdings, ideas, research, journal & tax</p>
+    </div>
+
+    <div class="portfolio-tabs">
+        <a href="{{ url_for('investing') }}" class="portfolio-tab {% if active_tab == 'dashboard' %}active{% endif %}">Dashboard</a>
+        <a href="{{ url_for('investing_holdings') }}" class="portfolio-tab {% if active_tab == 'holdings' %}active{% endif %}">Holdings</a>
+        <a href="{{ url_for('investing_watchlist') }}" class="portfolio-tab {% if active_tab == 'watchlist' %}active{% endif %}">Watchlist</a>
+        <a href="{{ url_for('investing_dividends') }}" class="portfolio-tab {% if active_tab == 'dividends' %}active{% endif %}">Dividends</a>
+        <a href="{{ url_for('investing_journal') }}" class="portfolio-tab {% if active_tab == 'journal' %}active{% endif %}">Journal</a>
+        <a href="{{ url_for('investing_tax') }}" class="portfolio-tab {% if active_tab == 'tax' %}active{% endif %}">Tax</a>
+        <a href="{{ url_for('investing_import') }}" class="portfolio-tab {% if active_tab == 'import' %}active{% endif %}">Import</a>
+    </div>
+
+    <div class="investing-content" style="padding: 24px 0;">
+        {% if active_tab == 'dashboard' %}
+            <div class="dashboard-tab">
+                {# ===== Hero KPIs ===== #}
+                <div class="dash-kpis" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:24px;">
+                    <div style="padding:16px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">Portfolio value</div>
+                        <div id="dash-value" style="font-size:24px; font-weight:600;">&euro;—</div>
+                        <div style="font-size:11px; opacity:.6;">{{ dash_owned_count }} position{{ '' if dash_owned_count == 1 else 's' }}</div>
+                    </div>
+                    <div style="padding:16px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">Today</div>
+                        <div id="dash-today" style="font-size:24px; font-weight:600;">&euro;—</div>
+                        <div id="dash-today-pct" style="font-size:11px; opacity:.6;">—</div>
+                    </div>
+                    <div style="padding:16px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">Unrealized P&amp;L <span style="opacity:.6;">(vs tax basis)</span></div>
+                        <div id="dash-unrealized" style="font-size:24px; font-weight:600;">&euro;—</div>
+                        <div id="dash-unrealized-pct" style="font-size:11px; opacity:.6;">—</div>
+                    </div>
+                    <div style="padding:16px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">YTD realized ({{ dash_year }})</div>
+                        <div style="font-size:24px; font-weight:600; color:{% if dash_ytd_realized >= 0 %}#16a34a{% else %}#dc2626{% endif %};">
+                            {% if dash_ytd_realized >= 0 %}+{% endif %}&euro;{{ '{:,.2f}'.format(dash_ytd_realized) }}
+                        </div>
+                        <div style="font-size:11px; opacity:.6;">
+                            +&euro;{{ '{:,.0f}'.format(dash_realized_gains_only) }} gains
+                            {% if dash_realized_losses_only < 0 %}· &minus;&euro;{{ '{:,.0f}'.format(dash_realized_losses_only|abs) }} losses{% endif %}
+                        </div>
+                    </div>
+                    <div style="padding:16px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">YTD dividends</div>
+                        <div style="font-size:24px; font-weight:600;">&euro;{{ '{:,.2f}'.format(dash_ytd_dividends) }}</div>
+                        <div style="font-size:11px; opacity:.6;">net of withholding</div>
+                    </div>
+                    <div style="padding:16px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">Exemption left</div>
+                        <div style="font-size:24px; font-weight:600;">&euro;{{ '{:,.0f}'.format(dash_exemption_remaining) }}</div>
+                        <div style="font-size:11px; opacity:.6;">{{ dash_pct_used }}% of &euro;{{ '{:,.0f}'.format(dash_exemption) }} used</div>
+                    </div>
+                    <div style="padding:16px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">Tax estimate (10%)</div>
+                        <div style="font-size:24px; font-weight:600; color:{% if dash_tax_owed > 0 %}#dc2626{% else %}#16a34a{% endif %};">
+                            &euro;{{ '{:,.2f}'.format(dash_tax_owed) }}
+                        </div>
+                        <div style="font-size:11px; opacity:.6;"><a href="{{ url_for('investing_tax') }}" style="color:inherit;">tax detail →</a></div>
+                    </div>
+                </div>
+
+                {# ===== Alerts (filled by JS) ===== #}
+                <div id="dash-alerts-wrap" style="margin-bottom:24px;">
+                    <h3 style="margin-bottom:8px;">Alerts</h3>
+                    <div id="dash-alerts" style="display:flex; flex-direction:column; gap:8px;">
+                        {# Server-rendered alerts: missing thesis, near-term catalysts #}
+                        {% for m in dash_missing_thesis %}
+                            <div class="dash-alert" style="padding:10px 14px; border-left:3px solid #f59e0b; background:#1a1408; font-size:13px;">
+                                <strong>{{ m.symbol }}</strong> has no thesis recorded —
+                                <a href="{{ url_for('investing_ticker_detail', symbol=m.symbol) }}" style="color:inherit;">write one →</a>
+                            </div>
+                        {% endfor %}
+                        {% for c in dash_upcoming if c.days_until <= 7 %}
+                            <div class="dash-alert" style="padding:10px 14px; border-left:3px solid #3b82f6; background:#0a1424; font-size:13px;">
+                                <strong>{{ c.symbol }}</strong> · {{ c.title }} in
+                                {% if c.days_until == 0 %}<strong>today</strong>{% elif c.days_until == 1 %}<strong>1 day</strong>{% else %}<strong>{{ c.days_until }} days</strong>{% endif %}
+                                ({{ c.date }})
+                            </div>
+                        {% endfor %}
+                        <div id="dash-zone-alerts"></div>
+                        {% if not dash_missing_thesis and not dash_upcoming %}
+                            <div id="dash-alerts-empty" style="padding:10px 14px; opacity:.5; font-size:13px;">No alerts. Waiting for live prices to check entry zones…</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {# ===== Two-column: Upcoming catalysts | Top watchlist ===== #}
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:24px; margin-bottom:24px;">
+                    <div>
+                        <h3 style="margin-bottom:8px;">Upcoming catalysts (30d)</h3>
+                        {% if dash_upcoming %}
+                            <div style="display:flex; flex-direction:column; gap:6px;">
+                                {% for c in dash_upcoming %}
+                                    <a href="{{ url_for('investing_ticker_detail', symbol=c.symbol) }}" style="text-decoration:none; color:inherit;">
+                                        <div style="padding:10px 12px; border:1px solid #2a2a2a; border-radius:6px; display:flex; align-items:center; gap:12px;">
+                                            <div style="min-width:64px; font-size:12px; opacity:.7;">
+                                                {% if c.days_until == 0 %}<strong style="color:#3b82f6;">today</strong>{% elif c.days_until == 1 %}<strong>1d</strong>{% else %}{{ c.days_until }}d{% endif %}
+                                            </div>
+                                            <div style="flex:1;">
+                                                <strong>{{ c.symbol }}</strong>
+                                                <span style="opacity:.6; font-size:12px;">· {{ c.type }}</span>
+                                                <div style="font-size:13px;">{{ c.title }}</div>
+                                            </div>
+                                            <div style="font-size:11px; opacity:.5;">{{ c.date }}</div>
+                                        </div>
+                                    </a>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p style="opacity:.5; font-size:13px;">No catalysts scheduled in the next 30 days.</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <h3 style="margin-bottom:8px;">Top watchlist ideas</h3>
+                        {% if dash_top_ideas %}
+                            <div style="display:flex; flex-direction:column; gap:6px;">
+                                {% for t in dash_top_ideas %}
+                                    <a href="{{ url_for('investing_ticker_detail', symbol=t.symbol) }}" style="text-decoration:none; color:inherit;">
+                                        <div style="padding:10px 12px; border:1px solid #2a2a2a; border-radius:6px; display:flex; align-items:center; gap:12px;">
+                                            <div style="min-width:48px; text-align:center; font-weight:700; font-size:18px;">{{ t.conviction }}<span style="font-size:11px; opacity:.5;">/10</span></div>
+                                            <div style="flex:1;">
+                                                <strong>{{ t.symbol }}</strong>
+                                                <span style="font-size:12px; opacity:.6;">· {{ t.status.replace('_', ' ') }}</span>
+                                                <div style="font-size:12px; opacity:.7;">{{ t.company_name }}</div>
+                                            </div>
+                                            {% if t.buy_zone %}
+                                                <div style="font-size:11px; color:#16a34a; text-align:right;">buy<br>{{ t.buy_zone }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </a>
+                                {% endfor %}
+                            </div>
+                            <a href="{{ url_for('investing_watchlist') }}" style="display:inline-block; margin-top:8px; font-size:12px; opacity:.7;">All ideas →</a>
+                        {% else %}
+                            <p style="opacity:.5; font-size:13px;">No ideas with conviction set.</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {# ===== Top holdings | Layer allocation ===== #}
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(360px, 1fr)); gap:24px; margin-bottom:24px;">
+                    <div>
+                        <h3 style="margin-bottom:8px;">Top holdings</h3>
+                        {% if dash_top_holdings %}
+                            <table style="width:100%; border-collapse:collapse;">
+                                <thead>
+                                    <tr style="text-align:left; font-size:12px; opacity:.6;">
+                                        <th style="padding:6px 8px;">Ticker</th>
+                                        <th style="padding:6px 8px; text-align:right;">Cost (&euro;)</th>
+                                        <th style="padding:6px 8px; text-align:right;">Value (&euro;)</th>
+                                        <th style="padding:6px 8px; text-align:right;">P&amp;L</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for h in dash_top_holdings %}
+                                        <tr data-dash-symbol="{{ h.symbol }}">
+                                            <td style="padding:8px; border-bottom:1px solid #222;">
+                                                <a href="{{ url_for('investing_ticker_detail', symbol=h.symbol) }}" style="color:inherit; text-decoration:none;">
+                                                    <strong>{{ h.symbol }}</strong>
+                                                </a>
+                                            </td>
+                                            <td style="padding:8px; border-bottom:1px solid #222; text-align:right;">{{ '{:,.0f}'.format(h.cost_basis_eur) }}</td>
+                                            <td class="dash-h-value" style="padding:8px; border-bottom:1px solid #222; text-align:right; opacity:.4;">—</td>
+                                            <td class="dash-h-pnl" style="padding:8px; border-bottom:1px solid #222; text-align:right; opacity:.4;">—</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                            <a href="{{ url_for('investing_holdings') }}" style="display:inline-block; margin-top:8px; font-size:12px; opacity:.7;">All holdings →</a>
+                        {% else %}
+                            <p style="opacity:.5; font-size:13px;">No holdings yet. <a href="{{ url_for('investing_import') }}">Import Bolero PDFs</a>.</p>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <div style="display:flex; align-items:baseline; justify-content:space-between; margin-bottom:8px;">
+                            <h3 style="margin:0;">Allocation by layer</h3>
+                            <span id="dash-alloc-mode" style="font-size:11px; opacity:.5;">cost basis</span>
+                        </div>
+                        {% if dash_layer_alloc %}
+                            <div id="dash-alloc-bars" style="display:flex; flex-direction:column; gap:8px;">
+                                {% for l in dash_layer_alloc %}
+                                    <div data-dash-layer="{{ l.layer }}">
+                                        <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:3px;">
+                                            <span>{{ l.layer }}</span>
+                                            <span class="dash-alloc-label" style="opacity:.7;">{{ '{:.1f}'.format(l.pct) }}% · &euro;{{ '{:,.0f}'.format(l.cost_basis_eur) }}</span>
+                                        </div>
+                                        <div style="background:#222; height:8px; border-radius:4px; overflow:hidden;">
+                                            <div class="dash-alloc-fill" style="background:#3b82f6; height:100%; width:{{ l.pct }}%; transition:width .3s;"></div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p style="opacity:.5; font-size:13px;">No holdings yet.</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {# ===== Recent activity ===== #}
+                {% if dash_recent_events %}
+                    <div style="margin-bottom:24px;">
+                        <h3 style="margin-bottom:8px;">Recent activity</h3>
+                        <div style="display:flex; flex-direction:column; gap:4px;">
+                            {% for e in dash_recent_events %}
+                                <a href="{{ url_for('investing_ticker_detail', symbol=e.symbol) }}" style="text-decoration:none; color:inherit;">
+                                    <div style="padding:8px 12px; border-bottom:1px solid #222; display:flex; align-items:center; gap:12px; font-size:13px;">
+                                        <div style="min-width:60px; font-size:11px; opacity:.6;">
+                                            {% if e.days_ago == 0 %}today{% elif e.days_ago == 1 %}1d ago{% else %}{{ e.days_ago }}d ago{% endif %}
+                                        </div>
+                                        <div style="min-width:70px;">
+                                            {% if e.kind == 'buy' %}
+                                                <span style="color:#3b82f6; font-weight:600;">BUY</span>
+                                            {% elif e.kind == 'sell' %}
+                                                <span style="color:#f59e0b; font-weight:600;">SELL</span>
+                                            {% else %}
+                                                <span style="color:#16a34a; font-weight:600;">DIV</span>
+                                            {% endif %}
+                                        </div>
+                                        <div style="min-width:64px;"><strong>{{ e.symbol }}</strong></div>
+                                        <div style="flex:1; opacity:.8;">{{ e.detail }}</div>
+                                        <div style="text-align:right;">
+                                            {% if e.kind == 'sell' and e.gain_eur is not none %}
+                                                <span style="color:{% if e.gain_eur >= 0 %}#16a34a{% else %}#dc2626{% endif %};">{{ '{:+,.0f}'.format(e.gain_eur) }} &euro;</span>
+                                            {% else %}
+                                                <span style="opacity:.7;">{{ '{:+,.0f}'.format(e.amount_eur) }} &euro;</span>
+                                            {% endif %}
+                                        </div>
+                                        <div style="min-width:84px; text-align:right; font-size:11px; opacity:.5;">{{ e.date_iso }}</div>
+                                    </div>
+                                </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+
+            <script>
+            (function() {
+                // ALERT ZONE DATA from server (active buy/sell zones across all tickers)
+                const ZONES = {{ dash_alert_zones | tojson }};
+                // PROXIMITY THRESHOLD: highlight when live price is within 5% of zone boundary
+                const NEAR_PCT = 0.05;
+
+                function fmtEur(v) {
+                    return '€' + v.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                }
+                function fmtPct(v) {
+                    return (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+                }
+
+                async function loadDashLive() {
+                    try {
+                        const r = await fetch('/api/investing/live-prices');
+                        const data = await r.json();
+                        if (!data.success) throw new Error('API error');
+
+                        // KPI updates
+                        const tot = data.totals || {};
+                        if (tot.total_value_eur != null) {
+                            document.getElementById('dash-value').textContent = fmtEur(tot.total_value_eur);
+                        }
+                        const pnl = tot.total_pnl_eur;
+                        if (pnl != null) {
+                            const el = document.getElementById('dash-unrealized');
+                            el.textContent = (pnl >= 0 ? '+' : '') + fmtEur(pnl);
+                            el.style.color = pnl >= 0 ? '#16a34a' : '#dc2626';
+                            document.getElementById('dash-unrealized-pct').textContent = fmtPct(tot.total_pnl_pct || 0);
+                        }
+                        const today = tot.total_today_change_eur;
+                        if (today != null) {
+                            const el = document.getElementById('dash-today');
+                            el.textContent = (today >= 0 ? '+' : '') + fmtEur(today);
+                            el.style.color = today >= 0 ? '#16a34a' : '#dc2626';
+                            document.getElementById('dash-today-pct').textContent = fmtPct(tot.total_today_change_pct || 0);
+                        }
+
+                        // Build symbol -> live data map (also keep native price for zone comparison)
+                        const bySymbol = {};
+                        for (const s of (data.stocks || [])) {
+                            bySymbol[s.symbol] = s;
+                        }
+
+                        // Layer allocation: recompute weights using live value
+                        const layerTotals = {};
+                        let grandTotal = 0;
+                        for (const s of (data.stocks || [])) {
+                            if (s.live_value_eur == null) continue;
+                            const layer = s.layer || 'Uncategorized';
+                            layerTotals[layer] = (layerTotals[layer] || 0) + s.live_value_eur;
+                            grandTotal += s.live_value_eur;
+                        }
+                        if (grandTotal > 0) {
+                            document.querySelectorAll('[data-dash-layer]').forEach(row => {
+                                const layer = row.dataset.dashLayer;
+                                const v = layerTotals[layer] || 0;
+                                const pct = v / grandTotal * 100;
+                                row.querySelector('.dash-alloc-label').textContent =
+                                    pct.toFixed(1) + '% · €' + Math.round(v).toLocaleString();
+                                row.querySelector('.dash-alloc-fill').style.width = pct + '%';
+                            });
+                            document.getElementById('dash-alloc-mode').textContent = 'live value';
+                        }
+
+                        // Top holdings live fill
+                        document.querySelectorAll('tr[data-dash-symbol]').forEach(row => {
+                            const sym = row.dataset.dashSymbol;
+                            const s = bySymbol[sym];
+                            if (!s || s.error) return;
+                            const valCell = row.querySelector('.dash-h-value');
+                            const pnlCell = row.querySelector('.dash-h-pnl');
+                            valCell.textContent = s.live_value_eur != null ? Math.round(s.live_value_eur).toLocaleString() : '—';
+                            valCell.style.opacity = 1;
+                            if (s.pnl_eur != null) {
+                                pnlCell.textContent = fmtPct(s.pnl_pct);
+                                pnlCell.style.color = s.pnl_eur >= 0 ? '#16a34a' : '#dc2626';
+                                pnlCell.style.opacity = 1;
+                            }
+                        });
+
+                        // Entry zone alerts: compare live native price against active zones
+                        const wrap = document.getElementById('dash-zone-alerts');
+                        const lines = [];
+                        for (const z of ZONES) {
+                            const s = bySymbol[z.symbol];
+                            if (!s || s.live_price_native == null) continue;
+                            let price = s.live_price_native;
+                            // Currency normalization for GBp: zones likely in pence too if currency='GBp', otherwise we'd need fx — keep simple, only alert when currencies match
+                            if (s.currency !== z.currency) continue;
+                            const lo = z.price_low, hi = z.price_high;
+                            const inZone = price >= lo && price <= hi;
+                            const nearLo = price < lo && (lo - price) / lo <= NEAR_PCT;
+                            const nearHi = price > hi && (price - hi) / hi <= NEAR_PCT;
+                            if (!inZone && !nearLo && !nearHi) continue;
+
+                            const isBuyish = z.zone_type === 'buy' || z.zone_type === 'add';
+                            const color = isBuyish ? '#16a34a' : '#dc2626';
+                            const bg = isBuyish ? '#0a1a10' : '#1a0a0a';
+                            let msg;
+                            if (inZone) {
+                                msg = `<strong>${z.symbol}</strong> price ${price.toFixed(2)} ${z.currency} is <strong>inside</strong> ${z.zone_type} zone (${lo}–${hi} ${z.currency})`;
+                            } else if (nearLo) {
+                                const pct = ((lo - price) / lo * 100).toFixed(1);
+                                msg = `<strong>${z.symbol}</strong> price ${price.toFixed(2)} ${z.currency} is ${pct}% below ${z.zone_type} zone (${lo}–${hi})`;
+                            } else {
+                                const pct = ((price - hi) / hi * 100).toFixed(1);
+                                msg = `<strong>${z.symbol}</strong> price ${price.toFixed(2)} ${z.currency} is ${pct}% above ${z.zone_type} zone (${lo}–${hi})`;
+                            }
+                            lines.push(`<a href="/investing/ticker/${z.symbol}" style="text-decoration:none; color:inherit;"><div class="dash-alert" style="padding:10px 14px; border-left:3px solid ${color}; background:${bg}; font-size:13px;">${msg}</div></a>`);
+                        }
+                        wrap.innerHTML = lines.join('');
+
+                        // Remove "waiting" placeholder once we've processed zones
+                        const empty = document.getElementById('dash-alerts-empty');
+                        if (empty) {
+                            if (lines.length === 0 && empty.textContent.includes('Waiting')) {
+                                empty.textContent = 'No alerts.';
+                            } else if (lines.length > 0) {
+                                empty.remove();
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Dashboard live load failed:', e);
+                        const empty = document.getElementById('dash-alerts-empty');
+                        if (empty) empty.textContent = 'Could not load live prices.';
+                    }
+                }
+
+                document.addEventListener('DOMContentLoaded', loadDashLive);
+            })();
+            </script>
+        {% elif active_tab == 'holdings' %}
+            <div class="holdings-tab">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:16px;">
+                    <h2 style="margin:0;">Holdings ({{ holdings|length }})</h2>
+                    <div style="display:flex; gap:12px; align-items:center;">
+                        <span id="last-refresh" style="font-size:12px; opacity:.6;"></span>
+                        <button onclick="loadLivePrices(true)" id="refresh-btn" style="padding:6px 12px; border:1px solid #555; border-radius:6px; background:transparent; color:inherit; cursor:pointer;">Refresh prices</button>
+                    </div>
+                </div>
+
+                <div id="holdings-totals" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:20px;">
+                    <div style="padding:16px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">Portfolio Value</div>
+                        <div id="kpi-value" style="font-size:24px; font-weight:600;">&euro;—</div>
+                    </div>
+                    <div style="padding:16px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">Cost basis (tax)</div>
+                        <div id="kpi-cost" style="font-size:24px; font-weight:600;">&euro;—</div>
+                        <div style="font-size:11px; opacity:.5;">Dec 31 step-up or post-2026 buy</div>
+                    </div>
+                    <div style="padding:16px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">Unrealized P&amp;L <span style="opacity:.6;">(vs tax basis)</span></div>
+                        <div id="kpi-pnl" style="font-size:24px; font-weight:600;">&euro;—</div>
+                        <div id="kpi-pnl-pct" style="font-size:12px; opacity:.7;">—</div>
+                        <div style="font-size:11px; opacity:.5;">what you'd realize if sold today</div>
+                    </div>
+                </div>
+
+                {% for layer_name, layer_holdings in layers.items() %}
+                    <h3 style="margin-top:24px; margin-bottom:8px;">{{ layer_name }}</h3>
+                    <table style="width:100%; border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#1a1a1a; text-align:left; font-size:13px;">
+                                <th style="padding:8px;">Ticker</th>
+                                <th style="padding:8px; text-align:right;">Shares</th>
+                                <th style="padding:8px; text-align:right;">Avg cost (&euro;/sh)</th>
+                                <th style="padding:8px; text-align:right;" title="Tax cost basis: Dec 31 2025 step-up for pre-2026 holdings, actual purchase price for post-2026 buys">Cost basis (&euro;)</th>
+                                <th style="padding:8px; text-align:right;">Live price</th>
+                                <th style="padding:8px; text-align:right;">Value (&euro;)</th>
+                                <th style="padding:8px; text-align:right;" title="Unrealized: live value minus tax cost basis. This is what you'd realize if sold today.">P&amp;L (&euro;) <span style="opacity:.6; font-weight:400;">vs basis</span></th>
+                                <th style="padding:8px; text-align:right;">%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for h in layer_holdings %}
+                                <tr data-symbol="{{ h.symbol }}">
+                                    <td style="padding:8px; border-bottom:1px solid #222;">
+                                        <a href="{{ url_for('investing_ticker_detail', symbol=h.symbol) }}" style="color:inherit; text-decoration:none;">
+                                            <strong>{{ h.symbol }}</strong>
+                                            <div style="font-size:11px; opacity:.5;">{{ h.company_name }}</div>
+                                        </a>
+                                    </td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right;">{{ '{:.4g}'.format(h.shares) }}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right;">{{ '{:,.2f}'.format(h.avg_cost_eur_per_share) }}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right;">{{ '{:,.2f}'.format(h.cost_basis_eur) }}</td>
+                                    <td class="live-price" style="padding:8px; border-bottom:1px solid #222; text-align:right; opacity:.5;">—</td>
+                                    <td class="live-value" style="padding:8px; border-bottom:1px solid #222; text-align:right; opacity:.5;">—</td>
+                                    <td class="live-pnl" style="padding:8px; border-bottom:1px solid #222; text-align:right; opacity:.5;">—</td>
+                                    <td class="live-pnl-pct" style="padding:8px; border-bottom:1px solid #222; text-align:right; opacity:.5;">—</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% endfor %}
+
+                {% if not holdings %}
+                    <p style="opacity:.6;">No holdings yet. Use the <a href="{{ url_for('investing_import') }}">Import</a> tab to ingest Bolero PDFs.</p>
+                {% endif %}
+            </div>
+
+            <script>
+            function fmtEur(v) {
+                return '€' + v.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+            }
+            function fmtPct(v) {
+                return (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+            }
+            async function loadLivePrices(force) {
+                const btn = document.getElementById('refresh-btn');
+                btn.disabled = true;
+                btn.textContent = 'Loading...';
+                try {
+                    const url = force ? '/api/investing/live-prices?force=1' : '/api/investing/live-prices';
+                    const r = await fetch(url);
+                    const data = await r.json();
+                    if (!data.success) throw new Error('API error');
+                    // Update totals
+                    const tot = data.totals;
+                    document.getElementById('kpi-value').textContent = fmtEur(tot.total_value_eur || 0);
+                    document.getElementById('kpi-cost').textContent = fmtEur(tot.total_cost_eur || 0);
+                    const pnl = tot.total_pnl_eur || 0;
+                    const pnlEl = document.getElementById('kpi-pnl');
+                    pnlEl.textContent = (pnl >= 0 ? '+' : '') + fmtEur(pnl).replace('€', '€');
+                    pnlEl.style.color = pnl >= 0 ? '#16a34a' : '#dc2626';
+                    document.getElementById('kpi-pnl-pct').textContent = fmtPct(tot.total_pnl_pct || 0);
+                    // Update each row
+                    for (const stock of data.stocks) {
+                        const row = document.querySelector(`tr[data-symbol="${stock.symbol}"]`);
+                        if (!row) continue;
+                        if (stock.error) {
+                            row.querySelector('.live-price').textContent = stock.error;
+                            continue;
+                        }
+                        row.querySelector('.live-price').textContent = stock.live_price_native.toFixed(2) + ' ' + stock.currency;
+                        row.querySelector('.live-price').style.opacity = 1;
+                        row.querySelector('.live-value').textContent = fmtEur(stock.live_value_eur);
+                        row.querySelector('.live-value').style.opacity = 1;
+                        const pnlCell = row.querySelector('.live-pnl');
+                        pnlCell.textContent = (stock.pnl_eur >= 0 ? '+' : '') + fmtEur(stock.pnl_eur).replace('€', '€');
+                        pnlCell.style.color = stock.pnl_eur >= 0 ? '#16a34a' : '#dc2626';
+                        pnlCell.style.opacity = 1;
+                        const pctCell = row.querySelector('.live-pnl-pct');
+                        pctCell.textContent = fmtPct(stock.pnl_pct);
+                        pctCell.style.color = stock.pnl_pct >= 0 ? '#16a34a' : '#dc2626';
+                        pctCell.style.opacity = 1;
+                    }
+                    const ageNote = data.cached ? ` (cached ${Math.round((data.cached_age_sec||0)/60)}m ago)` : '';
+                    document.getElementById('last-refresh').textContent = 'Updated ' + new Date().toLocaleTimeString() + ageNote;
+                } catch (e) {
+                    document.getElementById('last-refresh').textContent = 'Error: ' + e.message;
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = 'Refresh prices';
+                }
+            }
+            document.addEventListener('DOMContentLoaded', loadLivePrices);
+            </script>
+        {% elif active_tab == 'watchlist' %}
+            <div class="watchlist-tab">
+                <h2>Watchlist / Ideas ({{ watchlist_count }})</h2>
+                <p style="opacity:.6; font-size:13px;">Tickers you're researching or considering. Click any to open its detail page with thesis, zones, catalysts, risks.</p>
+
+                {% for layer_name, layer_tickers in watchlist_layers.items() %}
+                    <h3 style="margin-top:24px; margin-bottom:8px;">{{ layer_name }}</h3>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px;">
+                        {% for t in layer_tickers %}
+                            <a href="{{ url_for('investing_ticker_detail', symbol=t.symbol) }}" style="text-decoration:none; color:inherit;">
+                                <div style="padding:14px; border:1px solid #333; border-radius:8px; background:#0f0f0f; transition:border-color .2s;" onmouseover="this.style.borderColor='#666'" onmouseout="this.style.borderColor='#333'">
+                                    <div style="display:flex; align-items:baseline; justify-content:space-between;">
+                                        <strong style="font-size:16px;">{{ t.symbol }}</strong>
+                                        <span style="font-size:11px; opacity:.6;">{{ t.status.replace('_', ' ') }}</span>
+                                    </div>
+                                    <div style="font-size:12px; opacity:.7; margin-bottom:8px;">{{ t.company_name }}</div>
+
+                                    <div style="display:flex; gap:12px; font-size:12px;">
+                                        {% if t.conviction %}
+                                            <span><strong>{{ t.conviction }}</strong>/10 conviction</span>
+                                        {% endif %}
+                                        {% if t.horizon %}
+                                            <span style="opacity:.7;">· {{ t.horizon }}</span>
+                                        {% endif %}
+                                    </div>
+
+                                    {% if t.buy_zone %}
+                                        <div style="margin-top:6px; font-size:12px;">
+                                            <span style="color:#16a34a;">Buy zone:</span> {{ t.buy_zone }}
+                                        </div>
+                                    {% endif %}
+
+                                    {% if t.next_catalyst %}
+                                        <div style="margin-top:6px; font-size:12px;">
+                                            <span style="opacity:.6;">Next:</span> <strong>{{ t.next_catalyst.date }}</strong> {{ t.next_catalyst.title }}
+                                        </div>
+                                    {% endif %}
+
+                                    {% if not t.has_thesis and not t.conviction and not t.buy_zone %}
+                                        <div style="margin-top:6px; font-size:11px; opacity:.4;">No thesis yet</div>
+                                    {% endif %}
+                                </div>
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+
+                {% if not watchlist_count %}
+                    <p style="opacity:.6;">No ideas in watchlist yet.</p>
+                {% endif %}
+            </div>
+        {% elif active_tab == 'journal' %}
+            <div class="journal-tab">
+                {# ===== Filter bar ===== #}
+                <form method="get" action="{{ url_for('investing_journal') }}" style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:20px;">
+                    <label style="font-size:13px; opacity:.8;">Year
+                        <select name="year" onchange="this.form.submit()" style="margin-left:6px; padding:6px 10px; border:1px solid #444; border-radius:6px; background:#0a0a0a; color:inherit;">
+                            {% for y in jrn_years %}
+                                <option value="{{ y }}" {% if y == jrn_year %}selected{% endif %}>{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    <label style="font-size:13px; opacity:.8;">Ticker
+                        <select name="symbol" onchange="this.form.submit()" style="margin-left:6px; padding:6px 10px; border:1px solid #444; border-radius:6px; background:#0a0a0a; color:inherit;">
+                            <option value="">All tickers</option>
+                            {% for s in jrn_all_symbols %}
+                                <option value="{{ s }}" {% if s == jrn_symbol %}selected{% endif %}>{{ s }}</option>
+                            {% endfor %}
+                        </select>
+                    </label>
+                    {% if jrn_symbol %}
+                        <a href="{{ url_for('investing_journal', year=jrn_year) }}" style="font-size:12px; opacity:.7;">clear filter</a>
+                    {% endif %}
+                </form>
+
+                {# ===== KPI strip ===== #}
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; margin-bottom:24px;">
+                    <div style="padding:14px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">Events</div>
+                        <div style="font-size:22px; font-weight:600;">{{ jrn_events|length }}</div>
+                        <div style="font-size:11px; opacity:.6;">{{ jrn_counts.buy }} buys · {{ jrn_counts.sell }} sells · {{ jrn_counts.dividend }} divs</div>
+                    </div>
+                    <div style="padding:14px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">Inflows</div>
+                        <div style="font-size:22px; font-weight:600; color:#16a34a;">+&euro;{{ '{:,.2f}'.format(jrn_cashflow_in) }}</div>
+                        <div style="font-size:11px; opacity:.6;">sells + dividends</div>
+                    </div>
+                    <div style="padding:14px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">Outflows</div>
+                        <div style="font-size:22px; font-weight:600; color:#dc2626;">&minus;&euro;{{ '{:,.2f}'.format(jrn_cashflow_out) }}</div>
+                        <div style="font-size:11px; opacity:.6;">buys</div>
+                    </div>
+                    <div style="padding:14px; border:1px solid #444; border-radius:8px; background:#1a1a1a;">
+                        <div style="font-size:12px; opacity:.7;">Net cashflow</div>
+                        <div style="font-size:24px; font-weight:700; color:{% if jrn_cashflow_net >= 0 %}#16a34a{% else %}#dc2626{% endif %};">
+                            {% if jrn_cashflow_net >= 0 %}+{% endif %}&euro;{{ '{:,.2f}'.format(jrn_cashflow_net) }}
+                        </div>
+                        <div style="font-size:11px; opacity:.6;">in {{ jrn_year }}</div>
+                    </div>
+                </div>
+
+                {# ===== Event feed ===== #}
+                {% if jrn_events %}
+                    <div style="display:flex; flex-direction:column; gap:12px;">
+                        {% for e in jrn_events %}
+                            <div style="padding:14px; border:1px solid #2a2a2a; border-radius:8px; background:#0f0f0f;">
+                                <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:8px;">
+                                    <span style="min-width:90px; font-size:12px; opacity:.6;">{{ e.date_iso }}</span>
+                                    {% if e.kind == 'buy' %}
+                                        <span style="padding:2px 10px; background:#0a2540; color:#3b82f6; border-radius:4px; font-size:11px; font-weight:700; letter-spacing:.5px;">BUY</span>
+                                    {% elif e.kind == 'sell' %}
+                                        <span style="padding:2px 10px; background:#3a1a00; color:#f59e0b; border-radius:4px; font-size:11px; font-weight:700; letter-spacing:.5px;">SELL</span>
+                                    {% else %}
+                                        <span style="padding:2px 10px; background:#0a2418; color:#16a34a; border-radius:4px; font-size:11px; font-weight:700; letter-spacing:.5px;">DIV</span>
+                                    {% endif %}
+                                    <a href="{{ url_for('investing_ticker_detail', symbol=e.symbol) }}" style="color:inherit; text-decoration:none; font-weight:600;">{{ e.symbol }}</a>
+                                    <span style="font-size:12px; opacity:.6;">{{ e.company_name }}</span>
+                                    <span style="margin-left:auto; font-size:13px;">
+                                        {{ '{:g}'.format(e.shares) }} sh @ {{ '{:.4g}'.format(e.price_native) }} {{ e.currency }}
+                                        <strong style="margin-left:8px;">
+                                            {% if e.kind == 'buy' %}
+                                                <span style="color:#dc2626;">&minus;&euro;{{ '{:,.2f}'.format(e.amount_eur) }}</span>
+                                            {% else %}
+                                                <span style="color:#16a34a;">+&euro;{{ '{:,.2f}'.format(e.amount_eur) }}</span>
+                                            {% endif %}
+                                        </strong>
+                                        {% if e.kind == 'sell' and e.gain_eur is not none %}
+                                            <span style="margin-left:8px; font-size:11px; color:{% if e.gain_eur >= 0 %}#16a34a{% else %}#dc2626{% endif %};">
+                                                ({% if e.gain_eur >= 0 %}+{% endif %}{{ '{:,.2f}'.format(e.gain_eur) }} realized)
+                                            </span>
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                {% if e.kind in ('buy', 'sell') %}
+                                    <div style="margin-top:8px;">
+                                        <label style="font-size:11px; opacity:.6; display:block; margin-bottom:4px;">Reasoning / notes — why did you make this trade?</label>
+                                        <textarea
+                                            data-journal-kind="{{ e.kind }}"
+                                            data-journal-id="{{ e.event_id }}"
+                                            rows="2"
+                                            placeholder="(no reasoning recorded — click to add)"
+                                            style="width:100%; padding:8px; background:#0a0a0a; color:inherit; border:1px solid #333; border-radius:6px; font-family:inherit; font-size:13px; resize:vertical;"
+                                            onblur="saveJournalReasoning(this)">{{ e.reasoning }}</textarea>
+                                        <span class="jrn-saved" style="font-size:11px; opacity:.6; margin-left:6px;"></span>
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p style="opacity:.5; font-size:13px;">No events in {{ jrn_year }}{% if jrn_symbol %} for {{ jrn_symbol }}{% endif %}.</p>
+                {% endif %}
+
+                {# ===== Retrospective grading vs SPY ===== #}
+                {% if jrn_grading_rows %}
+                    <h3 style="margin-top:32px;">Retrospective grading vs SPY</h3>
+                    <p style="font-size:12px; opacity:.7; margin:0 0 8px 0;">
+                        Closed positions compared to what SPY (US large-cap index) did over the same holding period.
+                        Alpha = your return − SPY return. Positive alpha = you beat the index.
+                    </p>
+                    <table style="width:100%; border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#1a1a1a; text-align:left; font-size:12px;">
+                                <th style="padding:8px;">Ticker</th>
+                                <th style="padding:8px;">Held</th>
+                                <th style="padding:8px; text-align:right;">Cost (&euro;)</th>
+                                <th style="padding:8px; text-align:right;">Proceeds (&euro;)</th>
+                                <th style="padding:8px; text-align:right;">Your return</th>
+                                <th style="padding:8px; text-align:right;">SPY return</th>
+                                <th style="padding:8px; text-align:right;">Alpha</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% set ns = namespace(alpha_sum=0, alpha_count=0, beat=0) %}
+                            {% for g in jrn_grading_rows %}
+                                <tr>
+                                    <td style="padding:8px; border-bottom:1px solid #222;">
+                                        <a href="{{ url_for('investing_ticker_detail', symbol=g.symbol) }}" style="color:inherit; text-decoration:none;">
+                                            <strong>{{ g.symbol }}</strong>
+                                            <div style="font-size:11px; opacity:.5;">{{ g.buy_date }} &rarr; {{ g.sell_date }}</div>
+                                        </a>
+                                    </td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; font-size:12px; opacity:.7;">
+                                        {{ g.days_held }}d
+                                    </td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right;">{{ '{:,.2f}'.format(g.cost_eur) }}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right;">{{ '{:,.2f}'.format(g.proceeds_eur) }}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right; color:{% if g.your_return_pct >= 0 %}#16a34a{% else %}#dc2626{% endif %};">
+                                        {% if g.your_return_pct >= 0 %}+{% endif %}{{ '{:.2f}'.format(g.your_return_pct) }}%
+                                    </td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right; opacity:.8;">
+                                        {% if g.spy_return_pct is not none %}
+                                            {% if g.spy_return_pct >= 0 %}+{% endif %}{{ '{:.2f}'.format(g.spy_return_pct) }}%
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right; font-weight:600;">
+                                        {% if g.alpha_pct is not none %}
+                                            {% set ns.alpha_sum = ns.alpha_sum + g.alpha_pct %}
+                                            {% set ns.alpha_count = ns.alpha_count + 1 %}
+                                            {% if g.alpha_pct > 0 %}{% set ns.beat = ns.beat + 1 %}{% endif %}
+                                            <span style="color:{% if g.alpha_pct >= 0 %}#16a34a{% else %}#dc2626{% endif %};">
+                                                {% if g.alpha_pct >= 0 %}+{% endif %}{{ '{:.2f}'.format(g.alpha_pct) }} pp
+                                            </span>
+                                        {% else %}
+                                            —
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            {% if ns.alpha_count > 0 %}
+                                {% set avg_alpha = ns.alpha_sum / ns.alpha_count %}
+                                <tr style="background:#1a1a1a; font-weight:600;">
+                                    <td style="padding:8px;" colspan="5">
+                                        Average alpha across {{ ns.alpha_count }} closed position{{ '' if ns.alpha_count == 1 else 's' }}
+                                        <span style="font-weight:400; opacity:.7; font-size:12px;">
+                                            ({{ ns.beat }} beat SPY, {{ ns.alpha_count - ns.beat }} underperformed)
+                                        </span>
+                                    </td>
+                                    <td style="padding:8px;"></td>
+                                    <td style="padding:8px; text-align:right; color:{% if avg_alpha >= 0 %}#16a34a{% else %}#dc2626{% endif %};">
+                                        {% if avg_alpha >= 0 %}+{% endif %}{{ '{:.2f}'.format(avg_alpha) }} pp
+                                    </td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                    <p style="font-size:11px; opacity:.5; margin-top:6px;">
+                        Caveat: your return is in EUR (already includes FX); SPY return is in USD. For Belgian-tax-purposes positions held through Dec 31 2025, the buy date is the step-up date, not your original purchase.
+                    </p>
+                {% endif %}
+            </div>
+
+            <script>
+            async function saveJournalReasoning(textarea) {
+                const kind = textarea.dataset.journalKind;
+                const id = textarea.dataset.journalId;
+                const text = textarea.value;
+                const status = textarea.parentElement.querySelector('.jrn-saved');
+                try {
+                    const r = await fetch(`/api/investing/journal/reasoning/${kind}/${id}`, {
+                        method: 'PATCH',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({reasoning: text}),
+                    });
+                    if (r.ok) {
+                        status.textContent = 'Saved ' + new Date().toLocaleTimeString();
+                    } else {
+                        status.textContent = 'Save failed';
+                        status.style.color = '#dc2626';
+                    }
+                } catch (e) {
+                    status.textContent = 'Error: ' + e.message;
+                    status.style.color = '#dc2626';
+                }
+            }
+            </script>
+        {% elif active_tab == 'dividends' %}
+            <div class="dividends-tab">
+                {# ===== KPI cards ===== #}
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:24px;">
+                    <div style="padding:16px; border:1px solid #444; border-radius:8px; background:#1a1a1a;">
+                        <div style="font-size:12px; opacity:.7;">YTD net ({{ div_year }})</div>
+                        <div style="font-size:28px; font-weight:700; color:#16a34a;">&euro;{{ '{:,.2f}'.format(div_ytd_net) }}</div>
+                        <div style="font-size:11px; opacity:.6;">{{ div_ytd_count }} payment{{ '' if div_ytd_count == 1 else 's' }} from {{ div_payers_ytd }} ticker{{ '' if div_payers_ytd == 1 else 's' }}</div>
+                    </div>
+                    <div style="padding:16px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">YTD gross</div>
+                        <div style="font-size:22px; font-weight:600;">&euro;{{ '{:,.2f}'.format(div_ytd_gross) }}</div>
+                        <div style="font-size:11px; opacity:.6;">before withholding</div>
+                    </div>
+                    <div style="padding:16px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">Belgian withholding</div>
+                        <div style="font-size:22px; font-weight:600; color:#dc2626;">&euro;{{ '{:,.2f}'.format(div_ytd_belgian_wh) }}</div>
+                        <div style="font-size:11px; opacity:.6;">précompte mobilier 30%</div>
+                    </div>
+                    <div style="padding:16px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">Foreign withholding</div>
+                        <div style="font-size:22px; font-weight:600; color:#dc2626;">&euro;{{ '{:,.2f}'.format(div_ytd_foreign_wh) }}</div>
+                        <div style="font-size:11px; opacity:.6;">at source (US, UK, ...)</div>
+                    </div>
+                    <div style="padding:16px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">Lifetime net</div>
+                        <div style="font-size:22px; font-weight:600;">&euro;{{ '{:,.2f}'.format(div_lifetime_net) }}</div>
+                        <div style="font-size:11px; opacity:.6;">all years tracked</div>
+                    </div>
+                </div>
+
+                {# ===== Per-ticker breakdown ===== #}
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(420px, 1fr)); gap:24px;">
+                    <div>
+                        <h3 style="margin-bottom:8px;">Per ticker</h3>
+                        {% if div_ticker_breakdown %}
+                            <table style="width:100%; border-collapse:collapse;">
+                                <thead>
+                                    <tr style="background:#1a1a1a; text-align:left; font-size:12px;">
+                                        <th style="padding:8px;">Ticker</th>
+                                        <th style="padding:8px; text-align:right;">#</th>
+                                        <th style="padding:8px; text-align:right;">Net (€)</th>
+                                        <th style="padding:8px; text-align:right;">YoC %</th>
+                                        <th style="padding:8px; text-align:right;">Last paid</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for tb in div_ticker_breakdown %}
+                                        <tr>
+                                            <td style="padding:8px; border-bottom:1px solid #222;">
+                                                <a href="{{ url_for('investing_ticker_detail', symbol=tb.symbol) }}" style="color:inherit; text-decoration:none;">
+                                                    <strong>{{ tb.symbol }}</strong>
+                                                    <div style="font-size:11px; opacity:.5;">{{ tb.company_name }}</div>
+                                                </a>
+                                            </td>
+                                            <td style="padding:8px; border-bottom:1px solid #222; text-align:right;">{{ tb.count }}</td>
+                                            <td style="padding:8px; border-bottom:1px solid #222; text-align:right;"><strong>{{ '{:,.2f}'.format(tb.total_net_eur) }}</strong></td>
+                                            <td style="padding:8px; border-bottom:1px solid #222; text-align:right;">
+                                                {% if tb.yield_on_cost_pct is not none %}{{ '{:.2f}'.format(tb.yield_on_cost_pct) }}%{% else %}—{% endif %}
+                                            </td>
+                                            <td style="padding:8px; border-bottom:1px solid #222; text-align:right; font-size:12px; opacity:.7;">{{ tb.last_payment.isoformat() }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                            <p style="font-size:11px; opacity:.5; margin-top:6px;">YoC = lifetime dividends ÷ current cost basis. Raw cumulative, not annualized.</p>
+                        {% else %}
+                            <p style="opacity:.5; font-size:13px;">No dividends recorded yet.</p>
+                        {% endif %}
+                    </div>
+
+                    {# ===== Monthly view ===== #}
+                    <div>
+                        <h3 style="margin-bottom:8px;">By month ({{ div_year }})</h3>
+                        {% if div_monthly %}
+                            <div style="display:flex; flex-direction:column; gap:6px;">
+                                {% for m in div_monthly %}
+                                    <div>
+                                        <div style="display:flex; justify-content:space-between; font-size:13px; margin-bottom:3px;">
+                                            <span>{{ m.month }}</span>
+                                            <span style="opacity:.8;">&euro;{{ '{:,.2f}'.format(m.total_net_eur) }}</span>
+                                        </div>
+                                        <div style="background:#222; height:8px; border-radius:4px; overflow:hidden;">
+                                            <div style="background:#16a34a; height:100%; width:{% if div_monthly_max > 0 %}{{ (m.total_net_eur / div_monthly_max * 100) }}{% else %}0{% endif %}%;"></div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p style="opacity:.5; font-size:13px;">No dividend payments yet in {{ div_year }}.</p>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {# ===== Recent payments ===== #}
+                {% if div_recent %}
+                    <h3 style="margin-top:32px; margin-bottom:8px;">Recent payments</h3>
+                    <table style="width:100%; border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#1a1a1a; text-align:left; font-size:12px;">
+                                <th style="padding:8px;">Date</th>
+                                <th style="padding:8px;">Ticker</th>
+                                <th style="padding:8px; text-align:right;">Shares</th>
+                                <th style="padding:8px; text-align:right;">DPS (native)</th>
+                                <th style="padding:8px; text-align:right;">Gross (€)</th>
+                                <th style="padding:8px; text-align:right;">Belgian WH</th>
+                                <th style="padding:8px; text-align:right;">Foreign WH</th>
+                                <th style="padding:8px; text-align:right;">Net (€)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for d in div_recent %}
+                                <tr>
+                                    <td style="padding:8px; border-bottom:1px solid #222;">{{ d.payment_date.isoformat() }}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #222;">
+                                        <a href="{{ url_for('investing_ticker_detail', symbol=d.symbol) }}" style="color:inherit;"><strong>{{ d.symbol }}</strong></a>
+                                    </td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right;">{{ '{:g}'.format(d.shares) }}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right;">{{ '{:.4f}'.format(d.dps_native) }} {{ d.currency }}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right;">{{ '{:,.2f}'.format(d.gross_eur) if d.gross_eur else '—' }}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right; opacity:.7;">{{ '{:,.2f}'.format(d.belgian_withholding_eur) }}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right; opacity:.7;">{{ '{:,.2f}'.format(d.foreign_withholding_eur) }}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right; font-weight:600; color:#16a34a;">{{ '{:,.2f}'.format(d.net_eur) }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
+
+                <div style="margin-top:24px; padding:12px; background:#1a1a1a; border-left:3px solid #555; font-size:13px; opacity:.85;">
+                    <strong>Belgian tax context:</strong> dividends are taxed at <strong>30% précompte mobilier</strong> at source (already withheld by Bolero — shown above). They are <strong>not</strong> part of the new capital gains tax (10%, €10K exemption). Foreign withholding (US, UK, etc.) may be partially recoverable via tax treaty refunds.
+                </div>
+            </div>
+        {% elif active_tab == 'tax' %}
+            <div class="tax-tab">
+                <div class="tax-header" style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
+                    <h2 style="margin:0;">Belgian Capital Gains &mdash; {{ tax_year }}</h2>
+                    <form method="get" action="{{ url_for('investing_tax') }}" style="display:flex; gap:8px; align-items:center;">
+                        <label for="tax-year-select">Year:</label>
+                        <select id="tax-year-select" name="year" onchange="this.form.submit()">
+                            {% for y in tax_years %}
+                                <option value="{{ y }}" {% if y == tax_year %}selected{% endif %}>{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                        <a href="{{ url_for('investing_tax_export', year=tax_year) }}" class="btn-secondary" style="padding:6px 12px; border:1px solid #555; border-radius:6px; text-decoration:none; color:inherit;">Export CSV</a>
+                    </form>
+                </div>
+
+                <div class="tax-kpis" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; margin:20px 0;">
+                    <div class="tax-kpi" style="padding:16px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">Realized Gains</div>
+                        <div style="font-size:22px; font-weight:600; color:#16a34a;">
+                            +&euro;{{ '{:,.2f}'.format(tax_gains_only) }}
+                        </div>
+                    </div>
+                    <div class="tax-kpi" style="padding:16px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">Realized Losses</div>
+                        <div style="font-size:22px; font-weight:600; color:#dc2626;">
+                            &minus;&euro;{{ '{:,.2f}'.format(tax_losses_only|abs) }}
+                        </div>
+                    </div>
+                    <div class="tax-kpi" style="padding:16px; border:1px solid #444; border-radius:8px; background:#1a1a1a;">
+                        <div style="font-size:12px; opacity:.7;">Net Realized (offset)</div>
+                        <div style="font-size:24px; font-weight:700; color:{% if tax_total_gain >= 0 %}#16a34a{% else %}#dc2626{% endif %};">
+                            {% if tax_total_gain >= 0 %}+{% endif %}&euro;{{ '{:,.2f}'.format(tax_total_gain) }}
+                        </div>
+                        <div style="font-size:11px; opacity:.6;">gains &minus; losses</div>
+                    </div>
+                    <div class="tax-kpi" style="padding:16px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">Exemption Used</div>
+                        <div style="font-size:22px; font-weight:600;">{{ tax_pct_used }}%</div>
+                        <div style="font-size:12px; opacity:.7;">of &euro;{{ '{:,.0f}'.format(tax_exemption) }}</div>
+                    </div>
+                    <div class="tax-kpi" style="padding:16px; border:1px solid #333; border-radius:8px;">
+                        <div style="font-size:12px; opacity:.7;">Tax Estimate (10%)</div>
+                        <div style="font-size:22px; font-weight:600; color:{% if tax_owed > 0 %}#dc2626{% else %}#16a34a{% endif %};">
+                            &euro;{{ '{:,.2f}'.format(tax_owed) }}
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin:16px 0;">
+                    <div style="background:#222; height:18px; border-radius:8px; overflow:hidden; border:1px solid #333;">
+                        <div style="background:linear-gradient(90deg, #16a34a 0%, #f59e0b 80%, #dc2626 100%); height:100%; width:{{ tax_pct_used }}%; transition:width .3s;"></div>
+                    </div>
+                    <div style="font-size:12px; opacity:.7; margin-top:4px;">
+                        &euro;{{ '{:,.2f}'.format(tax_total_gain) }} of &euro;{{ '{:,.0f}'.format(tax_exemption) }} exemption
+                        {% if tax_total_gain < 0 %}
+                            &mdash; full &euro;{{ '{:,.0f}'.format(tax_exemption) }} still available (net loss this year)
+                        {% elif tax_total_gain < tax_exemption %}
+                            &mdash; &euro;{{ '{:,.2f}'.format(tax_exemption - tax_total_gain) }} remaining before tax kicks in
+                        {% endif %}
+                    </div>
+                </div>
+
+                <h3 style="margin-top:32px;">Per-trade detail</h3>
+                {% if tax_detail_rows %}
+                    <table style="width:100%; border-collapse:collapse; margin-top:8px;">
+                        <thead>
+                            <tr style="background:#1a1a1a; text-align:left;">
+                                <th style="padding:8px; border-bottom:1px solid #333;">Ticker</th>
+                                <th style="padding:8px; border-bottom:1px solid #333;">Sale date</th>
+                                <th style="padding:8px; border-bottom:1px solid #333;">Lot acq.</th>
+                                <th style="padding:8px; border-bottom:1px solid #333; text-align:right;">Shares</th>
+                                <th style="padding:8px; border-bottom:1px solid #333; text-align:right;">Cost basis (&euro;)</th>
+                                <th style="padding:8px; border-bottom:1px solid #333; text-align:right;">Proceeds (&euro;)</th>
+                                <th style="padding:8px; border-bottom:1px solid #333; text-align:right;">Gain (&euro;)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in tax_detail_rows %}
+                                <tr>
+                                    <td style="padding:8px; border-bottom:1px solid #222;">
+                                        <strong>{{ row.ticker }}</strong>
+                                        {% if row.isin %}<div style="font-size:11px; opacity:.5;">{{ row.isin }}</div>{% endif %}
+                                    </td>
+                                    <td style="padding:8px; border-bottom:1px solid #222;">{{ row.sale_date.isoformat() }}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #222;">
+                                        {{ row.lot_acq_date.isoformat() if row.lot_acq_date else '—' }}
+                                        {% if row.lot_source == 'migrated_pre_2026' %}
+                                            <div style="font-size:11px; opacity:.5;">step-up basis</div>
+                                        {% endif %}
+                                    </td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right;">{{ '{:.4g}'.format(row.shares) }}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right;">{{ '{:,.2f}'.format(row.cost_basis_eur) }}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right;">{{ '{:,.2f}'.format(row.proceeds_eur) }}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right; color:{% if row.gain_eur >= 0 %}#16a34a{% else %}#dc2626{% endif %}; font-weight:600;">
+                                        {{ '{:+,.2f}'.format(row.gain_eur) }}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            <tr style="background:#1a1a1a; font-weight:600;">
+                                <td colspan="4" style="padding:8px;">Totals</td>
+                                <td style="padding:8px; text-align:right;">{{ '{:,.2f}'.format(tax_total_cost) }}</td>
+                                <td style="padding:8px; text-align:right;">{{ '{:,.2f}'.format(tax_total_proceeds) }}</td>
+                                <td style="padding:8px; text-align:right; color:{% if tax_total_gain >= 0 %}#16a34a{% else %}#dc2626{% endif %};">
+                                    {{ '{:+,.2f}'.format(tax_total_gain) }}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p style="opacity:.6;">No sales in {{ tax_year }}.</p>
+                {% endif %}
+
+                {# ===== Loss-harvesting panel ===== #}
+                {% if tax_harvest_rows %}
+                    <h3 style="margin-top:32px;">Loss harvesting — unrealized losers</h3>
+                    <p style="font-size:12px; opacity:.7; margin:0 0 8px 0;">
+                        Click "Refresh prices" to populate live values. Sorted by largest EUR loss first.
+                    </p>
+                    <div style="padding:10px 14px; background:#0f0f0f; border:1px solid #2a2a2a; border-radius:6px; margin-bottom:8px; font-size:13px;">
+                        <span id="harvest-context"></span>
+                    </div>
+                    <table style="width:100%; border-collapse:collapse; margin-top:8px;">
+                        <thead>
+                            <tr style="background:#1a1a1a; text-align:left; font-size:12px;">
+                                <th style="padding:8px;">Ticker</th>
+                                <th style="padding:8px; text-align:right;">Shares</th>
+                                <th style="padding:8px; text-align:right;">Cost basis (&euro;)</th>
+                                <th style="padding:8px; text-align:right;">Live value (&euro;)</th>
+                                <th style="padding:8px; text-align:right;">Unrealized P&amp;L</th>
+                                <th style="padding:8px; text-align:right;">% gain/loss</th>
+                                <th style="padding:8px; text-align:right;">If realized: tax effect</th>
+                            </tr>
+                        </thead>
+                        <tbody id="harvest-tbody">
+                            {% for h in tax_harvest_rows %}
+                                <tr data-harvest-symbol="{{ h.symbol }}"
+                                    data-cost-basis="{{ h.cost_basis_eur }}"
+                                    data-shares="{{ h.shares }}">
+                                    <td style="padding:8px; border-bottom:1px solid #222;">
+                                        <a href="{{ url_for('investing_ticker_detail', symbol=h.symbol) }}" style="color:inherit; text-decoration:none;">
+                                            <strong>{{ h.symbol }}</strong>
+                                            <div style="font-size:11px; opacity:.5;">{{ h.company_name }}</div>
+                                        </a>
+                                    </td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right;">{{ '{:g}'.format(h.shares) }}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right;">{{ '{:,.2f}'.format(h.cost_basis_eur) }}</td>
+                                    <td class="hv-value" style="padding:8px; border-bottom:1px solid #222; text-align:right; opacity:.4;">—</td>
+                                    <td class="hv-pnl" style="padding:8px; border-bottom:1px solid #222; text-align:right; opacity:.4;">—</td>
+                                    <td class="hv-pct" style="padding:8px; border-bottom:1px solid #222; text-align:right; opacity:.4;">—</td>
+                                    <td class="hv-tax" style="padding:8px; border-bottom:1px solid #222; text-align:right; opacity:.4; font-size:12px;">—</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+
+                    <script>
+                    (function() {
+                        const TAX_RATE = 0.10;
+                        const EXEMPTION = {{ tax_exemption }};
+                        const REALIZED_YTD = {{ tax_total_gain }};
+                        const EXEMPTION_HEADROOM = {{ tax_exemption_headroom }};
+
+                        function fmtEur(v) {
+                            return (v >= 0 ? '+' : '') + '€' + v.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                        }
+
+                        async function loadHarvest() {
+                            try {
+                                const r = await fetch('/api/investing/live-prices');
+                                const data = await r.json();
+                                if (!data.success) throw new Error('API error');
+
+                                const bySymbol = {};
+                                for (const s of data.stocks || []) bySymbol[s.symbol] = s;
+
+                                const rows = Array.from(document.querySelectorAll('tr[data-harvest-symbol]'));
+                                // Compute pnl per row, sort by biggest loss first
+                                const enriched = rows.map(row => {
+                                    const sym = row.dataset.harvestSymbol;
+                                    const cost = parseFloat(row.dataset.costBasis);
+                                    const s = bySymbol[sym];
+                                    let value = null, pnl = null, pct = null;
+                                    if (s && s.live_value_eur != null) {
+                                        value = s.live_value_eur;
+                                        pnl = value - cost;
+                                        pct = cost > 0 ? (pnl / cost) * 100 : 0;
+                                    }
+                                    return {row, sym, cost, value, pnl, pct};
+                                });
+                                enriched.sort((a, b) => {
+                                    // losers first (most negative pnl), then unknowns at the bottom
+                                    if (a.pnl == null && b.pnl == null) return 0;
+                                    if (a.pnl == null) return 1;
+                                    if (b.pnl == null) return -1;
+                                    return a.pnl - b.pnl;
+                                });
+                                const tbody = document.getElementById('harvest-tbody');
+                                enriched.forEach(({row, pnl, pct, value, sym}) => {
+                                    tbody.appendChild(row);
+                                    if (pnl == null) {
+                                        row.querySelector('.hv-value').textContent = 'price unavailable';
+                                        return;
+                                    }
+                                    const valCell = row.querySelector('.hv-value');
+                                    valCell.textContent = '€' + value.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                                    valCell.style.opacity = 1;
+                                    const pnlCell = row.querySelector('.hv-pnl');
+                                    pnlCell.textContent = fmtEur(pnl);
+                                    pnlCell.style.color = pnl >= 0 ? '#16a34a' : '#dc2626';
+                                    pnlCell.style.opacity = 1;
+                                    const pctCell = row.querySelector('.hv-pct');
+                                    pctCell.textContent = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
+                                    pctCell.style.color = pct >= 0 ? '#16a34a' : '#dc2626';
+                                    pctCell.style.opacity = 1;
+
+                                    // Tax effect of realizing this position right now
+                                    const taxCell = row.querySelector('.hv-tax');
+                                    if (pnl >= 0) {
+                                        // Realizing a gain — eats into exemption
+                                        if (pnl <= EXEMPTION_HEADROOM) {
+                                            taxCell.textContent = 'tax-free (under exemption)';
+                                            taxCell.style.color = '#16a34a';
+                                        } else {
+                                            const taxable = pnl - EXEMPTION_HEADROOM;
+                                            const owed = taxable * TAX_RATE;
+                                            taxCell.textContent = `+€${owed.toFixed(2)} tax owed`;
+                                            taxCell.style.color = '#dc2626';
+                                        }
+                                    } else {
+                                        // Realizing a loss — only useful if you have gains over €10K to offset
+                                        if (REALIZED_YTD <= EXEMPTION) {
+                                            taxCell.textContent = 'no benefit (gains under exemption)';
+                                            taxCell.style.color = '#9ca3af';
+                                        } else {
+                                            // Up to current-over-exemption amount can be reduced by this loss
+                                            const offset = Math.min(-pnl, REALIZED_YTD - EXEMPTION);
+                                            const saving = offset * TAX_RATE;
+                                            taxCell.textContent = `−€${saving.toFixed(2)} tax saved`;
+                                            taxCell.style.color = '#16a34a';
+                                        }
+                                    }
+                                    taxCell.style.opacity = 1;
+                                });
+
+                                // Context blurb
+                                const ctx = document.getElementById('harvest-context');
+                                if (REALIZED_YTD <= EXEMPTION) {
+                                    const room = (EXEMPTION - REALIZED_YTD).toFixed(2);
+                                    ctx.innerHTML = `YTD realized: <strong>€${REALIZED_YTD.toFixed(2)}</strong> · €${room} of exemption headroom remaining → <strong>realizing losses now saves no tax</strong> (your net gain would still be under €10K). Losses become useful once you cross €10K of realized gains, which can't carry forward.`;
+                                } else {
+                                    const over = (REALIZED_YTD - EXEMPTION).toFixed(2);
+                                    ctx.innerHTML = `YTD realized: <strong>€${REALIZED_YTD.toFixed(2)}</strong> · <strong>€${over} above the €10K exemption</strong> → every euro of realized loss saves <strong>€0.10 in tax</strong>, up to €${over} of offset.`;
+                                }
+                            } catch (e) {
+                                document.getElementById('harvest-context').textContent = 'Could not load live prices: ' + e.message;
+                            }
+                        }
+                        document.addEventListener('DOMContentLoaded', loadHarvest);
+                    })();
+                    </script>
+                {% endif %}
+
+                <div style="margin-top:24px; padding:12px; background:#1a1a1a; border-left:3px solid #555; font-size:13px; opacity:.85;">
+                    <strong>How this is computed:</strong> Belgian capital gains tax (effective Jan 1, 2026): <strong>10%</strong> on realized gains above the <strong>&euro;10,000</strong> de minimis exemption per tax year. Realized losses within the same year offset realized gains (net basis). Losses do not carry forward to future years. Cost basis for holdings owned at Dec 31, 2025 uses the closing price on that date (step-up rule).
+                </div>
+            </div>
+        {% elif active_tab == 'import' %}
+            <div class="import-tab">
+                <h2>Import Bolero PDFs</h2>
+                <p style="opacity:.7;">Upload transaction confirmations (Extrait de compte with Bordereau). Statement-only PDFs and annual fee reports are detected and skipped automatically.</p>
+
+                <form method="post" enctype="multipart/form-data" action="{{ url_for('investing_import') }}" style="margin-top:16px; padding:20px; border:2px dashed #444; border-radius:8px; text-align:center;">
+                    <input type="file" name="pdfs" accept="application/pdf" multiple required style="margin-bottom:12px;">
+                    <div>
+                        <button type="submit" style="padding:8px 20px; background:#3b82f6; color:#fff; border:none; border-radius:6px; cursor:pointer; font-weight:500;">Upload &amp; Import</button>
+                    </div>
+                    <p style="margin-top:8px; font-size:12px; opacity:.6;">Successfully imported PDFs are also copied to <code>Investing/Bolero reports/</code> for your audit trail. Duplicates (by Bordereau number) are skipped.</p>
+                </form>
+
+                {% if import_results is not none %}
+                    <h3 style="margin-top:24px;">Results ({{ import_results|length }})</h3>
+                    <table style="width:100%; border-collapse:collapse;">
+                        <thead>
+                            <tr style="background:#1a1a1a; text-align:left; font-size:13px;">
+                                <th style="padding:8px;">File</th>
+                                <th style="padding:8px;">Status</th>
+                                <th style="padding:8px;">Type</th>
+                                <th style="padding:8px;">Ticker</th>
+                                <th style="padding:8px; text-align:right;">EUR amount</th>
+                                <th style="padding:8px;">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in import_results %}
+                                <tr>
+                                    <td style="padding:8px; border-bottom:1px solid #222; font-size:12px;">{{ r.get('file', '?') }}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #222;">
+                                        {% if r.get('status') == 'imported' %}
+                                            <span style="color:#16a34a;">&#10003; imported</span>
+                                        {% elif r.get('status') == 'duplicate' %}
+                                            <span style="color:#f59e0b;">already imported</span>
+                                        {% elif r.get('status') == 'skipped' %}
+                                            <span style="opacity:.6;">skipped</span>
+                                        {% else %}
+                                            <span style="color:#dc2626;">error</span>
+                                        {% endif %}
+                                    </td>
+                                    <td style="padding:8px; border-bottom:1px solid #222;">{{ r.get('kind', '—') }}</td>
+                                    <td style="padding:8px; border-bottom:1px solid #222;"><strong>{{ r.get('ticker', '—') }}</strong></td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; text-align:right;">
+                                        {% if r.get('cost_basis_eur') %}&euro;{{ '{:,.2f}'.format(r.cost_basis_eur) }}
+                                        {% elif r.get('proceeds_eur') %}&euro;{{ '{:,.2f}'.format(r.proceeds_eur) }}
+                                        {% elif r.get('net_eur') %}&euro;{{ '{:,.2f}'.format(r.net_eur) }}
+                                        {% else %}—{% endif %}
+                                    </td>
+                                    <td style="padding:8px; border-bottom:1px solid #222; font-size:12px; opacity:.7;">
+                                        {% if r.get('status') == 'imported' %}
+                                            Bordereau {{ r.get('bordereau', '?') }}
+                                            {% if r.get('superseded_synthetic_lots') %} · replaced {{ r.superseded_synthetic_lots }} placeholder lot{% endif %}
+                                        {% elif r.get('reason') %}
+                                            {{ r.reason }}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+
+                    {% set imported_count = import_results | selectattr('status', 'equalto', 'imported') | list | length %}
+                    {% if imported_count %}
+                        <div style="margin-top:16px; padding:12px; background:#0f2418; border-left:3px solid #16a34a; font-size:13px;">
+                            <strong>{{ imported_count }} new transaction(s) imported.</strong> Sales had FIFO applied automatically — check the <a href="{{ url_for('investing_tax') }}" style="color:inherit;">Tax</a> tab for realized gains, or <a href="{{ url_for('investing_holdings') }}" style="color:inherit;">Holdings</a> for updated positions.
+                        </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

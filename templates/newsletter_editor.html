@@ -14,7 +14,8 @@
                     <input type="text" id="issueTitle" class="nl-title-input" value="{{ issue.title }}" placeholder="Issue title...">
                     <div class="nl-header-meta">
                         <span class="nl-status-badge status-{{ issue.status }}">{{ issue.status|title }}</span>
-                        <span class="nl-autosave-status" id="autosaveStatus">Saved</span>
+                        <button class="btn-primary btn-small nl-save-btn" id="saveBtn" onclick="saveContent()">Save</button>
+                        <span class="nl-autosave-status" id="autosaveStatus"></span>
                     </div>
                 </div>
             </div>
@@ -120,7 +121,6 @@
 {% block extra_js %}
 <script>
 const ISSUE_ID = {{ issue.id }};
-let autoSaveTimer = null;
 // Export uses English-only mailing list
 
 // ===== SCROLL PRESERVATION =====
@@ -136,15 +136,11 @@ function withScroll(ta, fn) {
     });
 }
 
-// ===== STATUS UPDATES (batched to avoid reflow in sticky bar) =====
-let _statusRAF = null;
-function setStatus(text, unsaved) {
-    if (_statusRAF) cancelAnimationFrame(_statusRAF);
-    _statusRAF = requestAnimationFrame(() => {
-        const el = document.getElementById('autosaveStatus');
-        el.textContent = text;
-        unsaved ? el.classList.add('unsaved') : el.classList.remove('unsaved');
-    });
+// ===== STATUS UPDATES =====
+function setStatus(text) {
+    const el = document.getElementById('autosaveStatus');
+    el.textContent = text;
+    if (text) setTimeout(() => { if (el.textContent === text) el.textContent = ''; }, 2500);
 }
 
 // ===== MODE SWITCHING =====
@@ -178,7 +174,9 @@ async function loadPreview() {
         await saveContent(true);
         const resp = await fetch(`/api/newsletter/issue/${ISSUE_ID}/preview`);
         const html = await resp.text();
-        iframe.srcdoc = html;
+        // Inject a style to make the 600px email table responsive inside the iframe
+        const responsiveStyle = '<style>table[width="700"]{width:100%!important;max-width:700px!important;}td{word-break:break-word;}</style>';
+        iframe.srcdoc = html.replace('</head>', responsiveStyle + '</head>');
         // Auto-resize iframe to content height
         iframe.onload = () => {
             try {
@@ -215,7 +213,7 @@ function insertMd(prefix, suffix) {
                 ta.selectionEnd = end - prefix.length;
             });
             ta.focus({ preventScroll: true });
-            triggerAutoSave();
+            // content changed
             return;
         }
     }
@@ -228,7 +226,7 @@ function insertMd(prefix, suffix) {
         ta.selectionEnd = start + prefix.length + (selected.length || placeholder.length);
     });
     ta.focus({ preventScroll: true });
-    triggerAutoSave();
+    // content changed
 }
 
 function insertLine(prefix) {
@@ -255,7 +253,7 @@ function insertLine(prefix) {
         }
     });
     ta.focus({ preventScroll: true });
-    triggerAutoSave();
+    // content changed
 }
 
 function insertLink() {
@@ -287,7 +285,7 @@ function insertLink() {
         }
     }
     ta.focus({ preventScroll: true });
-    triggerAutoSave();
+    // content changed
 }
 
 function insertImage() {
@@ -327,7 +325,7 @@ document.getElementById('imageUpload').addEventListener('change', async (e) => {
             });
             const source = data.cloud_url ? 'Cloudinary' : 'local';
             showNotification(`Image uploaded (${source})`);
-            triggerAutoSave();
+            // content changed
         } else {
             withScroll(ta, () => {
                 ta.value = ta.value.replace(placeholder, '');
@@ -350,23 +348,15 @@ function insertBlock(text) {
         ta.selectionStart = ta.selectionEnd = start + text.length;
     });
     ta.focus({ preventScroll: true });
-    triggerAutoSave();
+    // content changed
 }
 
-// ===== AUTO-SAVE =====
-function triggerAutoSave() {
-    setStatus('Unsaved...', true);
-    if (autoSaveTimer) clearTimeout(autoSaveTimer);
-    autoSaveTimer = setTimeout(() => saveContent(), 1500);
-}
-
+// ===== SAVE =====
 async function saveContent(silent) {
     const content = document.getElementById('newsletterContent').value;
     const title = document.getElementById('issueTitle').value.trim();
 
-    if (!silent) {
-        setStatus('Saving...', true);
-    }
+    if (!silent) setStatus('Saving...');
 
     try {
         const resp = await fetch(`/api/newsletter/issue/${ISSUE_ID}/content`, {
@@ -376,8 +366,7 @@ async function saveContent(silent) {
         });
         const data = await resp.json();
         if (data.success) {
-            setStatus('Saved', false);
-            // Update status badge if changed
+            if (!silent) setStatus('Saved');
             const badge = document.querySelector('.nl-status-badge');
             if (badge && data.status) {
                 badge.textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
@@ -385,13 +374,9 @@ async function saveContent(silent) {
             }
         }
     } catch (err) {
-        setStatus('Save failed', true);
+        setStatus('Save failed');
     }
 }
-
-// Bind auto-save to textarea and title
-document.getElementById('newsletterContent').addEventListener('input', triggerAutoSave);
-document.getElementById('issueTitle').addEventListener('input', triggerAutoSave);
 
 // ===== EXPORT =====
 async function clipboardCopy(text) {
@@ -509,13 +494,23 @@ function showNotification(msg) {
 }
 
 // ===== UNSAVED CHANGES GUARD =====
+let _savedContent = document.getElementById('newsletterContent').value;
+let _savedTitle = document.getElementById('issueTitle').value;
 window.addEventListener('beforeunload', (e) => {
-    const status = document.getElementById('autosaveStatus');
-    if (status && status.classList.contains('unsaved')) {
+    const content = document.getElementById('newsletterContent').value;
+    const title = document.getElementById('issueTitle').value;
+    if (content !== _savedContent || title !== _savedTitle) {
         e.preventDefault();
         e.returnValue = '';
     }
 });
+// Update saved state after each successful save
+const _origSave = saveContent;
+saveContent = async function(silent) {
+    await _origSave(silent);
+    _savedContent = document.getElementById('newsletterContent').value;
+    _savedTitle = document.getElementById('issueTitle').value;
+};
 
 // ===== KEYBOARD SHORTCUTS =====
 document.getElementById('newsletterContent').addEventListener('keydown', (e) => {

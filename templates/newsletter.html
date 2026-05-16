@@ -176,6 +176,23 @@
                 {% endif %}
             </div>
         </div>
+
+        <!-- Survey Results -->
+        <div class="newsletter-card survey-results-card">
+            <div class="column-header">
+                <h3>{{ svg_icon('question', 'inline-icon') }} Survey Results</h3>
+                <div class="header-actions">
+                    <button class="btn-small" onclick="syncSurvey()" id="syncSurveyBtn">Sync Netlify</button>
+                    <span class="column-count">{{ survey_count }} responses</span>
+                </div>
+            </div>
+
+            <div id="surveyDashboard">
+                <div class="survey-loading" id="surveyLoading" style="text-align: center; padding: 1.5rem; color: #78716c;">
+                    Loading survey results...
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -540,6 +557,99 @@ function updateSubCount() {
     const count = document.querySelectorAll('#listEN .subscriber-row').length;
     document.querySelector('.column-count').textContent = count + ' total';
 }
+
+// Survey
+async function syncSurvey() {
+    const btn = document.getElementById('syncSurveyBtn');
+    btn.disabled = true;
+    btn.textContent = 'Syncing...';
+    try {
+        const resp = await fetch('/api/newsletter/sync-survey', { method: 'POST' });
+        const data = await resp.json();
+        if (data.success) {
+            showNotification(data.added > 0 ? `Synced ${data.added} new response${data.added > 1 ? 's' : ''}!` : 'No new responses');
+            loadSurveyResults();
+        } else {
+            showNotification(data.error || 'Sync failed');
+        }
+    } catch (err) {
+        showNotification('Survey sync failed');
+    }
+    btn.disabled = false;
+    btn.textContent = 'Sync Netlify';
+}
+
+async function loadSurveyResults() {
+    try {
+        const resp = await fetch('/api/newsletter/survey-results');
+        const data = await resp.json();
+        if (data.total === 0) {
+            document.getElementById('surveyDashboard').innerHTML = '<div style="text-align:center;padding:1.5rem;color:#78716c;">No responses yet. Sync from Netlify after sharing the survey.</div>';
+            return;
+        }
+        renderSurveyDashboard(data);
+    } catch (err) {
+        document.getElementById('surveyDashboard').innerHTML = '<div style="text-align:center;padding:1rem;color:#dc2626;">Failed to load survey results.</div>';
+    }
+}
+
+function renderSurveyDashboard(data) {
+    const questions = [
+        { key: 'q1', label: 'Q1 \u2014 What do you primarily want from AI?' },
+        { key: 'q2', label: 'Q2 \u2014 Where has AI surprised you the most?' },
+        { key: 'q3', label: 'Q3 \u2014 What worries you most about AI?' },
+        { key: 'q4', label: 'Q4 \u2014 Takeaway from the Chinese AI models section?' },
+    ];
+
+    let html = '<div class="survey-charts">';
+    for (const q of questions) {
+        const items = data[q.key];
+        if (!items || !items.length) continue;
+        const maxCount = items[0][1];
+        html += `<div class="survey-chart-block">
+            <div class="survey-chart-title">${q.label}</div>`;
+        for (const [label, count] of items) {
+            const pct = Math.round((count / data.total) * 100);
+            const barW = Math.max(Math.round((count / maxCount) * 100), 4);
+            html += `<div class="survey-bar-row">
+                <div class="survey-bar-label">${label}</div>
+                <div class="survey-bar-track">
+                    <div class="survey-bar-fill" style="width:${barW}%"></div>
+                </div>
+                <span class="survey-bar-count">${count} (${pct}%)</span>
+            </div>`;
+        }
+        html += '</div>';
+    }
+    html += '</div>';
+
+    // Individual responses table
+    if (data.individual && data.individual.length) {
+        html += `<div class="survey-individual">
+            <div class="survey-chart-title" style="margin-top:1.25rem;">Individual Responses</div>
+            <div class="survey-table-wrap">
+                <table class="survey-table">
+                    <thead><tr><th>Who</th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>When</th></tr></thead>
+                    <tbody>`;
+        for (const r of data.individual) {
+            const who = r.name || r.email || '<em>Anonymous</em>';
+            html += `<tr>
+                <td class="survey-who">${who}</td>
+                <td>${r.q1 || ''}</td>
+                <td>${r.q2 || ''}</td>
+                <td>${(r.q3 || '').replace(/ \| /g, ', ')}</td>
+                <td>${r.q4 || ''}</td>
+                <td class="survey-when">${r.submitted_at || ''}</td>
+            </tr>`;
+        }
+        html += '</tbody></table></div></div>';
+    }
+
+    document.getElementById('surveyDashboard').innerHTML = html;
+}
+
+// Load survey on page load
+loadSurveyResults();
 
 async function syncNetlify() {
     const btn = document.getElementById('syncNetlifyBtn');

@@ -143,8 +143,8 @@
                 <input type="number" id="tc-actual-km" step="0.1" min="0">
             </div>
             <div class="tc-feedback-row">
-                <label>Duration (minutes)</label>
-                <input type="number" id="tc-actual-duration" step="1" min="0">
+                <label>Duration (mm:ss)</label>
+                <input type="text" id="tc-actual-duration" placeholder="e.g. 20:45 or 20.75" inputmode="decimal">
             </div>
             <div class="tc-feedback-row">
                 <label>Notes (optional)</label>
@@ -392,7 +392,7 @@ const Cal = {
                 body: JSON.stringify({
                     feedback: this.feedback,
                     actual_km: parseFloat(document.getElementById('tc-actual-km').value) || null,
-                    actual_duration_minutes: parseFloat(document.getElementById('tc-actual-duration').value) || null,
+                    actual_duration_minutes: (() => { const v = document.getElementById('tc-actual-duration').value.trim(); if (!v) return null; if (v.includes(':')) { const [m, s] = v.split(':'); return (parseInt(m) || 0) + (parseInt(s) || 0) / 60; } return parseFloat(v) || null; })(),
                     notes: document.getElementById('tc-complete-notes').value,
                     followed_plan: document.getElementById('tc-followed').value === 'true',
                 })

@@ -103,9 +103,6 @@
                         <td class="holding-value-cell">${{ "{:,.0f}".format(h.value or 0) }}</td>
                         <td class="holding-pnl-cell">--</td>
                         <td class="holding-weight-cell">
-                            <div class="weight-bar-bg">
-                                <div class="weight-bar-fill" style="width: {{ (h.weight / 30 * 100)|int }}%"></div>
-                            </div>
                             <span>{{ h.weight }}%</span>
                         </td>
                         <td><span class="holding-conviction conviction-{{ h.conviction|lower|replace(' ', '-') }}">{{ h.conviction }}</span></td>
@@ -141,6 +138,7 @@
                 <option value="CONTRARIAN BUY">CONTRARIAN BUY</option>
                 <option value="SPECULATIVE">SPECULATIVE</option>
                 <option value="AVOID">AVOID</option>
+                <option value="Pre-IPO">Pre-IPO</option>
             </select>
             <button type="submit" class="btn-primary btn-small">+ Add</button>
         </form>
@@ -164,8 +162,10 @@
                         <td class="holding-layer-cell">{{ w.layer }}</td>
                         <td><span class="verdict-badge verdict-{{ w.verdict|lower|replace(' ', '-') }}">{{ w.verdict }}</span></td>
                         <td class="watchlist-actions-cell">
-                            <button class="btn-deep-dive" onclick="deepDive('{{ w.ticker }}', this)" title="Analyze">Analyze</button>
+                            <button class="btn-deep-dive" onclick="deepDive('{{ w.ticker }}', this)" title="{{ 'IPO watch brief' if w.verdict == 'Pre-IPO' else 'Analyze' }}">Analyze</button>
+                            {% if w.verdict != 'Pre-IPO' %}
                             <button class="btn-promote" onclick="showPromote({{ w.id }}, '{{ w.ticker }}')" title="Move to portfolio">&#x2197;</button>
+                            {% endif %}
                             <button class="btn-remove" onclick="removeStock({{ w.id }})" title="Remove">&times;</button>
                         </td>
                     </tr>
@@ -568,18 +568,34 @@
                     pnlCell.textContent = '--';
                 }
 
-                // Update weight bar
+                // Update weight percentage
                 const weightCell = row.querySelector('.holding-weight-cell');
                 if (weightCell) {
                     const newWeight = data.totals.total_value > 0
                         ? ((s.live_value_usd || 0) / data.totals.total_value * 100).toFixed(1)
                         : '0.0';
-                    const fill = weightCell.querySelector('.weight-bar-fill');
                     const span = weightCell.querySelector('span');
-                    if (fill) fill.style.width = (parseFloat(newWeight) / 30 * 100) + '%';
                     if (span) span.textContent = newWeight + '%';
                 }
             });
+
+            // Reorder holding rows by live value (largest first)
+            const tbody = document.querySelector('.holdings-section .holdings-table tbody');
+            if (tbody) {
+                const valueByTicker = {};
+                data.stocks.forEach(s => { valueByTicker[s.ticker] = s.live_value_usd || 0; });
+                const groups = [];
+                tbody.querySelectorAll('tr.holding-row').forEach(row => {
+                    const ticker = row.dataset.ticker;
+                    const dive = tbody.querySelector(`tr.deep-dive-row#dive-row-${CSS.escape(ticker)}`);
+                    groups.push({ ticker, value: valueByTicker[ticker] || 0, row, dive });
+                });
+                groups.sort((a, b) => b.value - a.value);
+                groups.forEach(g => {
+                    tbody.appendChild(g.row);
+                    if (g.dive) tbody.appendChild(g.dive);
+                });
+            }
 
             const now = new Date().toLocaleTimeString();
             statusEl.textContent = `Live prices updated at ${now}`;
@@ -1101,6 +1117,12 @@
             if (data.success) {
                 const s = data.stock;
                 const verdictClass = s.verdict ? s.verdict.toLowerCase().replace(/ /g, '-') : 'hold';
+                const isPreIpo = s.verdict === 'Pre-IPO';
+                const analyzeTitle = isPreIpo ? 'IPO watch brief' : 'Analyze';
+                const promoteBtn = isPreIpo ? '' : `<button class="btn-promote" onclick="showPromote(${s.id}, '${s.ticker}')" title="Move to portfolio">&#x2197;</button>`;
+                const actionButtons = `<button class="btn-deep-dive" onclick="deepDive('${s.ticker}', this)" title="${analyzeTitle}">Analyze</button>
+                            ${promoteBtn}
+                            <button class="btn-remove" onclick="removeStock(${s.id})" title="Remove">&times;</button>`;
                 const html = `
                     <tr class="holding-row watchlist-row" data-ticker="${s.ticker}" data-id="${s.id}">
                         <td class="holding-ticker-cell">${s.ticker}</td>
@@ -1108,9 +1130,7 @@
                         <td class="holding-layer-cell">${s.layer}</td>
                         <td><span class="verdict-badge verdict-${verdictClass}">${s.verdict || 'HOLD'}</span></td>
                         <td class="watchlist-actions-cell">
-                            <button class="btn-deep-dive" onclick="deepDive('${s.ticker}', this)" title="Analyze">Analyze</button>
-                            <button class="btn-promote" onclick="showPromote(${s.id}, '${s.ticker}')" title="Move to portfolio">&#x2197;</button>
-                            <button class="btn-remove" onclick="removeStock(${s.id})" title="Remove">&times;</button>
+                            ${actionButtons}
                         </td>
                     </tr>
                     <tr class="deep-dive-row" id="dive-row-${s.ticker}" style="display:none;">

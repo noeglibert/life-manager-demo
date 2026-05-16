@@ -77,6 +77,7 @@ function showDemoToast() {
             <li><a href="{{ url_for('activity') }}" class="{% if request.endpoint in ['activity', 'activity_log', 'activity_plan', 'activity_expert', 'activity_history'] %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-activity.svg') }}" alt=""> Activity</a></li>
             <li><a href="{{ url_for('coach') }}" class="{% if request.endpoint == 'coach' %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-coach.svg') }}" alt=""> Coach</a></li>
             <li><a href="{{ url_for('mandarin') }}" class="{% if request.endpoint == 'mandarin' %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-mandarin.svg') }}" alt=""> Mandarin</a></li>
+            <li><a href="{{ url_for('investing') }}" class="{% if request.endpoint and request.endpoint.startswith('investing') %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-portfolio.svg') }}" alt=""> Investing</a></li>
         </ul>
     </div>
 
@@ -86,7 +87,7 @@ function showDemoToast() {
             <li><a href="{{ url_for('newsletter') }}" class="{% if request.endpoint in ['newsletter', 'newsletter_editor'] %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-newsletter.svg') }}" alt=""> Newsletter</a></li>
             <li><a href="{{ url_for('highlights_list') }}" class="{% if request.endpoint == 'highlights_list' %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-highlights.svg') }}" alt=""> Highlights</a></li>
             <li><a href="{{ url_for('contacts_list') }}" class="{% if request.endpoint in ['contacts_list', 'contact_detail', 'contact_new', 'contact_edit'] %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-contacts.svg') }}" alt=""> Contacts</a></li>
-            <li><a href="{{ url_for('portfolio') }}" class="{% if request.endpoint == 'portfolio' %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-portfolio.svg') }}" alt=""> Portfolio</a></li>
+            <li><a href="{{ url_for('portfolio') }}" class="{% if request.endpoint == 'portfolio' %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-portfolio.svg') }}" alt=""> Portfolio (legacy)</a></li>
             <li><a href="{{ url_for('finance') }}" class="{% if request.endpoint == 'finance' %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-finance.svg') }}" alt=""> Finance</a></li>
             <li><a href="{{ url_for('wordle') }}" class="{% if request.endpoint == 'wordle' %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-wordle.svg') }}" alt=""> Wordle</a></li>
             <li><a href="{{ url_for('api_usage_dashboard') }}" class="{% if request.endpoint == 'api_usage_dashboard' %}active{% endif %}"><img class="le-icon" src="{{ url_for('static', filename='images/logo-api-costs.svg') }}" alt=""> API Costs</a></li>

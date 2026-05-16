@@ -1,6 +1,6 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response, session
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, Response, session, make_response
 from markupsafe import Markup
-from models import db, Contact, Interaction, Tag, JournalEntry, Reminder, GameStats, LearningInterest, LearningSession, LearningProgress, Highlight, WordleStats, PortfolioBriefing, MeditationSession, NutritionProfile, NutritionEntry, MealPlan, WeightEntry, NewsletterIssue, NewsletterIdea, NewsletterSubscriber, PortfolioStock, StockFundamentals, ApiUsageLog, Workout, TrainingPlan, TrainingWeek, CoachConversation, CoachGoal, CoachMood, CoachSummary, CoachPreference, MandarinCard, MandarinReview, MandarinSession, GarminDailyStats, TrainingDay, FinanceTransaction, FinanceBudget, FinanceRecurringCost, DCASchedule
+from models import db, Contact, Interaction, Tag, JournalEntry, Reminder, GameStats, LearningInterest, LearningSession, LearningProgress, Highlight, WordleStats, PortfolioBriefing, MeditationSession, NutritionProfile, NutritionEntry, MealPlan, WeightEntry, NewsletterIssue, NewsletterIdea, NewsletterSubscriber, PortfolioStock, StockFundamentals, ApiUsageLog, Workout, TrainingPlan, TrainingWeek, CoachConversation, CoachGoal, CoachMood, CoachSummary, CoachPreference, MandarinCard, MandarinReview, MandarinSession, GarminDailyStats, TrainingDay, FinanceTransaction, FinanceBudget, FinanceRecurringCost, DCASchedule, SurveyResponse, Trip, Ticker, TradeLot, TradeSale, LotConsumption, Dividend, EntryZone, Catalyst, Risk, TickerChatMessage
 import hashlib
 import csv
 import io
@@ -32,6 +32,8 @@ CLAUDE_PRICING = {
     "claude-sonnet-4-20250514": (3.0, 15.0),
     "claude-haiku-4-5-20251001": (1.0, 5.0),
     "claude-sonnet-4-5-20250929": (3.0, 15.0),
+    "claude-sonnet-4-6": (3.0, 15.0),
+    "claude-opus-4-7": (15.0, 75.0),
 }
 
 
@@ -55,10 +57,18 @@ def call_claude(feature, endpoint, **kwargs):
     model = kwargs.get('model', 'unknown')
     input_tokens = response.usage.input_tokens
     output_tokens = response.usage.output_tokens
+    # Prompt caching: cache writes cost 1.25x, cache reads cost 0.1x of normal input
+    cache_creation = getattr(response.usage, 'cache_creation_input_tokens', 0) or 0
+    cache_read = getattr(response.usage, 'cache_read_input_tokens', 0) or 0
 
     # Calculate cost
     pricing = CLAUDE_PRICING.get(model, (3.0, 15.0))  # default to Sonnet pricing
-    cost = (input_tokens * pricing[0] + output_tokens * pricing[1]) / 1_000_000
+    cost = (
+        input_tokens * pricing[0]
+        + cache_creation * pricing[0] * 1.25
+        + cache_read * pricing[0] * 0.1
+        + output_tokens * pricing[1]
+    ) / 1_000_000
 
     # Log to database
     try:
@@ -3320,6 +3330,7 @@ def portfolio_deep_dive(ticker):
         return jsonify({'error': 'Ticker not found'}), 404
     holding = stock.to_dict()
     is_watchlist = stock.status == 'watchlist'
+    is_pre_ipo = stock.verdict == 'Pre-IPO'
 
     # Get today's cached articles
     today = datetime.now().date()
@@ -3333,12 +3344,26 @@ def portfolio_deep_dive(ticker):
             for a in relevant[:10]:
                 articles_context += f"- {a['title']} ({a['source']})\n  {a.get('description', '')[:200]}\n"
 
-    if is_watchlist:
-        context_line = f"- Status: Watchlist (not currently held)\n- Sector: {holding['layer']}\n- Verdict: {holding.get('verdict', 'N/A')}"
-    else:
-        context_line = f"- Weight: {holding['weight']}%\n- Sector: {holding['layer']}\n- Conviction: {holding['conviction']}"
+    if is_pre_ipo:
+        prompt = f"""You are a private-markets / IPO analyst. The user is tracking {holding['company']} as a pre-IPO company they want to buy on or shortly after IPO.
 
-    prompt = f"""You are a portfolio analyst. Give a focused deep-dive on {holding['company']} ({holding['ticker']}).
+Sector: {holding['layer']}
+{articles_context}
+
+Write a concise IPO watch brief (3-4 paragraphs) covering:
+1. Current IPO status — has the company filed an S-1, hired underwriters, or signaled timing? What's the latest reported expected window? If still private with no filing, say so directly.
+2. Latest known valuation (most recent funding round or secondary-market mark) and headline financials if disclosed (revenue run-rate, growth, profitability).
+3. Key catalysts and risks specific to IPO timing and post-listing performance — regulatory, market conditions, governance, competitive dynamics.
+4. Concrete next steps for the user: what filings/news to watch for, where to monitor (SEC EDGAR, specific publications), and any pre-IPO access mechanisms (e.g. secondary marketplaces, brokerage IPO access programs) if relevant.
+
+Be specific. Acknowledge uncertainty when information is not public. No generic filler."""
+    else:
+        if is_watchlist:
+            context_line = f"- Status: Watchlist (not currently held)\n- Sector: {holding['layer']}\n- Verdict: {holding.get('verdict', 'N/A')}"
+        else:
+            context_line = f"- Weight: {holding['weight']}%\n- Sector: {holding['layer']}\n- Conviction: {holding['conviction']}"
+
+        prompt = f"""You are a portfolio analyst. Give a focused deep-dive on {holding['company']} ({holding['ticker']}).
 
 Portfolio context:
 {context_line}
@@ -3941,7 +3966,8 @@ def nutrition():
                          weekly_data=weekly_data,
                          latest_plan=latest_plan,
                          today_weight=today_weight,
-                         latest_weight=latest_weight)
+                         latest_weight=latest_weight,
+                         today=today)
 
 
 @app.route('/nutrition/setup')
@@ -4029,6 +4055,8 @@ def nutrition_log():
     description = data.get('description', '').strip()
     meal_type = data.get('meal_type', 'snack')
 
+    today = datetime.now().date()
+
     if not description:
         return jsonify({'error': 'Please describe your meal'}), 400
 
@@ -4066,11 +4094,18 @@ Return ONLY valid JSON with no extra text: {{"calories": int, "protein": float, 
         except Exception as e:
             print(f"Claude estimation error: {e}")
 
-    today = datetime.now().date()
+    meal_date_str = data.get('date', '')
+    if meal_date_str:
+        try:
+            meal_date = datetime.strptime(meal_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            meal_date = datetime.now().date()
+    else:
+        meal_date = datetime.now().date()
     xp = 5  # base XP per meal log
 
     entry = NutritionEntry(
-        date=today,
+        date=meal_date,
         meal_type=meal_type,
         description=estimated.get('name', description),
         calories=int(estimated.get('calories', 300)),
@@ -5708,15 +5743,52 @@ If no adjustment is needed for a day, omit it.
 # GARMIN CONNECT INTEGRATION
 ##############################################
 
+_garmin_rate_limited_until = None
+
+
 def get_garmin_client():
-    """Create and authenticate a Garmin Connect client."""
+    """Create and authenticate a Garmin Connect client, reusing cached tokens when possible."""
+    global _garmin_rate_limited_until
     from garminconnect import Garmin
+
+    # Don't retry if we were recently rate-limited (cooldown: 1 hour)
+    if _garmin_rate_limited_until and datetime.utcnow() < _garmin_rate_limited_until:
+        remaining = int((_garmin_rate_limited_until - datetime.utcnow()).total_seconds() / 60)
+        raise Exception(f"Garmin rate-limited. Try again in ~{remaining} minutes.")
+
     email = os.getenv('GARMIN_EMAIL')
     password = os.getenv('GARMIN_PASSWORD')
     if not email or not password:
         return None
+
+    tokenstore = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.garmin_tokens')
+
     client = Garmin(email, password)
-    client.login()
+    # Override default mobile app user agent to avoid Garmin SSO rate limits
+    client.garth.sess.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+    })
+    try:
+        # Try loading cached tokens first (avoids SSO login and rate limits)
+        client.login(tokenstore)
+    except Exception:
+        # Tokens missing or expired — do a fresh login
+        try:
+            client.login()
+        except Exception as e:
+            if '429' in str(e):
+                _garmin_rate_limited_until = datetime.utcnow() + timedelta(hours=1)
+                raise Exception(
+                    "Garmin rate-limited (too many login attempts). "
+                    "The app will automatically retry in 1 hour. "
+                    "Do NOT click sync again before then — it extends the ban."
+                )
+            raise
+
+    # Save/refresh tokens for next time
+    client.garth.dump(tokenstore)
+    _garmin_rate_limited_until = None
+
     return client
 
 
@@ -5826,10 +5898,7 @@ def sync_garmin_backfill(days=14):
     synced = 0
     for i in range(days):
         target = today - timedelta(days=i)
-        # Skip if already synced today (for today) or exists (for past days)
-        existing = GarminDailyStats.query.filter_by(date=target).first()
-        if existing and i > 0:
-            continue
+        # Always re-fetch all days to get complete data
         try:
             result = sync_garmin_daily(target, client=client)
             if result:
@@ -6196,6 +6265,28 @@ def build_coach_context(area_id=None):
             avg_cal = round(total_cal / days_with_data) if days_with_data else 0
             avg_protein = round(total_protein / days_with_data) if days_with_data else 0
             lines.append(f"  Last 7 days avg: {avg_cal} kcal/day, {avg_protein}g protein/day ({days_with_data} days tracked)")
+        # Detailed meal logs (what was actually eaten)
+        if week_entries:
+            lines.append("\n  Detailed meal log (last 7 days):")
+            entries_by_date = {}
+            for e in sorted(week_entries, key=lambda x: (x.date, x.meal_type or '')):
+                date_str = e.date.strftime('%b %d (%a)')
+                if date_str not in entries_by_date:
+                    entries_by_date[date_str] = []
+                entries_by_date[date_str].append(e)
+            for date_str, entries in entries_by_date.items():
+                lines.append(f"    {date_str}:")
+                for e in entries:
+                    meal_label = e.meal_type.capitalize() if e.meal_type else "Meal"
+                    desc = e.description or "no description"
+                    macros = f"{e.calories or '?'}cal"
+                    if e.protein_grams:
+                        macros += f", {e.protein_grams}g P"
+                    if e.carbs_grams:
+                        macros += f", {e.carbs_grams}g C"
+                    if e.fat_grams:
+                        macros += f", {e.fat_grams}g F"
+                    lines.append(f"      {meal_label}: {desc} ({macros})")
     # Weight trend
     recent_weights = WeightEntry.query.filter(
         WeightEntry.date >= thirty_days_ago
@@ -6720,6 +6811,8 @@ def newsletter():
     subs_en = [s for s in subscribers if s.language == 'en']
     subs_fr = [s for s in subscribers if s.language == 'fr']
 
+    survey_count = SurveyResponse.query.filter_by(survey_name='arc-2').count()
+
     return render_template('newsletter.html',
                          game_stats=game_stats,
                          backlog_ideas=backlog_ideas,
@@ -6727,7 +6820,8 @@ def newsletter():
                          issues=issues,
                          subscribers=subscribers,
                          subs_en=subs_en,
-                         subs_fr=subs_fr)
+                         subs_fr=subs_fr,
+                         survey_count=survey_count)
 
 
 @app.route('/api/newsletter/idea', methods=['POST'])
@@ -7070,7 +7164,7 @@ def newsletter_mark_sent(issue_id):
         print(f"Warning: Could not archive newsletter: {e}")
 
     game_stats = get_or_create_game_stats()
-    xp = 10
+    xp = 100
     game_stats.xp += xp
 
     db.session.commit()
@@ -7148,9 +7242,9 @@ def newsletter_upload_image():
 def sync_netlify_subscribers():
     """Pull new newsletter signups from Netlify Forms API into local database"""
     netlify_token = os.getenv('NETLIFY_ACCESS_TOKEN')
-    form_id = os.getenv('NETLIFY_FORM_ID')
+    form_id = os.getenv('NETLIFY_SIGNUP_FORM_ID')
     if not netlify_token or not form_id:
-        return jsonify({'error': 'Netlify credentials not configured. Add NETLIFY_ACCESS_TOKEN and NETLIFY_FORM_ID to .env'}), 400
+        return jsonify({'error': 'Netlify credentials not configured. Add NETLIFY_ACCESS_TOKEN and NETLIFY_SIGNUP_FORM_ID to .env'}), 400
 
     try:
         req = urllib.request.Request(
@@ -7188,6 +7282,110 @@ def sync_netlify_subscribers():
     db.session.commit()
     return jsonify({'success': True, 'added': added, 'skipped': skipped, 'total_checked': len(submissions)})
 
+
+@app.route('/api/newsletter/sync-survey', methods=['POST'])
+def sync_survey_responses():
+    """Pull survey responses from Netlify Forms API into local database"""
+    if 'authenticated' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    netlify_token = os.getenv('NETLIFY_ACCESS_TOKEN')
+    survey_form_id = os.getenv('NETLIFY_SURVEY_FORM_ID')
+    if not netlify_token or not survey_form_id:
+        return jsonify({'error': 'Add NETLIFY_SURVEY_FORM_ID to .env'}), 400
+
+    try:
+        req = urllib.request.Request(
+            f'https://api.netlify.com/api/v1/forms/{survey_form_id}/submissions?per_page=200',
+            headers={'Authorization': f'Bearer {netlify_token}'}
+        )
+        with urllib.request.urlopen(req) as resp:
+            submissions = json.loads(resp.read().decode())
+    except Exception as e:
+        return jsonify({'error': f'Failed to fetch from Netlify: {e}'}), 500
+
+    added = 0
+    for sub in submissions:
+        netlify_id = sub.get('id')
+        if SurveyResponse.query.filter_by(netlify_id=str(netlify_id)).first():
+            continue
+
+        data = sub.get('data', {})
+        q1 = (data.get('q1') or '').strip()
+        if not q1:
+            continue
+
+        response = SurveyResponse(
+            survey_name='arc-2',
+            email=(data.get('email') or '').strip().lower() or None,
+            q1=q1,
+            q2=(data.get('q2') or '').strip(),
+            q3=(data.get('q3') or '').strip(),
+            q4=(data.get('q4') or '').strip(),
+            netlify_id=str(netlify_id),
+            submitted_at=datetime.fromisoformat(sub['created_at'].replace('Z', '+00:00')) if sub.get('created_at') else datetime.utcnow(),
+        )
+        db.session.add(response)
+        added += 1
+
+    db.session.commit()
+    total = SurveyResponse.query.filter_by(survey_name='arc-2').count()
+    return jsonify({'success': True, 'added': added, 'total': total})
+
+
+@app.route('/api/newsletter/survey-results')
+def survey_results():
+    """Get aggregated survey results"""
+    if 'authenticated' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    responses = SurveyResponse.query.filter_by(survey_name='arc-2').order_by(SurveyResponse.submitted_at.desc()).all()
+
+    # Aggregate
+    q1_counts = {}
+    q2_counts = {}
+    q3_counts = {}
+    q4_counts = {}
+    individual = []
+
+    for r in responses:
+        if r.q1:
+            q1_counts[r.q1] = q1_counts.get(r.q1, 0) + 1
+        if r.q2:
+            q2_counts[r.q2] = q2_counts.get(r.q2, 0) + 1
+        if r.q3:
+            for item in r.q3.split(' | '):
+                item = item.strip()
+                if item:
+                    q3_counts[item] = q3_counts.get(item, 0) + 1
+        if r.q4:
+            q4_counts[r.q4] = q4_counts.get(r.q4, 0) + 1
+
+        # Match email to subscriber name
+        name = None
+        if r.email:
+            sub = NewsletterSubscriber.query.filter_by(email=r.email).first()
+            if sub:
+                name = sub.name
+
+        individual.append({
+            'email': r.email,
+            'name': name,
+            'q1': r.q1,
+            'q2': r.q2,
+            'q3': r.q3,
+            'q4': r.q4,
+            'submitted_at': r.submitted_at.strftime('%b %d, %H:%M') if r.submitted_at else None,
+        })
+
+    return jsonify({
+        'total': len(responses),
+        'q1': sorted(q1_counts.items(), key=lambda x: -x[1]),
+        'q2': sorted(q2_counts.items(), key=lambda x: -x[1]),
+        'q3': sorted(q3_counts.items(), key=lambda x: -x[1]),
+        'q4': sorted(q4_counts.items(), key=lambda x: -x[1]),
+        'individual': individual,
+    })
 
 
 # ===== API USAGE DASHBOARD =====
@@ -7663,6 +7861,10 @@ def mandarin_categories():
 # ===== PERSONAL FINANCE =====
 
 FINANCE_CATEGORIES = {
+    'Rent / Housing': {
+        'keywords': [],
+        'icon': 'home', 'color': '#5D4037'
+    },
     'Groceries': {
         'keywords': ['okay', 'intermarché', 'delhaize', 'carrefour', 'whole foods', 'safeway', 'colruyt', 'aldi', 'lidl', 'albert heijn', 'spirigros'],
         'icon': 'cart', 'color': '#4CAF50'
@@ -7694,7 +7896,7 @@ FINANCE_CATEGORIES = {
         'icon': 'moon', 'color': '#9C27B0'
     },
     'Subscriptions': {
-        'keywords': ['apple', 'patreon', 'anthropic', 'amazon prime', 'netflix', 'spotify', 'riot games'],
+        'keywords': ['apple', 'patreon', 'anthropic', 'amazon prime', 'netflix', 'spotify', 'riot games', 'abonnement metal'],
         'icon': 'repeat', 'color': '#607D8B',
         'exclude': ['apple pay', 'recharge']
     },
@@ -7736,13 +7938,17 @@ FINANCE_CATEGORIES = {
         'keywords': ['kbc bank', 'belfius', 'bnp', 'ing'],
         'icon': 'arrow-right', 'color': '#78909C'
     },
-    'Metal Fee': {
-        'keywords': ['abonnement metal'],
-        'icon': 'credit-card', 'color': '#37474F'
-    },
-    'SF Trip': {
+    'SF Trip (Mar)': {
         'keywords': [],
         'icon': 'map-pin', 'color': '#FF5722'
+    },
+    'SF Trip (Apr)': {
+        'keywords': [],
+        'icon': 'map-pin', 'color': '#E64A19'
+    },
+    'Vancouver Trip': {
+        'keywords': [],
+        'icon': 'map-pin', 'color': '#D32F2F'
     },
     'Other': {
         'keywords': [],
@@ -7761,7 +7967,7 @@ def auto_categorize_transaction(description, transaction_type, revolut_type=None
     if revolut_type == 'Intérêts':
         return 'Interest', 'interest'
     if 'abonnement metal' in desc_lower or 'frais d\'abonnement' in desc_lower:
-        return 'Metal Fee', 'subscription'
+        return 'Subscriptions', 'subscription'
 
     # Check for savings transfers
     if 'compte d\'épargne' in desc_lower or 'savings' in desc_lower:
@@ -7774,7 +7980,7 @@ def auto_categorize_transaction(description, transaction_type, revolut_type=None
 
     # Check each category with exclude logic
     for cat_name, cat_info in FINANCE_CATEGORIES.items():
-        if cat_name in ('Other', 'Family Transfer', 'Savings', 'Interest', 'Metal Fee', 'Investments'):
+        if cat_name in ('Other', 'Family Transfer', 'Savings', 'Interest', 'Investments'):
             continue
         excludes = [e.lower() for e in cat_info.get('exclude', [])]
         for keyword in cat_info['keywords']:
@@ -7945,11 +8151,24 @@ def finance():
             cost = abs(t.amount) + (t.fee or 0)
             category_totals[cat] = category_totals.get(cat, 0) + cost
 
-    # Sort by amount descending
+    budgets = FinanceBudget.query.filter_by(is_active=True).all()
+
+    # Recurring costs — fold into expense totals & category breakdown so the dashboard
+    # reflects fixed costs (rent, etc.) alongside imported transactions.
+    recurring = FinanceRecurringCost.query.filter_by(is_active=True).all()
+    freq_to_monthly = {'monthly': 1.0, 'yearly': 1.0 / 12, 'weekly': 52.0 / 12}
+    recurring_total = 0.0
+    for r in recurring:
+        monthly_amt = r.amount * freq_to_monthly.get(r.frequency, 1.0)
+        recurring_total += monthly_amt
+        cat = r.category or 'Other'
+        category_totals[cat] = category_totals.get(cat, 0) + monthly_amt
+    total_expenses += recurring_total
+
+    # Re-sort category breakdown after adding recurring
     category_breakdown = sorted(category_totals.items(), key=lambda x: x[1], reverse=True)
 
-    # Budgets
-    budgets = FinanceBudget.query.filter_by(is_active=True).all()
+    # Re-compute budget progress against the new category_totals
     budget_progress = []
     for b in budgets:
         spent = category_totals.get(b.category, 0)
@@ -7958,9 +8177,6 @@ def finance():
             'spent': spent,
             'percentage': round((spent / b.monthly_limit) * 100, 1) if b.monthly_limit > 0 else 0,
         })
-
-    # Recurring costs
-    recurring = FinanceRecurringCost.query.filter_by(is_active=True).all()
 
     # Monthly history (last 6 months)
     # Find the earliest transaction to know where to start the trend
@@ -7990,6 +8206,7 @@ def finance():
 
         m_income = sum(t.amount for t in m_txns if t.transaction_type == 'income')
         m_expenses = sum(abs(t.amount) + t.fee for t in m_txns if t.transaction_type in ('expense', 'subscription'))
+        m_expenses += recurring_total
 
         # Skip months with no data at all
         if not m_txns and m_num < current_month_num:
@@ -8002,6 +8219,34 @@ def finance():
             'expenses': round(m_expenses, 2),
             'net': round(m_income - m_expenses, 2),
         })
+
+    # Trips dashboard — aggregate spending per trip across all months
+    trips = Trip.query.order_by(Trip.start_date.asc().nullslast()).all()
+    trip_data = []
+    for trip in trips:
+        d = trip.to_dict()
+        if trip.category:
+            t_txns = FinanceTransaction.query.filter(
+                FinanceTransaction.category == trip.category,
+                FinanceTransaction.transaction_type.in_(('expense', 'subscription')),
+                FinanceTransaction.state != 'RENVOYÉ',
+            ).all()
+            d['total_spent'] = round(sum(abs(t.amount) + (t.fee or 0) for t in t_txns), 2)
+            d['txn_count'] = len(t_txns)
+        else:
+            d['total_spent'] = 0.0
+            d['txn_count'] = 0
+        if trip.start_date and trip.end_date:
+            d['duration_days'] = (trip.end_date - trip.start_date).days + 1
+            d['daily_avg'] = round(d['total_spent'] / d['duration_days'], 2) if d['duration_days'] > 0 else 0
+        else:
+            d['duration_days'] = None
+            d['daily_avg'] = None
+        if trip.budget and trip.budget > 0:
+            d['budget_pct'] = round((d['total_spent'] / trip.budget) * 100, 1)
+        else:
+            d['budget_pct'] = None
+        trip_data.append(d)
 
     return render_template('finance.html',
         current_month=current_month,
@@ -8020,8 +8265,68 @@ def finance():
         recurring_costs=[r.to_dict() for r in recurring],
         monthly_history=monthly_history,
         categories=FINANCE_CATEGORY_LIST,
+        trips=trip_data,
         today=today,
     )
+
+
+@app.route('/api/trips', methods=['POST'])
+def trips_create():
+    """Create a new trip"""
+    data = request.get_json()
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'error': 'Name required'}), 400
+    try:
+        start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date() if data.get('start_date') else None
+        end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date() if data.get('end_date') else None
+    except ValueError:
+        return jsonify({'error': 'Invalid date'}), 400
+    category = (data.get('category') or '').strip() or name
+    trip = Trip(
+        name=name,
+        destination=(data.get('destination') or '').strip() or None,
+        start_date=start_date,
+        end_date=end_date,
+        category=category,
+        status=data.get('status') or 'planned',
+        budget=float(data['budget']) if data.get('budget') else None,
+        notes=(data.get('notes') or '').strip() or None,
+        color=data.get('color') or '#FF5722',
+    )
+    db.session.add(trip)
+    db.session.commit()
+    return jsonify({'success': True, 'trip': trip.to_dict()})
+
+
+@app.route('/api/trips/<int:trip_id>', methods=['PUT'])
+def trips_update(trip_id):
+    """Update a trip"""
+    trip = Trip.query.get_or_404(trip_id)
+    data = request.get_json()
+    if 'name' in data: trip.name = (data['name'] or '').strip() or trip.name
+    if 'destination' in data: trip.destination = (data['destination'] or '').strip() or None
+    if 'start_date' in data:
+        trip.start_date = datetime.strptime(data['start_date'], '%Y-%m-%d').date() if data['start_date'] else None
+    if 'end_date' in data:
+        trip.end_date = datetime.strptime(data['end_date'], '%Y-%m-%d').date() if data['end_date'] else None
+    if 'category' in data: trip.category = (data['category'] or '').strip() or trip.category
+    if 'status' in data: trip.status = data['status']
+    if 'budget' in data:
+        trip.budget = float(data['budget']) if data['budget'] not in ('', None) else None
+    if 'notes' in data: trip.notes = (data['notes'] or '').strip() or None
+    if 'color' in data: trip.color = data['color']
+    db.session.commit()
+    return jsonify({'success': True, 'trip': trip.to_dict()})
+
+
+@app.route('/api/trips/<int:trip_id>', methods=['DELETE'])
+def trips_delete(trip_id):
+    """Delete a trip (does not affect transactions)"""
+    trip = Trip.query.get_or_404(trip_id)
+    db.session.delete(trip)
+    db.session.commit()
+    return jsonify({'success': True})
 
 
 @app.route('/api/finance/import-csv', methods=['POST'])
@@ -8262,5 +8567,1535 @@ def finance_delete_recurring(id):
     return jsonify({'success': True})
 
 
+# ============================================================================
+# Investing feature (replaces Portfolio)
+# ============================================================================
+
+@app.route('/investing')
+def investing():
+    """Dashboard: YTD P&L, alerts, upcoming catalysts, top holdings, watchlist."""
+    today = date.today()
+    year = today.year
+
+    # --- Owned tickers + cost basis aggregates ---
+    owned = Ticker.query.filter_by(status='owned').all()
+    holdings = []
+    for t in owned:
+        shares = 0.0
+        cost_basis_eur = 0.0
+        for lot in t.lots:
+            if lot.remaining_shares > 1e-6:
+                shares += lot.remaining_shares
+                if lot.shares > 0:
+                    cost_basis_eur += lot.cost_basis_eur * (lot.remaining_shares / lot.shares)
+        if shares < 1e-6:
+            continue
+        holdings.append({
+            'id': t.id,
+            'symbol': t.symbol,
+            'company_name': t.company_name,
+            'layer': t.layer or 'Uncategorized',
+            'shares': shares,
+            'cost_basis_eur': cost_basis_eur,
+            'avg_cost_eur_per_share': (cost_basis_eur / shares) if shares > 0 else 0,
+            'currency': t.currency,
+        })
+
+    total_cost_eur = sum(h['cost_basis_eur'] for h in holdings)
+
+    # Top 5 by cost basis (client re-ranks by live value once prices arrive)
+    top_holdings = sorted(holdings, key=lambda h: h['cost_basis_eur'], reverse=True)[:5]
+
+    # Allocation by layer (cost basis %)
+    layer_totals = {}
+    for h in holdings:
+        layer_totals[h['layer']] = layer_totals.get(h['layer'], 0.0) + h['cost_basis_eur']
+    layer_alloc = [
+        {
+            'layer': lyr,
+            'cost_basis_eur': v,
+            'pct': (v / total_cost_eur * 100) if total_cost_eur > 0 else 0,
+        }
+        for lyr, v in sorted(layer_totals.items(), key=lambda x: x[1], reverse=True)
+    ]
+
+    # --- YTD realized gains (LotConsumption via TradeSale) ---
+    ytd_sales = (
+        TradeSale.query
+        .filter(db.extract('year', TradeSale.trade_date) == year)
+        .all()
+    )
+    ytd_realized = 0.0
+    gains_only = 0.0
+    losses_only = 0.0
+    for sale in ytd_sales:
+        for cons in sale.consumptions:
+            ytd_realized += cons.gain_eur
+            if cons.gain_eur >= 0:
+                gains_only += cons.gain_eur
+            else:
+                losses_only += cons.gain_eur
+
+    EXEMPTION = 10000.0
+    TAX_RATE = 0.10
+    taxable = max(0.0, ytd_realized - EXEMPTION)
+    tax_owed = taxable * TAX_RATE
+    # Clamp to [0, EXEMPTION]: net losses don't grow headroom above the €10K cap.
+    exemption_remaining = max(0.0, min(EXEMPTION, EXEMPTION - ytd_realized))
+    pct_used = min(100.0, max(0.0, ytd_realized / EXEMPTION * 100)) if ytd_realized > 0 else 0.0
+
+    # --- YTD dividends (net) ---
+    ytd_dividends = (
+        db.session.query(db.func.sum(Dividend.net_eur))
+        .filter(db.extract('year', Dividend.payment_date) == year)
+        .scalar() or 0.0
+    )
+
+    # --- Upcoming catalysts (next 30 days) ---
+    in_30 = today + timedelta(days=30)
+    upcoming_q = (
+        db.session.query(Catalyst, Ticker)
+        .join(Ticker, Catalyst.ticker_id == Ticker.id)
+        .filter(
+            Catalyst.catalyst_date >= today,
+            Catalyst.catalyst_date <= in_30,
+            Catalyst.resolved.is_(False),
+        )
+        .order_by(Catalyst.catalyst_date.asc())
+        .all()
+    )
+    upcoming_catalysts = [
+        {
+            'symbol': t.symbol,
+            'ticker_status': t.status,
+            'date': c.catalyst_date.isoformat(),
+            'days_until': (c.catalyst_date - today).days,
+            'type': c.catalyst_type or '',
+            'title': c.title,
+        }
+        for c, t in upcoming_q
+    ]
+
+    # --- Top watchlist by conviction ---
+    top_ideas_q = (
+        Ticker.query
+        .filter(Ticker.status.in_(['idea', 'researching', 'ready_to_buy']))
+        .filter(Ticker.conviction.isnot(None))
+        .order_by(Ticker.conviction.desc())
+        .limit(5)
+        .all()
+    )
+    top_ideas = []
+    for t in top_ideas_q:
+        buy_z = t.entry_zones.filter_by(zone_type='buy', active=True).first()
+        top_ideas.append({
+            'id': t.id,
+            'symbol': t.symbol,
+            'company_name': t.company_name,
+            'conviction': t.conviction,
+            'horizon': t.horizon,
+            'status': t.status,
+            'buy_zone': f"{buy_z.price_low}–{buy_z.price_high} {buy_z.currency}" if buy_z else None,
+        })
+
+    # --- Active entry zones (client compares to live prices) ---
+    zones_q = (
+        db.session.query(EntryZone, Ticker)
+        .join(Ticker, EntryZone.ticker_id == Ticker.id)
+        .filter(EntryZone.active.is_(True))
+        .all()
+    )
+    alert_zones = [
+        {
+            'symbol': t.symbol,
+            'zone_type': z.zone_type,
+            'price_low': z.price_low,
+            'price_high': z.price_high,
+            'currency': z.currency,
+            'ticker_status': t.status,
+        }
+        for z, t in zones_q
+    ]
+
+    # --- Owned tickers without a thesis (server-side actionable signal) ---
+    missing_thesis = [
+        {'symbol': t.symbol, 'company_name': t.company_name}
+        for t in owned
+        if (not t.thesis or not t.thesis.strip()) and t.current_shares() > 1e-6
+    ]
+
+    # --- Recent activity (merged: buys + sells + dividends, newest first) ---
+    recent_events = []
+    recent_lots = (
+        db.session.query(TradeLot, Ticker)
+        .join(Ticker, TradeLot.ticker_id == Ticker.id)
+        .order_by(TradeLot.trade_date.desc(), TradeLot.id.desc())
+        .limit(10)
+        .all()
+    )
+    for lot, t in recent_lots:
+        if lot.source == 'migrated_pre_2026':
+            continue  # synthetic step-up lots aren't real activity
+        recent_events.append({
+            'kind': 'buy',
+            'symbol': t.symbol,
+            'date': lot.trade_date,
+            'detail': f"{lot.shares:g} shares @ {lot.price_native:.2f} {lot.currency}",
+            'amount_eur': -lot.net_eur,  # debit
+        })
+    recent_sales = (
+        db.session.query(TradeSale, Ticker)
+        .join(Ticker, TradeSale.ticker_id == Ticker.id)
+        .order_by(TradeSale.trade_date.desc(), TradeSale.id.desc())
+        .limit(10)
+        .all()
+    )
+    for sale, t in recent_sales:
+        recent_events.append({
+            'kind': 'sell',
+            'symbol': t.symbol,
+            'date': sale.trade_date,
+            'detail': f"{sale.shares:g} shares @ {sale.price_native:.2f} {sale.currency}",
+            'amount_eur': sale.proceeds_eur,
+            'gain_eur': sale.realized_gain_eur,
+        })
+    recent_divs = (
+        db.session.query(Dividend, Ticker)
+        .join(Ticker, Dividend.ticker_id == Ticker.id)
+        .order_by(Dividend.payment_date.desc(), Dividend.id.desc())
+        .limit(10)
+        .all()
+    )
+    for div, t in recent_divs:
+        recent_events.append({
+            'kind': 'dividend',
+            'symbol': t.symbol,
+            'date': div.payment_date,
+            'detail': f"{div.shares_at_record:g} × {div.dividend_per_share_native:.4f} {div.currency}",
+            'amount_eur': div.net_eur,
+        })
+    recent_events.sort(key=lambda e: e['date'], reverse=True)
+    recent_events = recent_events[:7]
+    for e in recent_events:
+        e['date_iso'] = e['date'].isoformat()
+        e['days_ago'] = (today - e['date']).days
+        del e['date']
+
+    return render_template(
+        'investing.html',
+        active_tab='dashboard',
+        dash_year=year,
+        dash_owned_count=len(holdings),
+        dash_total_cost_eur=round(total_cost_eur, 2),
+        dash_ytd_realized=round(ytd_realized, 2),
+        dash_realized_gains_only=round(gains_only, 2),
+        dash_realized_losses_only=round(losses_only, 2),
+        dash_ytd_dividends=round(ytd_dividends, 2),
+        dash_exemption=EXEMPTION,
+        dash_exemption_remaining=round(exemption_remaining, 2),
+        dash_tax_owed=round(tax_owed, 2),
+        dash_pct_used=round(pct_used, 1),
+        dash_top_holdings=top_holdings,
+        dash_layer_alloc=layer_alloc,
+        dash_upcoming=upcoming_catalysts,
+        dash_top_ideas=top_ideas,
+        dash_alert_zones=alert_zones,
+        dash_missing_thesis=missing_thesis,
+        dash_recent_events=recent_events,
+    )
+
+
+@app.route('/investing/holdings')
+def investing_holdings():
+    """Owned tickers with cost basis in EUR. Live prices fetched async."""
+    owned = (
+        Ticker.query
+        .filter_by(status='owned')
+        .order_by(Ticker.layer.asc().nullslast(), Ticker.symbol.asc())
+        .all()
+    )
+
+    holdings = []
+    for t in owned:
+        shares = 0.0
+        cost_basis_eur = 0.0
+        for lot in t.lots:
+            if lot.remaining_shares > 1e-6:
+                shares += lot.remaining_shares
+                # Proportional cost basis for remaining shares
+                if lot.shares > 0:
+                    cost_basis_eur += lot.cost_basis_eur * (lot.remaining_shares / lot.shares)
+        if shares < 1e-6:
+            continue  # fully sold; not a current holding
+
+        avg_cost_eur = cost_basis_eur / shares if shares > 0 else 0
+        holdings.append({
+            'id': t.id,
+            'symbol': t.symbol,
+            'company_name': t.company_name,
+            'isin': t.isin,
+            'currency': t.currency,
+            'layer': t.layer or 'Uncategorized',
+            'shares': round(shares, 6),
+            'cost_basis_eur': round(cost_basis_eur, 2),
+            'avg_cost_eur_per_share': round(avg_cost_eur, 4),
+            'step_up_basis_eur_per_share': t.step_up_basis_eur_per_share,
+        })
+
+    # Group by layer
+    layers = {}
+    for h in holdings:
+        layers.setdefault(h['layer'], []).append(h)
+
+    return render_template(
+        'investing.html',
+        active_tab='holdings',
+        holdings=holdings,
+        layers=layers,
+    )
+
+
+# 30-min TTL cache for live-prices response. Module-level dict shared across requests.
+# Avoids re-hitting yfinance on every tab switch. Force-refresh via ?force=1.
+_LIVE_PRICES_CACHE = {'data': None, 'fetched_at': None}
+_LIVE_PRICES_TTL = timedelta(minutes=30)
+
+
+@app.route('/api/investing/live-prices')
+def investing_live_prices():
+    """Fetch live prices for all owned tickers and compute EUR P&L. Cached 30 min."""
+    import yfinance as yf
+
+    now = datetime.utcnow()
+    force = request.args.get('force') == '1'
+    if (not force
+            and _LIVE_PRICES_CACHE['data'] is not None
+            and _LIVE_PRICES_CACHE['fetched_at'] is not None
+            and (now - _LIVE_PRICES_CACHE['fetched_at']) < _LIVE_PRICES_TTL):
+        cached_resp = dict(_LIVE_PRICES_CACHE['data'])
+        cached_resp['cached'] = True
+        cached_resp['cached_age_sec'] = int((now - _LIVE_PRICES_CACHE['fetched_at']).total_seconds())
+        return jsonify(cached_resp)
+
+    YF_TICKER_MAP = {
+        'GSK': 'GSK.L',
+        'NOVO-B': 'NOVO-B.CO',
+        'CSG': 'CSG.AS',
+        'EUDF': 'EUDF.DE',
+    }
+
+    owned = Ticker.query.filter_by(status='owned').all()
+    if not owned:
+        return jsonify({'success': True, 'stocks': [], 'totals': {}})
+
+    # Build per-ticker aggregates from lots
+    agg = {}
+    for t in owned:
+        shares = 0.0
+        cost_basis_eur = 0.0
+        for lot in t.lots:
+            if lot.remaining_shares > 1e-6:
+                shares += lot.remaining_shares
+                if lot.shares > 0:
+                    cost_basis_eur += lot.cost_basis_eur * (lot.remaining_shares / lot.shares)
+        if shares > 1e-6:
+            agg[t.symbol] = {
+                'ticker': t,
+                'shares': shares,
+                'cost_basis_eur': cost_basis_eur,
+            }
+
+    # Fetch live prices + previous close in native currency
+    prices = {}
+    prev_closes = {}
+    for symbol, data in agg.items():
+        yf_symbol = YF_TICKER_MAP.get(symbol, symbol)
+        try:
+            info = yf.Ticker(yf_symbol).info
+            p = info.get('currentPrice') or info.get('regularMarketPrice') or info.get('previousClose')
+            if p is not None:
+                prices[symbol] = float(p)
+            pc = info.get('regularMarketPreviousClose') or info.get('previousClose')
+            if pc is not None:
+                prev_closes[symbol] = float(pc)
+        except Exception:
+            pass
+
+    # Fetch EUR/X FX rates for non-EUR currencies (1 EUR = X currency)
+    fx_rates = {'EUR': 1.0}
+    needed = set()
+    for data in agg.values():
+        cur = data['ticker'].currency or 'USD'
+        base = 'GBP' if cur == 'GBp' else cur
+        if base != 'EUR':
+            needed.add(base)
+
+    for base in needed:
+        try:
+            r = yf.Ticker(f'EUR{base}=X').info.get('regularMarketPrice') or yf.Ticker(f'EUR{base}=X').info.get('previousClose')
+            if r:
+                fx_rates[base] = float(r)
+        except Exception:
+            fx_rates[base] = None
+
+    stock_results = []
+    total_value_eur = 0.0
+    total_cost_eur = 0.0
+    total_with_live_price = 0.0  # for pnl_pct denominator (only tickers we got prices for)
+    total_prev_value_eur = 0.0  # for today's-change aggregation (denominator + delta)
+    total_today_change_eur = 0.0
+
+    for symbol, data in agg.items():
+        t = data['ticker']
+        shares = data['shares']
+        cost_basis_eur = data['cost_basis_eur']
+        currency = t.currency or 'USD'
+        live_price = prices.get(symbol)
+        prev_close = prev_closes.get(symbol)
+
+        # EUR per unit of native currency
+        if currency == 'EUR':
+            eur_per_unit = 1.0
+        elif currency == 'GBp':
+            gbp_rate = fx_rates.get('GBP')
+            eur_per_unit = (1.0 / gbp_rate / 100.0) if gbp_rate else None
+        else:
+            r = fx_rates.get(currency)
+            eur_per_unit = (1.0 / r) if r else None
+
+        row = {
+            'symbol': symbol,
+            'company_name': t.company_name,
+            'currency': currency,
+            'shares': round(shares, 6),
+            'cost_basis_eur': round(cost_basis_eur, 2),
+            'avg_cost_eur_per_share': round(cost_basis_eur / shares, 4) if shares > 0 else 0,
+            'live_price_native': live_price,
+            'prev_close_native': prev_close,
+            'layer': t.layer,
+        }
+        if live_price is not None and eur_per_unit is not None:
+            live_value_eur = shares * live_price * eur_per_unit
+            pnl_eur = live_value_eur - cost_basis_eur
+            pnl_pct = (pnl_eur / cost_basis_eur * 100) if cost_basis_eur > 0 else 0
+            row['live_value_eur'] = round(live_value_eur, 2)
+            row['pnl_eur'] = round(pnl_eur, 2)
+            row['pnl_pct'] = round(pnl_pct, 1)
+            total_value_eur += live_value_eur
+            total_cost_eur += cost_basis_eur
+            total_with_live_price += cost_basis_eur
+
+            # Today's change vs previous close
+            if prev_close is not None:
+                today_change_native = live_price - prev_close
+                today_change_eur = shares * today_change_native * eur_per_unit
+                prev_value_eur = shares * prev_close * eur_per_unit
+                today_change_pct = (today_change_native / prev_close * 100) if prev_close > 0 else 0
+                row['today_change_eur'] = round(today_change_eur, 2)
+                row['today_change_pct'] = round(today_change_pct, 2)
+                total_today_change_eur += today_change_eur
+                total_prev_value_eur += prev_value_eur
+        else:
+            row['error'] = 'Price unavailable' if live_price is None else 'FX unavailable'
+            # Still count cost basis in total cost
+            total_cost_eur += cost_basis_eur
+
+        stock_results.append(row)
+
+    # Sort by value descending
+    stock_results.sort(key=lambda r: r.get('live_value_eur', 0), reverse=True)
+
+    total_pnl_eur = total_value_eur - total_with_live_price
+    total_pnl_pct = (total_pnl_eur / total_with_live_price * 100) if total_with_live_price > 0 else 0
+    total_today_change_pct = (total_today_change_eur / total_prev_value_eur * 100) if total_prev_value_eur > 0 else 0
+
+    response_data = {
+        'success': True,
+        'stocks': stock_results,
+        'totals': {
+            'total_value_eur': round(total_value_eur, 2),
+            'total_cost_eur': round(total_cost_eur, 2),
+            'total_pnl_eur': round(total_pnl_eur, 2),
+            'total_pnl_pct': round(total_pnl_pct, 1),
+            'total_today_change_eur': round(total_today_change_eur, 2),
+            'total_today_change_pct': round(total_today_change_pct, 2),
+        },
+        'fx_rates': {k: round(v, 6) if v else None for k, v in fx_rates.items()},
+    }
+    _LIVE_PRICES_CACHE['data'] = response_data
+    _LIVE_PRICES_CACHE['fetched_at'] = now
+    fresh = dict(response_data)
+    fresh['cached'] = False
+    fresh['cached_age_sec'] = 0
+    return jsonify(fresh)
+
+
+@app.route('/investing/watchlist')
+def investing_watchlist():
+    """Ideas / watchlist tickers, grouped by layer, sorted by conviction."""
+    ideas = (
+        Ticker.query
+        .filter(Ticker.status.in_(['idea', 'researching', 'ready_to_buy']))
+        .order_by(
+            Ticker.conviction.desc().nullslast(),
+            Ticker.layer.asc().nullslast(),
+            Ticker.symbol.asc(),
+        )
+        .all()
+    )
+
+    # Group by layer
+    layers = {}
+    for t in ideas:
+        layer = t.layer or 'Uncategorized'
+        layers.setdefault(layer, []).append({
+            'id': t.id,
+            'symbol': t.symbol,
+            'company_name': t.company_name,
+            'conviction': t.conviction,
+            'horizon': t.horizon,
+            'status': t.status,
+            'currency': t.currency,
+            'has_thesis': bool(t.thesis),
+            'next_catalyst': None,  # filled in below
+            'buy_zone': None,
+        })
+
+    # Attach next catalyst + active buy zone per ticker
+    from datetime import date as _date
+    today_d = _date.today()
+    for t in ideas:
+        next_c = (
+            t.catalysts.filter(Catalyst.catalyst_date >= today_d, Catalyst.resolved.is_(False))
+            .order_by(Catalyst.catalyst_date.asc())
+            .first()
+        )
+        buy_z = (
+            t.entry_zones.filter_by(zone_type='buy', active=True)
+            .order_by(EntryZone.price_low.asc())
+            .first()
+        )
+        # find the dict we already built and patch it
+        for h in layers.get(t.layer or 'Uncategorized', []):
+            if h['id'] == t.id:
+                if next_c:
+                    h['next_catalyst'] = {'date': next_c.catalyst_date.isoformat(), 'title': next_c.title}
+                if buy_z:
+                    h['buy_zone'] = f"{buy_z.price_low}–{buy_z.price_high} {buy_z.currency}"
+                break
+
+    return render_template(
+        'investing.html',
+        active_tab='watchlist',
+        watchlist_layers=layers,
+        watchlist_count=len(ideas),
+    )
+
+
+# SPY close-price cache for retrospective grading. Daily prices never change, so this
+# can grow indefinitely without staleness issues. Keyed by ISO date string.
+_SPY_CLOSE_CACHE = {}
+
+
+def _get_spy_close(d):
+    """Return SPY close (USD) on or just before date d. None if unavailable."""
+    import yfinance as yf
+    from datetime import timedelta as _td
+    key = d.isoformat()
+    if key in _SPY_CLOSE_CACHE:
+        return _SPY_CLOSE_CACHE[key]
+    # Fetch a small window around the date — handles weekends/holidays
+    try:
+        start = d - _td(days=5)
+        end = d + _td(days=2)
+        hist = yf.Ticker('SPY').history(start=start.isoformat(), end=end.isoformat())
+        if hist.empty:
+            _SPY_CLOSE_CACHE[key] = None
+            return None
+        # Take the last close on or before d
+        hist = hist[hist.index.date <= d]
+        if hist.empty:
+            _SPY_CLOSE_CACHE[key] = None
+            return None
+        close = float(hist['Close'].iloc[-1])
+        _SPY_CLOSE_CACHE[key] = close
+        return close
+    except Exception:
+        _SPY_CLOSE_CACHE[key] = None
+        return None
+
+
+@app.route('/investing/journal')
+def investing_journal():
+    """Chronological feed of every buy/sell/dividend with reasoning."""
+    today = date.today()
+    requested_year = request.args.get('year', type=int) or today.year
+    symbol_filter = request.args.get('symbol', '').strip().upper() or None
+
+    def _within(d):
+        return d.year == requested_year
+
+    # Collect events from all three tables
+    events = []
+    cashflow_in = 0.0
+    cashflow_out = 0.0
+
+    lot_q = (
+        db.session.query(TradeLot, Ticker)
+        .join(Ticker, TradeLot.ticker_id == Ticker.id)
+    )
+    if symbol_filter:
+        lot_q = lot_q.filter(Ticker.symbol == symbol_filter)
+    for lot, t in lot_q.all():
+        if lot.source == 'migrated_pre_2026':
+            continue  # synthetic step-up lots aren't real journal entries
+        if not _within(lot.trade_date):
+            continue
+        events.append({
+            'kind': 'buy',
+            'event_id': lot.id,
+            'symbol': t.symbol,
+            'company_name': t.company_name,
+            'date': lot.trade_date,
+            'shares': lot.shares,
+            'price_native': lot.price_native,
+            'currency': lot.currency,
+            'amount_eur': lot.net_eur,
+            'gain_eur': None,
+            'reasoning': lot.reasoning or '',
+        })
+        cashflow_out += lot.net_eur
+
+    sale_q = (
+        db.session.query(TradeSale, Ticker)
+        .join(Ticker, TradeSale.ticker_id == Ticker.id)
+    )
+    if symbol_filter:
+        sale_q = sale_q.filter(Ticker.symbol == symbol_filter)
+    for sale, t in sale_q.all():
+        if not _within(sale.trade_date):
+            continue
+        events.append({
+            'kind': 'sell',
+            'event_id': sale.id,
+            'symbol': t.symbol,
+            'company_name': t.company_name,
+            'date': sale.trade_date,
+            'shares': sale.shares,
+            'price_native': sale.price_native,
+            'currency': sale.currency,
+            'amount_eur': sale.proceeds_eur,
+            'gain_eur': sale.realized_gain_eur,
+            'reasoning': sale.reasoning or '',
+        })
+        cashflow_in += sale.proceeds_eur
+
+    div_q = (
+        db.session.query(Dividend, Ticker)
+        .join(Ticker, Dividend.ticker_id == Ticker.id)
+    )
+    if symbol_filter:
+        div_q = div_q.filter(Ticker.symbol == symbol_filter)
+    for d, t in div_q.all():
+        if not _within(d.payment_date):
+            continue
+        events.append({
+            'kind': 'dividend',
+            'event_id': d.id,
+            'symbol': t.symbol,
+            'company_name': t.company_name,
+            'date': d.payment_date,
+            'shares': d.shares_at_record,
+            'price_native': d.dividend_per_share_native,
+            'currency': d.currency,
+            'amount_eur': d.net_eur,
+            'gain_eur': None,
+            'reasoning': '',  # dividends have no reasoning field
+        })
+        cashflow_in += d.net_eur
+
+    # Sort newest first
+    events.sort(key=lambda e: (e['date'], e['kind']), reverse=True)
+    for e in events:
+        e['date_iso'] = e['date'].isoformat()
+
+    # Counts by kind
+    counts = {'buy': 0, 'sell': 0, 'dividend': 0}
+    for e in events:
+        counts[e['kind']] += 1
+
+    # Year list — every year that has any event
+    all_years = set()
+    for lot in TradeLot.query.filter(TradeLot.source != 'migrated_pre_2026').all():
+        all_years.add(lot.trade_date.year)
+    for s in TradeSale.query.all():
+        all_years.add(s.trade_date.year)
+    for d in Dividend.query.all():
+        all_years.add(d.payment_date.year)
+    years = sorted(all_years, reverse=True) or [today.year]
+
+    # Symbols list for filter dropdown (tickers active in any year)
+    all_symbols = sorted({t.symbol for t in Ticker.query.filter(
+        Ticker.status.in_(['owned', 'sold'])
+    ).all()})
+
+    # Retrospective grading vs SPY for every sale in the requested year.
+    # Comparison period: from the earliest consumed lot's trade_date to the sale_date.
+    # Returns are computed in EUR for "your return" and converted SPY into EUR using
+    # the lot's fx_rate (best available; falls back to USD-only if absent).
+    grading_rows = []
+    grading_sales = (
+        db.session.query(TradeSale, Ticker)
+        .join(Ticker, TradeSale.ticker_id == Ticker.id)
+        .filter(db.extract('year', TradeSale.trade_date) == requested_year)
+    )
+    if symbol_filter:
+        grading_sales = grading_sales.filter(Ticker.symbol == symbol_filter)
+    for sale, t in grading_sales.all():
+        consumptions = list(sale.consumptions)
+        if not consumptions:
+            continue
+        cost_total = sum(c.cost_basis_eur for c in consumptions)
+        proceeds = sale.proceeds_eur or 0
+        your_return_eur = proceeds - cost_total
+        your_return_pct = (your_return_eur / cost_total * 100) if cost_total > 0 else 0
+        # Buy reference date = earliest consumed lot
+        buy_dates = []
+        for c in consumptions:
+            lot = TradeLot.query.get(c.lot_id)
+            if lot:
+                buy_dates.append(lot.trade_date)
+        if not buy_dates:
+            continue
+        buy_date = min(buy_dates)
+        sell_date = sale.trade_date
+        days_held = (sell_date - buy_date).days
+
+        spy_buy = _get_spy_close(buy_date)
+        spy_sell = _get_spy_close(sell_date)
+        spy_return_pct = None
+        alpha_pct = None
+        if spy_buy and spy_sell and spy_buy > 0:
+            spy_return_pct = (spy_sell - spy_buy) / spy_buy * 100
+            alpha_pct = your_return_pct - spy_return_pct
+
+        grading_rows.append({
+            'symbol': t.symbol,
+            'buy_date': buy_date.isoformat(),
+            'sell_date': sell_date.isoformat(),
+            'days_held': days_held,
+            'cost_eur': round(cost_total, 2),
+            'proceeds_eur': round(proceeds, 2),
+            'your_return_eur': round(your_return_eur, 2),
+            'your_return_pct': round(your_return_pct, 2),
+            'spy_buy': round(spy_buy, 2) if spy_buy else None,
+            'spy_sell': round(spy_sell, 2) if spy_sell else None,
+            'spy_return_pct': round(spy_return_pct, 2) if spy_return_pct is not None else None,
+            'alpha_pct': round(alpha_pct, 2) if alpha_pct is not None else None,
+        })
+    grading_rows.sort(key=lambda r: r['sell_date'], reverse=True)
+
+    return render_template(
+        'investing.html',
+        active_tab='journal',
+        jrn_events=events,
+        jrn_year=requested_year,
+        jrn_years=years,
+        jrn_symbol=symbol_filter,
+        jrn_all_symbols=all_symbols,
+        jrn_counts=counts,
+        jrn_cashflow_in=round(cashflow_in, 2),
+        jrn_cashflow_out=round(cashflow_out, 2),
+        jrn_cashflow_net=round(cashflow_in - cashflow_out, 2),
+        jrn_grading_rows=grading_rows,
+    )
+
+
+@app.route('/api/investing/journal/reasoning/<kind>/<int:event_id>', methods=['PATCH'])
+def investing_journal_reasoning(kind, event_id):
+    """Update the reasoning field on a buy lot or sell. Dividends have no reasoning."""
+    if kind not in ('buy', 'sell'):
+        return jsonify({'error': 'reasoning only supported for buy/sell'}), 400
+    data = request.get_json() or {}
+    text = (data.get('reasoning') or '').strip() or None
+    if kind == 'buy':
+        obj = TradeLot.query.get_or_404(event_id)
+    else:
+        obj = TradeSale.query.get_or_404(event_id)
+    obj.reasoning = text
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@app.route('/investing/dividends')
+def investing_dividends():
+    """Dividend tracker: totals, per-ticker breakdown, monthly view."""
+    today = date.today()
+
+    # All dividends, joined with ticker for display
+    rows = (
+        db.session.query(Dividend, Ticker)
+        .join(Ticker, Dividend.ticker_id == Ticker.id)
+        .order_by(Dividend.payment_date.desc(), Dividend.id.desc())
+        .all()
+    )
+
+    all_divs = [
+        {
+            'id': d.id,
+            'symbol': t.symbol,
+            'company_name': t.company_name,
+            'payment_date': d.payment_date,
+            'ex_date': d.ex_date,
+            'shares': d.shares_at_record,
+            'dps_native': d.dividend_per_share_native,
+            'currency': d.currency,
+            'gross_eur': d.gross_eur,
+            'belgian_withholding_eur': d.belgian_withholding_eur or 0,
+            'foreign_withholding_eur': d.foreign_withholding_eur or 0,
+            'fees_eur': d.fees_eur or 0,
+            'net_eur': d.net_eur,
+        }
+        for d, t in rows
+    ]
+
+    # YTD vs lifetime totals
+    ytd_total = sum(d['net_eur'] for d in all_divs if d['payment_date'].year == today.year)
+    lifetime_total = sum(d['net_eur'] for d in all_divs)
+    ytd_gross = sum(d['gross_eur'] for d in all_divs if d['payment_date'].year == today.year and d['gross_eur'])
+    ytd_belgian_wh = sum(d['belgian_withholding_eur'] for d in all_divs if d['payment_date'].year == today.year)
+    ytd_foreign_wh = sum(d['foreign_withholding_eur'] for d in all_divs if d['payment_date'].year == today.year)
+
+    # Per-ticker breakdown (sorted by total net descending)
+    by_ticker = {}
+    for d in all_divs:
+        slot = by_ticker.setdefault(d['symbol'], {
+            'symbol': d['symbol'],
+            'company_name': d['company_name'],
+            'count': 0,
+            'total_net_eur': 0.0,
+            'total_gross_eur': 0.0,
+            'last_payment': None,
+            'first_payment': None,
+        })
+        slot['count'] += 1
+        slot['total_net_eur'] += d['net_eur']
+        slot['total_gross_eur'] += d['gross_eur'] or 0
+        if slot['last_payment'] is None or d['payment_date'] > slot['last_payment']:
+            slot['last_payment'] = d['payment_date']
+        if slot['first_payment'] is None or d['payment_date'] < slot['first_payment']:
+            slot['first_payment'] = d['payment_date']
+    ticker_breakdown = sorted(by_ticker.values(), key=lambda r: r['total_net_eur'], reverse=True)
+
+    # Yield-on-cost per ticker (annualized if we have ≥6 months of payments; otherwise raw)
+    cost_basis_by_ticker = {}
+    for t in Ticker.query.all():
+        cost = 0.0
+        for lot in t.lots:
+            if lot.remaining_shares > 1e-6 and lot.shares > 0:
+                cost += lot.cost_basis_eur * (lot.remaining_shares / lot.shares)
+        if cost > 0:
+            cost_basis_by_ticker[t.symbol] = cost
+    for tb in ticker_breakdown:
+        cost = cost_basis_by_ticker.get(tb['symbol'])
+        if cost and cost > 0:
+            tb['cost_basis_eur'] = cost
+            tb['yield_on_cost_pct'] = (tb['total_net_eur'] / cost) * 100
+        else:
+            tb['cost_basis_eur'] = None
+            tb['yield_on_cost_pct'] = None
+
+    # Monthly breakdown (YYYY-MM -> total net) for the current year
+    monthly = {}
+    for d in all_divs:
+        if d['payment_date'].year != today.year:
+            continue
+        key = d['payment_date'].strftime('%Y-%m')
+        monthly[key] = monthly.get(key, 0.0) + d['net_eur']
+    monthly_list = [{'month': k, 'total_net_eur': v} for k, v in sorted(monthly.items())]
+    monthly_max = max((m['total_net_eur'] for m in monthly_list), default=0)
+
+    # Years that have any dividend data (for context)
+    years = sorted({d['payment_date'].year for d in all_divs}, reverse=True)
+
+    return render_template(
+        'investing.html',
+        active_tab='dividends',
+        div_year=today.year,
+        div_years=years,
+        div_ytd_net=round(ytd_total, 2),
+        div_lifetime_net=round(lifetime_total, 2),
+        div_ytd_gross=round(ytd_gross, 2),
+        div_ytd_belgian_wh=round(ytd_belgian_wh, 2),
+        div_ytd_foreign_wh=round(ytd_foreign_wh, 2),
+        div_ytd_count=sum(1 for d in all_divs if d['payment_date'].year == today.year),
+        div_payers_ytd=len({d['symbol'] for d in all_divs if d['payment_date'].year == today.year}),
+        div_ticker_breakdown=ticker_breakdown,
+        div_monthly=monthly_list,
+        div_monthly_max=monthly_max,
+        div_recent=all_divs[:20],
+    )
+
+
+@app.route('/investing/tax')
+def investing_tax():
+    """Belgian capital gains: YTD realized gains, €10K exemption, 10% tax estimate."""
+    today = date.today()
+    requested_year = request.args.get('year', type=int) or today.year
+
+    # All sales in the requested year, with their consumptions
+    sales = (
+        TradeSale.query
+        .filter(db.extract('year', TradeSale.trade_date) == requested_year)
+        .order_by(TradeSale.trade_date.asc(), TradeSale.id.asc())
+        .all()
+    )
+
+    # Build flat per-consumption rows for the table
+    detail_rows = []
+    total_proceeds = 0.0
+    total_cost = 0.0
+    total_gain = 0.0
+    realized_gains_only = 0.0  # sum of positive gains
+    realized_losses_only = 0.0  # sum of negative gains (kept negative)
+    for sale in sales:
+        ticker = Ticker.query.get(sale.ticker_id)
+        for cons in sale.consumptions:
+            lot = TradeLot.query.get(cons.lot_id)
+            detail_rows.append({
+                'sale_id': sale.id,
+                'ticker': ticker.symbol if ticker else '?',
+                'isin': ticker.isin if ticker else None,
+                'sale_date': sale.trade_date,
+                'lot_acq_date': lot.trade_date if lot else None,
+                'lot_source': lot.source if lot else None,
+                'shares': cons.shares_consumed,
+                'cost_basis_eur': cons.cost_basis_eur,
+                'proceeds_eur': cons.proceeds_eur,
+                'gain_eur': cons.gain_eur,
+                'lot_id': lot.id if lot else None,
+            })
+            total_proceeds += cons.proceeds_eur
+            total_cost += cons.cost_basis_eur
+            total_gain += cons.gain_eur
+            if cons.gain_eur >= 0:
+                realized_gains_only += cons.gain_eur
+            else:
+                realized_losses_only += cons.gain_eur
+
+    # Belgian tax math (Jan 1 2026 rules)
+    EXEMPTION = 10000.0
+    TAX_RATE = 0.10
+    taxable = max(0.0, total_gain - EXEMPTION)
+    tax_owed = taxable * TAX_RATE
+    pct_used = min(100.0, max(0.0, total_gain / EXEMPTION * 100)) if total_gain > 0 else 0.0
+
+    # Years that have sales (for the year selector)
+    years = sorted({
+        s.trade_date.year for s in TradeSale.query.all()
+    }, reverse=True) or [today.year]
+
+    # Loss-harvesting candidates: owned tickers, cost-basis side computed server-side,
+    # live prices filled in by JS so we don't block on yfinance during page render.
+    owned = Ticker.query.filter_by(status='owned').all()
+    harvest_rows = []
+    for t in owned:
+        shares = 0.0
+        cost_basis_eur = 0.0
+        for lot in t.lots:
+            if lot.remaining_shares > 1e-6:
+                shares += lot.remaining_shares
+                if lot.shares > 0:
+                    cost_basis_eur += lot.cost_basis_eur * (lot.remaining_shares / lot.shares)
+        if shares < 1e-6:
+            continue
+        harvest_rows.append({
+            'symbol': t.symbol,
+            'company_name': t.company_name,
+            'shares': round(shares, 6),
+            'cost_basis_eur': round(cost_basis_eur, 2),
+            'avg_cost': round(cost_basis_eur / shares, 4) if shares > 0 else 0,
+            'currency': t.currency,
+        })
+
+    # Exemption headroom: how much realized gain you can still book tax-free this year
+    exemption_headroom = max(0.0, EXEMPTION - total_gain)
+
+    return render_template(
+        'investing.html',
+        active_tab='tax',
+        tax_year=requested_year,
+        tax_years=years,
+        tax_detail_rows=detail_rows,
+        tax_total_proceeds=round(total_proceeds, 2),
+        tax_total_cost=round(total_cost, 2),
+        tax_total_gain=round(total_gain, 2),
+        tax_gains_only=round(realized_gains_only, 2),
+        tax_losses_only=round(realized_losses_only, 2),
+        tax_exemption=EXEMPTION,
+        tax_rate=TAX_RATE,
+        tax_exemption_headroom=round(exemption_headroom, 2),
+        tax_harvest_rows=harvest_rows,
+        tax_taxable=round(taxable, 2),
+        tax_owed=round(tax_owed, 2),
+        tax_pct_used=round(pct_used, 1),
+    )
+
+
+@app.route('/investing/import', methods=['GET', 'POST'])
+def investing_import():
+    """Upload Bolero PDFs and import as trades/dividends."""
+    import_results = None
+    if request.method == 'POST':
+        from scripts.bolero_import import import_pdf
+        import tempfile
+        import shutil
+
+        bolero_dir = os.path.join(os.path.dirname(__file__), 'Investing', 'Bolero reports')
+        os.makedirs(bolero_dir, exist_ok=True)
+
+        files = request.files.getlist('pdfs')
+        results = []
+        for f in files:
+            if not f.filename:
+                continue
+            if not f.filename.lower().endswith('.pdf'):
+                results.append({'file': f.filename, 'status': 'error', 'reason': 'not a PDF'})
+                continue
+
+            with tempfile.NamedTemporaryFile(suffix='.pdf', delete=False) as tmp:
+                f.save(tmp.name)
+                tmp_path = tmp.name
+            try:
+                r = import_pdf(tmp_path, dry_run=False)
+                r['file'] = f.filename
+                # Save a copy to the Bolero reports folder if import was successful (not duplicate or error)
+                if r.get('status') == 'imported':
+                    dest = os.path.join(bolero_dir, f.filename)
+                    if not os.path.exists(dest):
+                        shutil.copy2(tmp_path, dest)
+                results.append(r)
+            except Exception as e:
+                results.append({'file': f.filename, 'status': 'error', 'reason': str(e)})
+                db.session.rollback()
+            finally:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            results.append({'status': 'error', 'reason': f'commit failed: {e}'})
+        import_results = results
+
+    return render_template('investing.html', active_tab='import', import_results=import_results)
+
+
+@app.route('/investing/ticker/<symbol>')
+def investing_ticker_detail(symbol):
+    """Per-ticker research + journal + chat page."""
+    ticker = Ticker.query.filter_by(symbol=symbol).first_or_404()
+
+    # Aggregate position info
+    lots = list(ticker.lots.order_by(TradeLot.trade_date.asc(), TradeLot.id.asc()))
+    sales = list(ticker.sales.order_by(TradeSale.trade_date.desc(), TradeSale.id.desc()))
+    dividends = list(ticker.dividends.order_by(Dividend.payment_date.desc()))
+    zones = list(ticker.entry_zones.order_by(EntryZone.price_low.asc()))
+    catalysts = list(ticker.catalysts.order_by(Catalyst.catalyst_date.asc()))
+    risks = list(ticker.risks.filter_by(active=True).order_by(Risk.severity.desc()))
+
+    open_shares = sum(l.remaining_shares for l in lots if l.remaining_shares > 1e-6)
+    total_cost_basis_eur = sum(
+        (l.cost_basis_eur * l.remaining_shares / l.shares) if l.shares > 0 else 0
+        for l in lots if l.remaining_shares > 1e-6
+    )
+    avg_cost_eur = (total_cost_basis_eur / open_shares) if open_shares > 0 else 0
+
+    realized_gain_eur = sum((s.realized_gain_eur or 0) for s in sales)
+    total_dividends_eur = sum((d.net_eur or 0) for d in dividends)
+
+    # YTD realized across ALL tickers (used by the unrealized-PnL card to compute
+    # what selling this position would do to the user's total tax position).
+    today = date.today()
+    ytd_realized_total_eur = (
+        db.session.query(db.func.coalesce(db.func.sum(TradeSale.realized_gain_eur), 0))
+        .filter(db.extract('year', TradeSale.trade_date) == today.year)
+        .scalar()
+    ) or 0.0
+
+    return render_template(
+        'ticker_detail.html',
+        ticker=ticker,
+        lots=lots,
+        sales=sales,
+        dividends=dividends,
+        zones=zones,
+        catalysts=catalysts,
+        risks=risks,
+        open_shares=round(open_shares, 6),
+        total_cost_basis_eur=round(total_cost_basis_eur, 2),
+        avg_cost_eur=round(avg_cost_eur, 4),
+        realized_gain_eur=round(realized_gain_eur, 2),
+        total_dividends_eur=round(total_dividends_eur, 2),
+        ytd_realized_total_eur=round(ytd_realized_total_eur, 2),
+    )
+
+
+@app.route('/api/investing/ticker/<int:ticker_id>', methods=['PATCH'])
+def investing_ticker_update(ticker_id):
+    """Update editable ticker fields."""
+    t = Ticker.query.get_or_404(ticker_id)
+    data = request.get_json() or {}
+    for field in ('thesis', 'conviction', 'horizon', 'layer', 'status'):
+        if field in data:
+            setattr(t, field, data[field] or None)
+    db.session.commit()
+    return jsonify({'success': True, 'ticker': t.to_dict()})
+
+
+@app.route('/api/investing/ticker/<int:ticker_id>/zone', methods=['POST'])
+def investing_zone_create(ticker_id):
+    Ticker.query.get_or_404(ticker_id)
+    data = request.get_json() or {}
+    z = EntryZone(
+        ticker_id=ticker_id,
+        zone_type=data.get('zone_type', 'buy'),
+        price_low=float(data.get('price_low', 0)),
+        price_high=float(data.get('price_high', 0)),
+        currency=data.get('currency', 'USD'),
+        notes=data.get('notes'),
+    )
+    db.session.add(z)
+    db.session.commit()
+    return jsonify({'success': True, 'zone': z.to_dict()})
+
+
+@app.route('/api/investing/zone/<int:zone_id>', methods=['DELETE'])
+def investing_zone_delete(zone_id):
+    z = EntryZone.query.get_or_404(zone_id)
+    db.session.delete(z)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@app.route('/api/investing/ticker/<int:ticker_id>/risk', methods=['POST'])
+def investing_risk_create(ticker_id):
+    Ticker.query.get_or_404(ticker_id)
+    data = request.get_json() or {}
+    r = Risk(
+        ticker_id=ticker_id,
+        description=data.get('description', ''),
+        severity=data.get('severity', 'medium'),
+    )
+    db.session.add(r)
+    db.session.commit()
+    return jsonify({'success': True, 'risk': r.to_dict()})
+
+
+@app.route('/api/investing/risk/<int:risk_id>', methods=['DELETE'])
+def investing_risk_delete(risk_id):
+    r = Risk.query.get_or_404(risk_id)
+    db.session.delete(r)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@app.route('/api/investing/ticker/<int:ticker_id>/catalyst', methods=['POST'])
+def investing_catalyst_create(ticker_id):
+    Ticker.query.get_or_404(ticker_id)
+    data = request.get_json() or {}
+    date_str = (data.get('catalyst_date') or '').strip()
+    if not date_str:
+        return jsonify({'error': 'catalyst_date required (YYYY-MM-DD)'}), 400
+    try:
+        catalyst_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify({'error': f'invalid catalyst_date format: {date_str!r} (expected YYYY-MM-DD)'}), 400
+    title = (data.get('title') or '').strip()
+    if not title:
+        return jsonify({'error': 'title required'}), 400
+    c = Catalyst(
+        ticker_id=ticker_id,
+        catalyst_date=catalyst_date,
+        catalyst_type=data.get('catalyst_type'),
+        title=title,
+        description=data.get('description'),
+    )
+    db.session.add(c)
+    db.session.commit()
+    return jsonify({'success': True, 'catalyst': c.to_dict()})
+
+
+@app.route('/api/investing/catalyst/<int:catalyst_id>', methods=['DELETE'])
+def investing_catalyst_delete(catalyst_id):
+    c = Catalyst.query.get_or_404(catalyst_id)
+    db.session.delete(c)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+# ----------------------------------------------------------------------------
+# Chat-per-ticker with Claude (prompt caching enabled)
+# ----------------------------------------------------------------------------
+
+CHAT_SYSTEM_INSTRUCTION = """You are Noé's personal investing assistant for a specific stock he's tracking in his app.
+
+Noé is an experienced retail investor based in Belgium. He's subject to the new Belgian capital gains tax (effective Jan 1, 2026): 10% on net realized gains above €10,000 per year. Cost basis for pre-2026 holdings is the Dec 31, 2025 close.
+
+Be direct and concise. Reference his thesis and risks below when relevant — don't repeat them back to him. Don't hedge with generic financial-advice disclaimers unless something is genuinely speculative. Build on what he already knows.
+
+Format responses in markdown when useful (lists, bold for key numbers). Keep replies focused on this specific ticker unless he asks otherwise.
+
+---
+## Ticker context
+"""
+
+
+def build_ticker_context(ticker):
+    """Build a markdown context block for the chat system prompt."""
+    parts = []
+    parts.append(f"### {ticker.symbol} — {ticker.company_name}")
+    meta = []
+    if ticker.isin:
+        meta.append(f"ISIN {ticker.isin}")
+    if ticker.exchange:
+        meta.append(f"exchange {ticker.exchange}")
+    meta.append(f"currency {ticker.currency}")
+    meta.append(f"status {ticker.status}")
+    parts.append(' · '.join(meta))
+    parts.append("")
+
+    # Position
+    open_lots = [l for l in ticker.lots if l.remaining_shares > 1e-6]
+    if open_lots:
+        open_shares = sum(l.remaining_shares for l in open_lots)
+        cost_basis = sum(
+            (l.cost_basis_eur * l.remaining_shares / l.shares) if l.shares > 0 else 0
+            for l in open_lots
+        )
+        avg = cost_basis / open_shares if open_shares > 0 else 0
+        parts.append("**Position:**")
+        parts.append(f"- Open shares: {open_shares:g}")
+        parts.append(f"- Avg cost (EUR): €{avg:,.2f}/share")
+        parts.append(f"- Total cost basis (EUR): €{cost_basis:,.2f}")
+        if ticker.step_up_basis_eur_per_share:
+            parts.append(f"- Step-up basis (Dec 31, 2025 EUR/share): €{ticker.step_up_basis_eur_per_share:.2f} — used for tax cost basis on shares owned at year-end 2025")
+        parts.append("")
+
+    # User's view
+    if ticker.thesis:
+        parts.append("**Thesis:**")
+        parts.append(ticker.thesis)
+        parts.append("")
+    view_meta = []
+    if ticker.conviction:
+        view_meta.append(f"conviction {ticker.conviction}/10")
+    if ticker.horizon:
+        view_meta.append(f"horizon {ticker.horizon}")
+    if ticker.layer:
+        view_meta.append(f"sector {ticker.layer}")
+    if view_meta:
+        parts.append(' · '.join(view_meta))
+        parts.append("")
+
+    # Entry zones
+    zones = list(ticker.entry_zones.filter_by(active=True))
+    if zones:
+        parts.append("**Entry zones (active):**")
+        for z in zones:
+            line = f"- {z.zone_type.upper()}: {z.price_low}–{z.price_high} {z.currency}"
+            if z.notes:
+                line += f" — {z.notes}"
+            parts.append(line)
+        parts.append("")
+
+    # Active risks
+    risks = list(ticker.risks.filter_by(active=True))
+    if risks:
+        parts.append("**Risks (active):**")
+        for r in risks:
+            parts.append(f"- [{r.severity}] {r.description}")
+        parts.append("")
+
+    # Upcoming catalysts
+    today_d = date.today()
+    upcoming = ticker.catalysts.filter(Catalyst.catalyst_date >= today_d).order_by(Catalyst.catalyst_date.asc()).limit(8).all()
+    if upcoming:
+        parts.append("**Upcoming catalysts:**")
+        for c in upcoming:
+            parts.append(f"- {c.catalyst_date.isoformat()} ({c.catalyst_type or 'other'}): {c.title}")
+        parts.append("")
+
+    # Recent sales (with realized gains)
+    recent_sales = ticker.sales.order_by(TradeSale.trade_date.desc()).limit(5).all()
+    if recent_sales:
+        parts.append("**Recent sales:**")
+        for s in recent_sales:
+            gain = s.realized_gain_eur or 0
+            sign = '+' if gain >= 0 else ''
+            parts.append(
+                f"- {s.trade_date.isoformat()}: sold {s.shares:g} @ {s.price_native:g} {s.currency} "
+                f"(proceeds €{s.proceeds_eur:.2f}, realized {sign}€{gain:.2f})"
+            )
+        parts.append("")
+
+    # Recent dividends
+    recent_divs = ticker.dividends.order_by(Dividend.payment_date.desc()).limit(3).all()
+    if recent_divs:
+        parts.append("**Recent dividends:**")
+        for d in recent_divs:
+            parts.append(f"- {d.payment_date.isoformat()}: net €{d.net_eur or 0:.2f}")
+        parts.append("")
+
+    return "\n".join(parts)
+
+
+@app.route('/api/investing/ticker/<int:ticker_id>/chat', methods=['POST'])
+def investing_ticker_chat(ticker_id):
+    """Send a message to Claude with the ticker as context. Uses prompt caching."""
+    if not claude_client:
+        return jsonify({'error': 'Claude API not configured'}), 500
+
+    ticker = Ticker.query.get_or_404(ticker_id)
+    data = request.get_json() or {}
+    user_message = (data.get('message') or '').strip()
+    if not user_message:
+        return jsonify({'error': 'Empty message'}), 400
+
+    # Build cacheable system context
+    context_text = CHAT_SYSTEM_INSTRUCTION + build_ticker_context(ticker)
+
+    # Cap context sent to Claude to the last N messages (15 user+assistant pairs).
+    # The full history stays in the DB and is still shown in the UI via the GET endpoint;
+    # only the API call's context window is bounded so a long-running conversation
+    # can't grow unbounded and eventually 500 from token-limit errors.
+    MAX_CHAT_CONTEXT = 30
+    prior = (
+        TickerChatMessage.query
+        .filter_by(ticker_id=ticker.id)
+        .order_by(TickerChatMessage.created_at.desc())
+        .limit(MAX_CHAT_CONTEXT)
+        .all()
+    )
+    prior.reverse()  # back to chronological order
+    # Persist code always adds messages as (user, assistant) pairs, so the trimmed
+    # window will start with a user message and end with an assistant message.
+    messages = [{"role": m.role, "content": m.content} for m in prior]
+    messages.append({"role": "user", "content": user_message})
+
+    try:
+        response = call_claude(
+            'investing', 'ticker_chat',
+            model='claude-sonnet-4-6',
+            max_tokens=1024,
+            system=[
+                {"type": "text", "text": context_text, "cache_control": {"type": "ephemeral"}}
+            ],
+            messages=messages,
+        )
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+    assistant_text = response.content[0].text
+
+    # Persist both messages
+    db.session.add(TickerChatMessage(ticker_id=ticker.id, role='user', content=user_message))
+    db.session.add(TickerChatMessage(ticker_id=ticker.id, role='assistant', content=assistant_text))
+    db.session.commit()
+
+    return jsonify({
+        'success': True,
+        'reply': assistant_text,
+        'usage': {
+            'input_tokens': response.usage.input_tokens,
+            'output_tokens': response.usage.output_tokens,
+            'cache_creation_input_tokens': getattr(response.usage, 'cache_creation_input_tokens', 0) or 0,
+            'cache_read_input_tokens': getattr(response.usage, 'cache_read_input_tokens', 0) or 0,
+        },
+    })
+
+
+@app.route('/api/investing/ticker/<int:ticker_id>/chat', methods=['GET'])
+def investing_ticker_chat_history(ticker_id):
+    """Return the chat history for a ticker."""
+    Ticker.query.get_or_404(ticker_id)
+    messages = (
+        TickerChatMessage.query
+        .filter_by(ticker_id=ticker_id)
+        .order_by(TickerChatMessage.created_at.asc())
+        .all()
+    )
+    return jsonify({'messages': [m.to_dict() for m in messages]})
+
+
+@app.route('/api/investing/ticker/<int:ticker_id>/chat/clear', methods=['POST'])
+def investing_ticker_chat_clear(ticker_id):
+    """Wipe chat history for a ticker."""
+    Ticker.query.get_or_404(ticker_id)
+    TickerChatMessage.query.filter_by(ticker_id=ticker_id).delete()
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@app.route('/api/investing/ticker/<int:ticker_id>/second-opinion-prompt')
+def investing_ticker_second_opinion(ticker_id):
+    """Build a copy-paste-ready prompt for claude.ai to critique this position."""
+    t = Ticker.query.get_or_404(ticker_id)
+    shares = sum(l.remaining_shares for l in t.lots if l.remaining_shares > 1e-6)
+    cost = sum(
+        l.cost_basis_eur * l.remaining_shares / l.shares
+        for l in t.lots
+        if l.remaining_shares > 1e-6 and l.shares > 0
+    )
+
+    out = []
+    out.append(
+        "You are a senior investment analyst. I hold the following position and want "
+        "a critical, skeptical second opinion. Your job is NOT to validate my thinking — "
+        "push back on weak assumptions, identify what I am missing, and tell me what a smart "
+        "bear on this stock would say."
+    )
+    out.append("")
+    out.append(f"=== POSITION: {t.symbol} ({t.company_name}) ===")
+    out.append(
+        f"Status: {t.status} | Native currency: {t.currency} | "
+        f"Exchange: {t.exchange or '?'} | ISIN: {t.isin or '?'}"
+    )
+    out.append(f"Shares held: {shares:g}")
+    if shares > 0:
+        out.append(f"EUR cost basis: EUR {cost:,.2f} (EUR {cost/shares:.2f}/share avg)")
+    out.append(f"Sector/layer (my tag): {t.layer or '(not set)'}")
+    out.append(
+        f"Conviction: {t.conviction if t.conviction is not None else '(not set)'}/10  |  "
+        f"Horizon: {t.horizon or '(not set)'}"
+    )
+    out.append("")
+    out.append("=== MY THESIS ===")
+    out.append(t.thesis or "(not written)")
+    out.append("")
+
+    zones = t.entry_zones.filter_by(active=True).order_by(EntryZone.price_low).all()
+    if zones:
+        out.append("=== MY ENTRY/EXIT ZONES ===")
+        for z in zones:
+            line = f"  {z.zone_type.upper()}: {z.price_low}-{z.price_high} {z.currency}"
+            if z.notes:
+                line += f" ({z.notes})"
+            out.append(line)
+        out.append("")
+
+    risks = t.risks.filter_by(active=True).all()
+    if risks:
+        out.append("=== RISKS I HAVE IDENTIFIED ===")
+        for r in risks:
+            out.append(f"  [{r.severity}] {r.description}")
+        out.append("")
+
+    cats = t.catalysts.filter_by(resolved=False).order_by(Catalyst.catalyst_date).all()
+    if cats:
+        out.append("=== UPCOMING CATALYSTS I AM WATCHING ===")
+        for c in cats:
+            out.append(f"  {c.catalyst_date.isoformat()} [{c.catalyst_type or 'other'}] {c.title}")
+        out.append("")
+
+    lots = list(t.lots)
+    if lots:
+        out.append("=== MY BUY HISTORY ===")
+        for l in lots:
+            tag = " [Dec 31 2025 step-up basis, not original purchase]" if l.source == 'migrated_pre_2026' else ""
+            out.append(
+                f"  {l.trade_date.isoformat()}: {l.shares:g} sh @ {l.price_native:g} {l.currency} "
+                f"-> EUR {l.cost_basis_eur:,.2f} cost ({l.remaining_shares:g} remaining){tag}"
+            )
+        out.append("")
+
+    sales = list(t.sales)
+    if sales:
+        out.append("=== MY SELL HISTORY ===")
+        for s in sales:
+            gain = s.realized_gain_eur or 0
+            out.append(
+                f"  {s.trade_date.isoformat()}: {s.shares:g} sh @ {s.price_native:g} {s.currency} "
+                f"-> EUR {s.proceeds_eur:,.2f} proceeds, realized {gain:+,.2f} EUR"
+            )
+        out.append("")
+
+    divs = list(t.dividends)
+    if divs:
+        out.append("=== DIVIDEND HISTORY ===")
+        for d in divs:
+            out.append(
+                f"  {d.payment_date.isoformat()}: {d.shares_at_record:g} sh x "
+                f"{d.dividend_per_share_native:.4f} {d.currency}/sh -> EUR {d.net_eur:,.2f} net"
+            )
+        out.append("")
+
+    out.append("=== WHAT I WANT FROM YOU ===")
+    out.append("1. Is my thesis logically sound? What are its weakest assumptions?")
+    out.append("2. What is a smart bear case on this stock that I have not considered?")
+    out.append("3. Are my risks complete, or are there major ones I have missed?")
+    out.append("4. Do my entry/exit zones make sense given the current price and historical valuation?")
+    out.append("5. Are my catalyst dates realistic? Any major upcoming catalysts I have missed?")
+    out.append("6. Given my conviction and horizon, is the current position sizing reasonable, or should I trim/add?")
+    out.append("7. What is the ONE thing about this company that I should be tracking that I am probably not?")
+    out.append("")
+    out.append("Be specific. Use concrete numbers. Push back where I am weak. Do not flatter me.")
+
+    return jsonify({'prompt': '\n'.join(out)})
+
+
+@app.route('/investing/tax/export')
+def investing_tax_export():
+    """CSV export of per-trade tax detail. Belgian declaration audit trail."""
+    year = request.args.get('year', type=int) or date.today().year
+
+    sales = (
+        TradeSale.query
+        .filter(db.extract('year', TradeSale.trade_date) == year)
+        .order_by(TradeSale.trade_date.asc(), TradeSale.id.asc())
+        .all()
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        'ticker', 'isin', 'company_name',
+        'sale_date', 'sale_bordereau', 'shares_consumed',
+        'lot_acq_date', 'lot_source', 'lot_id',
+        'cost_basis_eur', 'proceeds_eur', 'gain_eur',
+        'method',
+    ])
+
+    for sale in sales:
+        ticker = Ticker.query.get(sale.ticker_id)
+        for cons in sale.consumptions:
+            lot = TradeLot.query.get(cons.lot_id)
+            writer.writerow([
+                ticker.symbol if ticker else '',
+                ticker.isin if ticker else '',
+                ticker.company_name if ticker else '',
+                sale.trade_date.isoformat(),
+                sale.bordereau or '',
+                f'{cons.shares_consumed:.6g}',
+                lot.trade_date.isoformat() if lot and lot.trade_date else '',
+                lot.source if lot else '',
+                lot.id if lot else '',
+                f'{cons.cost_basis_eur:.4f}',
+                f'{cons.proceeds_eur:.4f}',
+                f'{cons.gain_eur:.4f}',
+                cons.method,
+            ])
+
+    response = make_response(output.getvalue())
+    response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+    response.headers['Content-Disposition'] = f'attachment; filename=tax_detail_{year}.csv'
+    return response
+
+
 if __name__ == '__main__':
+    # Prevent Windows from sleeping while the app is running
+    import ctypes
+    ctypes.windll.kernel32.SetThreadExecutionState(0x80000000 | 0x00000001)  # ES_CONTINUOUS | ES_SYSTEM_REQUIRED
     app.run(debug=True, port=5000)
